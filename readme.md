@@ -10,16 +10,16 @@
 ### Contents
 
 - [Motivation](#Motivation)
-- [Transporting Arguments](#Transporting arguments)
+- [Transporting Arguments](#Transporting-arguments)
 - [Naming](#Naming)
 - [DataTypes](#DataTypes)
 - [Encoding](#Encoding)
-- [The "return"-Property](#The "return"-Property)
+- [The "return"-Property](#The-"return"-Property)
 - ["Out"-Arguments](#"Out"-Arguments)
-- [The "fault"-Property](#The "fault"-Property)
-- [The "returnCode"-Pattern](#The "returnCode"-Pattern)
+- [The "fault"-Property](#The-"fault"-Property)
+- [The "returnCode"-Pattern](#The-"returnCode"-Pattern)
 - [Side-Channels](#Side-Channels)
-- ... [well known](#Reserved / well known Side-Channel names)
+- ... [well known](#Reserved-/-well-known-Side-Channel-names)
 
 
 
