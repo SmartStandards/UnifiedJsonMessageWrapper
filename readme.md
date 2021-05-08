@@ -14,12 +14,12 @@
 - [Naming](#Naming)
 - [DataTypes](#DataTypes)
 - [Encoding](#Encoding)
-- [The "return"-Property](#The-"return"-Property)
-- ["Out"-Arguments](#"Out"-Arguments)
-- [The "fault"-Property](#The-"fault"-Property)
-- [The "returnCode"-Pattern](#The-"returnCode"-Pattern)
+- [The "return"-Property](#The-return-Property)
+- ["Out"-Arguments](#Out-Arguments)
+- [The "fault"-Property](#The-fault-Property)
+- [The "returnCode"-Pattern](#The-returncode-Pattern)
 - [Side-Channels](#Side-Channels)
-- ... [well known](#Reserved-/-well-known-Side-Channel-names)
+- ... [well known](#Reserved--well-known-Side-Channel-names)
 
 
 
