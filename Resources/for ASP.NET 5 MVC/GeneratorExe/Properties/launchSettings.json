@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UJMW-Gen": {
+      "commandName": "Project",
+      "commandLineArgs": "Debug.json"
+    }
+  }
+}
