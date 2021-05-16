@@ -1,83 +1,78 @@
-﻿using Newtonsoft.Json;
+﻿using MyBusinessNamespace;
 using System;
-using System.Net;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace MyBusinessNamespace.WebApi {
   
-  public partial class  {
-    
-    public (string url, string apiToken) {
-      
-      if (!url.EndsWith("/")) {
-        url = url + "/";
-      }
-      
-      _FooClient = new FooClient(url + "foo/", apiToken);
-      
-    }
-    
-    private FooClient _FooClient = null;
-    public IFoo Foo {
-      get {
-        return _FooClient;
-      }
-    }
-    
+  /// <summary>
+  /// Contains arguments for calling 'Foooo'.
+  /// </summary>
+  public class FooooRequest {
+  
+    /// <summary> Required Argument for 'Foooo' (String) </summary>
+    [Required]
+    public String a { get; set; }
+  
   }
   
-  internal partial class FooClient : IFoo {
-    
-    private string _Url;
-    private string _ApiToken;
-    private WebClient _WebClient;
-    
-    public FooClient(string url, string apiToken) {
-      _Url = url;
-      _ApiToken = apiToken;
-      _WebClient = new WebClient();
-      _WebClient.Headers.Set("X-API-Key", apiToken);
-      _WebClient.Headers.Set("Content-Type", "application/json");
-    }
-    
-    /// <summary> Foooo </summary>
-    public Boolean Foooo(String a, out Int32 b) {
-      string url = _Url + "foooo";
-      var args = new FooooRequest {
-        a = a,
-      };
-      string rawRequest = JsonConvert.SerializeObject(args);
-      string rawResponse = _WebClient.UploadString(url, rawRequest);
-      var result = JsonConvert.DeserializeObject<FooooResponse>(rawResponse);
-      b = result.b;
-      return result.@return;
-    }
-    
-    /// <summary> Kkkkkk </summary>
-    public TestModel Kkkkkk(Int32 optParamA = 0, String optParamB = "f") {
-      string url = _Url + "kkkkkk";
-      var args = new KkkkkkRequest {
-        optParamA = optParamA,
-        optParamB = optParamB
-      };
-      string rawRequest = JsonConvert.SerializeObject(args);
-      string rawResponse = _WebClient.UploadString(url, rawRequest);
-      var result = JsonConvert.DeserializeObject<KkkkkkResponse>(rawResponse);
-      return result.@return;
-    }
-    
-    /// <summary> Meth </summary>
-    /// <param name="errorCode"> Bbbbbb </param>
-    public void AVoid(TestModel errorCode) {
-      string url = _Url + "aVoid";
-      var args = new AVoidRequest {
-        errorCode = errorCode
-      };
-      string rawRequest = JsonConvert.SerializeObject(args);
-      string rawResponse = _WebClient.UploadString(url, rawRequest);
-      var result = JsonConvert.DeserializeObject<AVoidResponse>(rawResponse);
-      return;
-    }
-    
+  /// <summary>
+  /// Contains results from calling 'Foooo'.
+  /// </summary>
+  public class FooooResponse {
+  
+    /// <summary> Out-Argument of 'Foooo' (Int32) </summary>
+    [Required]
+    public Int32 b { get; set; }
+  
+    /// <summary> Return-Value of 'Foooo' (Boolean) </summary>
+    [Required]
+    public Boolean @return { get; set; }
+  
+  }
+  
+  /// <summary>
+  /// Contains arguments for calling 'Kkkkkk'.
+  /// </summary>
+  public class KkkkkkRequest {
+  
+    /// <summary> Optional Argument for 'Kkkkkk' (Int32?) </summary>
+    public Int32? optParamA { get; set; } = null;
+  
+    /// <summary> Optional Argument for 'Kkkkkk' (String) </summary>
+    public String optParamB { get; set; }
+  
+  }
+  
+  /// <summary>
+  /// Contains results from calling 'Kkkkkk'.
+  /// </summary>
+  public class KkkkkkResponse {
+  
+    /// <summary> Return-Value of 'Kkkkkk' (TestModel): MMMMMMMMMMMMMMMMMMM </summary>
+    [Required]
+    public TestModel @return { get; set; }
+  
+  }
+  
+  /// <summary>
+  /// Contains arguments for calling 'AVoid'.
+  /// Method: Meth
+  /// </summary>
+  public class AVoidRequest {
+  
+    /// <summary> Required Argument for 'AVoid' (TestModel): Bbbbbb </summary>
+    [Required]
+    public TestModel errorCode { get; set; }
+  
+  }
+  
+  /// <summary>
+  /// Contains results from calling 'AVoid'.
+  /// Method: Meth
+  /// </summary>
+  public class AVoidResponse {
+  
   }
   
 }
