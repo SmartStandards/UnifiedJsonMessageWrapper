@@ -11,7 +11,7 @@ namespace MyBusinessNamespace {
 
     bool Foooo(string a, out int b);
 
-    TestModel Kkkkkk();
+    TestModel Kkkkkk(int optParamA = 0, string optParamB = "f" );
 
     /// <summary>
     /// Meth

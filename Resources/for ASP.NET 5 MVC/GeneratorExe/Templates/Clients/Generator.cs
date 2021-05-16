@@ -69,7 +69,7 @@ namespace CodeGeneration.Clients {
         if (endpointName[0] == 'I' && Char.IsUpper(endpointName[1])) {
           endpointName = endpointName.Substring(1);
         }
-        writer.WriteLine($"_{endpointName}Client = new {endpointName}Client(url + \"{writer.Ftl(endpointName)}\", apiToken);");
+        writer.WriteLine($"_{endpointName}Client = new {endpointName}Client(url + \"{writer.Ftl(endpointName)}/\", apiToken);");
       }
       writer.WriteLine();
       writer.PopAndWriteLine("}");
@@ -119,7 +119,7 @@ namespace CodeGeneration.Clients {
         writer.WriteLine("_WebClient = new WebClient();");
 
         //TODO: make customizable
-        writer.WriteLine("_WebClient.Headers.Set(\"X-API-Key\", apiToken);");
+        writer.WriteLine("_WebClient.Headers.Set(\"" + cfg.authHeaderName + "\", apiToken);");
         writer.WriteLine("_WebClient.Headers.Set(\"Content-Type\", \"application/json\");");
 
         writer.PopAndWriteLine("}"); //constructor
@@ -155,13 +155,29 @@ namespace CodeGeneration.Clients {
               }
             }
             if (svcMthPrm.IsOptional) {
-              //paramSignature.Add($"{pt} {svcMthPrm.Name} = default({pt.Name})");
-              if (pt.IsValueType) {
-                paramSignature.Add($"{pfx}{pt.Name}? {svcMthPrm.Name} = null");
+              //were implementing the interface "as it is"
+
+              string defaultValueString = "";
+
+              if (svcMthPrm.DefaultValue == null) {
+                defaultValueString = " = null";
+              }
+              else if(svcMthPrm.DefaultValue.GetType() == typeof(string)) {
+                defaultValueString = " = \"" + svcMthPrm.DefaultValue.ToString() + "\"";
               }
               else {
-                paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name} = null");
+                defaultValueString = " = " + svcMthPrm.DefaultValue.ToString() + "";
               }
+
+              paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name}" + defaultValueString);
+
+              //paramSignature.Add($"{pt} {svcMthPrm.Name} = default({pt.Name})");
+              //if (pt.IsValueType) {
+              //  paramSignature.Add($"{pfx}{pt.Name}? {svcMthPrm.Name} = null");
+              //}
+              //else {
+              //  paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name} = null");
+              //}
             }
             else {
               paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name}");

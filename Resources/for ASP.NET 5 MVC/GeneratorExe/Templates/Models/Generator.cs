@@ -209,12 +209,12 @@ namespace CodeGeneration.Models {
             }
           }
 
+          string accessModifier = "";//interfaces have no a.m.
           if (modelTypeToGenerate.IsClass) {
-            modelContent.AppendLine("  public " + prop.PropertyType.Name + " " + prop.Name + " { get; set; }");
+            accessModifier = "public ";
           }
-          else {//interface
-            modelContent.AppendLine("  " + prop.PropertyType.Name + " " + prop.Name + " { get; set; }");
-          }
+
+          modelContent.AppendLine($"  " + accessModifier + prop.PropertyType.Name + " " + prop.Name + " { get; set; }");
 
         }
 

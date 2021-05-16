@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>UJMW.Tools.CodeGen</id>
-    <version>1.0.3-localbuild</version>
+    <version>1.0.14-localbuild</version>
     <title>UJMW.Tools.CodeGen</title>
     <authors>KornSW</authors>
     <owners>KornSW</owners>

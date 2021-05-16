@@ -9,6 +9,7 @@ namespace CodeGeneration.Clients {
   public class Cfg: RootCfg {
 
     public string connectorClassName = "Connector";
+    public string authHeaderName = "Authorization";
 
   }
 

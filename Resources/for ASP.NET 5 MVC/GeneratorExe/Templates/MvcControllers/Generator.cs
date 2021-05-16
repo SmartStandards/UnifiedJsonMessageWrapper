@@ -123,15 +123,41 @@ namespace CodeGeneration.MvcControllers {
               @params.Add($"response.{writer.Ftl(svcMthPrm.Name)}");
             }
             else {
-              @params.Add($"args.{writer.Ftl(svcMthPrm.Name)}");
+
+              if (svcMthPrm.IsOptional) {
+
+                string defaultValueString = "";
+                if (svcMthPrm.DefaultValue == null) {
+                  defaultValueString = "null";
+                }
+                else if (svcMthPrm.DefaultValue.GetType() == typeof(string)) {
+                  defaultValueString = "\"" + svcMthPrm.DefaultValue.ToString() + "\"";
+                }
+                else {
+                  defaultValueString = svcMthPrm.DefaultValue.ToString();
+                }
+
+                if (svcMthPrm.ParameterType.IsValueType) {
+                  @params.Add($"(args.{writer.Ftl(svcMthPrm.Name)}.HasValue ? args.{writer.Ftl(svcMthPrm.Name)}.Value : {defaultValueString})");
+                }
+                else {
+                  //here 'null' will be used
+                  @params.Add($"args.{writer.Ftl(svcMthPrm.Name)}");
+
+                  //@params.Add($"(args.{writer.Ftl(svcMthPrm.Name)} == null ? args.{writer.Ftl(svcMthPrm.Name)} : {defaultValueString})");
+                }
+              }
+              else {
+                @params.Add($"args.{writer.Ftl(svcMthPrm.Name)}");
+              }
             }
           }
 
           if (svcMth.ReturnType != null && svcMth.ReturnType != typeof(void)) {
-            writer.WriteLine($"response.@return = _{endpointName}.{svcMth.Name}({String.Join(", ", @params.ToArray())});");
+            writer.WriteLine($"response.@return = _{endpointName}.{svcMth.Name}({Environment.NewLine + String.Join("," + Environment.NewLine, @params.ToArray()) + Environment.NewLine});");
           }
           else {
-            writer.WriteLine($"_{endpointName}.{svcMth.Name}({String.Join(", ", @params.ToArray())});");
+            writer.WriteLine($"_{endpointName}.{svcMth.Name}({Environment.NewLine + String.Join("," + Environment.NewLine, @params.ToArray()) + Environment.NewLine});");
           }
 
           writer.WriteLine($"return response;");

@@ -23,6 +23,7 @@ namespace CodeGeneration.Wrappers {
       var nsImports = new List<string>();
       nsImports.Add("System");
       nsImports.Add("System.Collections.Generic");
+      nsImports.Add("System.ComponentModel.DataAnnotations");
 
       var wrapperContent = new StringBuilder(10000);
 
@@ -100,25 +101,65 @@ namespace CodeGeneration.Wrappers {
             if (svcMthPrm.IsOptional) {
               reqStr = "Optional";
             }
+
+
+            //if (svcMthPrm.IsOptional) {
+            //  //paramSignature.Add($"{pt} {svcMthPrm.Name} = default({pt.Name})");
+            //  if (pt.IsValueType) {
+            //    paramSignature.Add($"{pfx}{pt.Name}? {svcMthPrm.Name} = null");
+            //  }
+            //  else {
+            //    paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name} = null");
+            //  }
+            //}
+            //else {
+            //  paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name}");
+            //}
+
+            //string accessModifier = "";//interfaces have no a.m.
+            //if (modelTypeToGenerate.IsClass) {
+            //  accessModifier = "public ";
+            //}
+            //string pType = prop.PropertyType.Name;
+            //if ()
+
+            String pType;
+            String initializer = "";
+            if (svcMthPrm.IsOut) {
+              pType = svcMthPrm.ParameterType.GetElementType().Name;
+            }
+            else {
+              pType = svcMthPrm.ParameterType.Name;
+            }
+            if (svcMthPrm.IsOptional && svcMthPrm.ParameterType.IsValueType) {
+              pType = pType + "?";
+              initializer = " = null;";
+            }
             if (!svcMthPrm.IsOut) {
               requestWrapperContent.AppendLine();
               if (!String.IsNullOrWhiteSpace(svcMthPrmDoc)) {
-                requestWrapperContent.AppendLine($"  /// <summary> {reqStr} Argument for '{svcMth.Name}' ({svcMthPrm.ParameterType.Name}): {svcMthPrmDoc} </summary>");
+                requestWrapperContent.AppendLine($"  /// <summary> {reqStr} Argument for '{svcMth.Name}' ({pType}): {svcMthPrmDoc} </summary>");
               }
               else {
-                requestWrapperContent.AppendLine($"  /// <summary> {reqStr} Argument for '{svcMth.Name}' ({svcMthPrm.ParameterType.Name}) </summary>");
+                requestWrapperContent.AppendLine($"  /// <summary> {reqStr} Argument for '{svcMth.Name}' ({pType}) </summary>");
               }
-              requestWrapperContent.AppendLine("  public " + svcMthPrm.ParameterType.Name + " " + svcMthPrm.Name + " { get; set; }");
+              if (!svcMthPrm.IsOptional) {
+                requestWrapperContent.AppendLine("  [Required]");
+              }
+              requestWrapperContent.AppendLine("  public " + pType + " " + svcMthPrm.Name + " { get; set; }" + initializer);
             }
             if (svcMthPrm.IsOut) {
               responseWrapperContent.AppendLine();
               if (!String.IsNullOrWhiteSpace(svcMthPrmDoc)) {
-                responseWrapperContent.AppendLine($"  /// <summary> Out-Argument of '{svcMth.Name}' ({svcMthPrm.ParameterType.GetElementType().Name}): {svcMthPrmDoc} </summary>");
+                responseWrapperContent.AppendLine($"  /// <summary> Out-Argument of '{svcMth.Name}' ({pType}): {svcMthPrmDoc} </summary>");
               }
               else {
-                responseWrapperContent.AppendLine($"  /// <summary> Out-Argument of '{svcMth.Name}' ({svcMthPrm.ParameterType.GetElementType().Name}) </summary>");
+                responseWrapperContent.AppendLine($"  /// <summary> Out-Argument of '{svcMth.Name}' ({pType}) </summary>");
               }
-              responseWrapperContent.AppendLine("  public " + svcMthPrm.ParameterType.GetElementType().Name + " " + svcMthPrm.Name + " { get; set; }");
+              if (!svcMthPrm.IsOptional) {
+                responseWrapperContent.AppendLine("  [Required]");
+              }
+              responseWrapperContent.AppendLine("  public " + pType + " " + svcMthPrm.Name + " { get; set; }" + initializer);
             }
 
           }//foreach Param
@@ -135,6 +176,7 @@ namespace CodeGeneration.Wrappers {
             else {
               responseWrapperContent.AppendLine($"  /// <summary> Return-Value of '{svcMth.Name}' ({svcMth.ReturnType.Name}) </summary>");
             }
+            responseWrapperContent.AppendLine("  [Required]");
             responseWrapperContent.AppendLine("  public " + svcMth.ReturnType.Name + " @return { get; set; }");
           }
           responseWrapperContent.AppendLine();

@@ -31,7 +31,7 @@
            },
 
            // Output:
-           template = "Wrappers",     // <- choose between: Models|Wrappers|MvcControllers|Clients|Interfaces
+           template = "Clients",     // <- choose between: Models|Wrappers|MvcControllers|Clients|Interfaces
            outputLanguage = "C#",   // <- choose between: C#|VB|TS
            indentDepthPerLevel = 2,
            outputNamespace = "MyBusinessNamespace.WebApi",
@@ -61,7 +61,8 @@
 
          // CLIENTS ///////////////////////////////////////////////////////////////////////////
 
-
+           connectorClassName = "",
+           authHeaderName = "Authorization",
 
          // INTERFACES ////////////////////////////////////////////////////////////////////////
  
