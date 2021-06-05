@@ -10,6 +10,7 @@ namespace CodeGeneration.Clients {
 
     public string connectorClassName = "Connector";
     public string authHeaderName = "Authorization";
+    public bool throwClientExecptionsFromFaultProperty = false;
 
   }
 

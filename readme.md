@@ -108,7 +108,7 @@ Is also a constant name which is magic-value **representing an Exception**. This
 
 ```json
 {
-    "fault": "messgae"
+    "fault": "message"
 }
 ```
 

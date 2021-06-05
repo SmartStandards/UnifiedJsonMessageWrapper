@@ -165,7 +165,12 @@ namespace CodeGeneration.MvcControllers {
 
           writer.WriteLineAndPush("catch (Exception ex) {");
           writer.WriteLine($"_Logger.LogCritical(ex, ex.Message);");
-          writer.WriteLine($"return new {svcMth.Name}Response();");
+          if (cfg.fillFaultPropertyOnException) {
+            writer.WriteLine($"return new {svcMth.Name}Response {{ fault = {cfg.exceptionDisplay} }};");
+          }
+          else {
+            writer.WriteLine($"return new {svcMth.Name}Response();");
+          }
           writer.PopAndWriteLine("}");
 
           writer.PopAndWriteLine("}"); //method

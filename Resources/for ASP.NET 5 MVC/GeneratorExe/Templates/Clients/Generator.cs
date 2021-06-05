@@ -111,17 +111,18 @@ namespace CodeGeneration.Clients {
         writer.WriteLine();
         writer.WriteLine("private string _Url;");
         writer.WriteLine("private string _ApiToken;");
-        writer.WriteLine("private WebClient _WebClient;");
         writer.WriteLine();
         writer.WriteLineAndPush($"public {endpointName}Client(string url, string apiToken) {{");
         writer.WriteLine("_Url = url;");
         writer.WriteLine("_ApiToken = apiToken;");
-        writer.WriteLine("_WebClient = new WebClient();");
-
+        writer.PopAndWriteLine("}"); //constructor
+        writer.WriteLine();
+        writer.WriteLineAndPush($"private WebClient CreateWebClient() {{");
+        writer.WriteLine("var wc = new WebClient();");
         //TODO: make customizable
-        writer.WriteLine("_WebClient.Headers.Set(\"" + cfg.authHeaderName + "\", apiToken);");
-        writer.WriteLine("_WebClient.Headers.Set(\"Content-Type\", \"application/json\");");
-
+        writer.WriteLine("wc.Headers.Set(\"" + cfg.authHeaderName + "\", _ApiToken);");
+        writer.WriteLine("wc.Headers.Set(\"Content-Type\", \"application/json\");");
+        writer.WriteLine("return wc;");
         writer.PopAndWriteLine("}"); //constructor
 
         foreach (MethodInfo svcMth in svcInt.GetMethods()) {
@@ -192,6 +193,8 @@ namespace CodeGeneration.Clients {
             writer.WriteLineAndPush($"public {svcMth.ReturnType.Name} {svcMth.Name}({String.Join(", ", paramSignature.ToArray())}) {{");
           }
 
+          writer.WriteLineAndPush($"using (var webClient = this.CreateWebClient()) {{");
+
           writer.WriteLine($"string url = _Url + \"{writer.Ftl(svcMth.Name)}\";");
 
           writer.WriteLineAndPush($"var args = new {svcMth.Name}Request {{");
@@ -211,7 +214,7 @@ namespace CodeGeneration.Clients {
           writer.PopAndWriteLine("};");
 
           writer.WriteLine($"string rawRequest = JsonConvert.SerializeObject(args);");
-          writer.WriteLine($"string rawResponse = _WebClient.UploadString(url, rawRequest);");
+          writer.WriteLine($"string rawResponse = webClient.UploadString(url, rawRequest);");
           writer.WriteLine($"var result = JsonConvert.DeserializeObject<{svcMth.Name}Response>(rawResponse);");
 
           foreach (ParameterInfo svcMthPrm in svcMth.GetParameters()) {
@@ -220,13 +223,21 @@ namespace CodeGeneration.Clients {
             }
           }
 
+          if (cfg.throwClientExecptionsFromFaultProperty) {
+            writer.WriteLineAndPush($"if(result.fault != null){{");
+            writer.WriteLine($"throw new Exception(result.fault);");
+            writer.PopAndWriteLine("}");
+          }
+
           if (svcMth.ReturnType == null || svcMth.ReturnType == typeof(void)) {
             writer.WriteLine($"return;");
           }
           else {
             writer.WriteLine($"return result.@return;");
           }
-          writer.PopAndWriteLine("}");
+
+          writer.PopAndWriteLine("}");//using
+          writer.PopAndWriteLine("}");//method
 
         }//foreach Method
 

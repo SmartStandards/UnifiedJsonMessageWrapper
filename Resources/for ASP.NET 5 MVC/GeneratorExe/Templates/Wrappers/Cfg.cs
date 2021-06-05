@@ -8,6 +8,8 @@ namespace CodeGeneration.Wrappers {
 
   public class Cfg: RootCfg {
 
+    public bool generateFaultProperty = false;
+
   }
 
 }

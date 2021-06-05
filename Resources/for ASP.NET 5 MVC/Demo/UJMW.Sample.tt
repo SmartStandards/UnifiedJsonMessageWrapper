@@ -53,16 +53,22 @@
 
          // WRAPPERS //////////////////////////////////////////////////////////////////////////
 
+            generateFaultProperty = true,
 
          // MVC-CONTROLLERS ///////////////////////////////////////////////////////////////////
            
            generateSwashbuckleAttributesForControllers = true,
            customAttributesPerControllerMethod = "RequireBaererAuth(\"{C}/{O}\")",
 
+           fillFaultPropertyOnException = true,
+           exceptionDisplay = "ex.Message", //change this into an extension-method to do some
+           //                                    custom evaluation before exposing too much details
+
          // CLIENTS ///////////////////////////////////////////////////////////////////////////
 
-           connectorClassName = "",
+           connectorClassName = "DemoConnector",
            authHeaderName = "Authorization",
+           throwClientExecptionsFromFaultProperty = true,
 
          // INTERFACES ////////////////////////////////////////////////////////////////////////
  

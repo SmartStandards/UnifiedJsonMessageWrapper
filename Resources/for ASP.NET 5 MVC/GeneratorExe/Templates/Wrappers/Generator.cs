@@ -164,6 +164,12 @@ namespace CodeGeneration.Wrappers {
 
           }//foreach Param
 
+          if (cfg.generateFaultProperty) {
+            responseWrapperContent.AppendLine();
+            responseWrapperContent.AppendLine($"  /// <summary> This field contains error text equivalent to an Exception message! (note that only 'fault' XOR 'return' can have a value != null)  </summary>");
+            responseWrapperContent.AppendLine("  public string fault { get; set; } = null;");
+          }
+
           requestWrapperContent.AppendLine();
           requestWrapperContent.AppendLine("}");
 
@@ -176,7 +182,9 @@ namespace CodeGeneration.Wrappers {
             else {
               responseWrapperContent.AppendLine($"  /// <summary> Return-Value of '{svcMth.Name}' ({svcMth.ReturnType.Name}) </summary>");
             }
-            responseWrapperContent.AppendLine("  [Required]");
+            if (!cfg.generateFaultProperty) {
+              responseWrapperContent.AppendLine("  [Required]");
+            }
             responseWrapperContent.AppendLine("  public " + svcMth.ReturnType.Name + " @return { get; set; }");
           }
           responseWrapperContent.AppendLine();

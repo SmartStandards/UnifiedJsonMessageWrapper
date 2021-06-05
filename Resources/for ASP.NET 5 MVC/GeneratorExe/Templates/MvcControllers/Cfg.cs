@@ -10,6 +10,8 @@ namespace CodeGeneration.MvcControllers {
 
     public bool generateSwashbuckleAttributesForControllers = true;
     public string customAttributesPerControllerMethod = null;
+    public bool fillFaultPropertyOnException = false;
+    public string exceptionDisplay = "ex.Message";
 
   }
 

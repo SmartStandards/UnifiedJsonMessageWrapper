@@ -25,8 +25,10 @@ namespace MyBusinessNamespace.WebApi {
     [Required]
     public Int32 b { get; set; }
   
+    /// <summary> This field contains error text equivalent to an Exception message! (note that only 'fault' XOR 'return' can have a value != null)  </summary>
+    public string fault { get; set; } = null;
+  
     /// <summary> Return-Value of 'Foooo' (Boolean) </summary>
-    [Required]
     public Boolean @return { get; set; }
   
   }
@@ -49,8 +51,10 @@ namespace MyBusinessNamespace.WebApi {
   /// </summary>
   public class KkkkkkResponse {
   
+    /// <summary> This field contains error text equivalent to an Exception message! (note that only 'fault' XOR 'return' can have a value != null)  </summary>
+    public string fault { get; set; } = null;
+  
     /// <summary> Return-Value of 'Kkkkkk' (TestModel): MMMMMMMMMMMMMMMMMMM </summary>
-    [Required]
     public TestModel @return { get; set; }
   
   }
@@ -72,6 +76,9 @@ namespace MyBusinessNamespace.WebApi {
   /// Method: Meth
   /// </summary>
   public class AVoidResponse {
+  
+    /// <summary> This field contains error text equivalent to an Exception message! (note that only 'fault' XOR 'return' can have a value != null)  </summary>
+    public string fault { get; set; } = null;
   
   }
   
