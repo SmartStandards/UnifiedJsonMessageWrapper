@@ -33,8 +33,9 @@ namespace CodeGeneration.MvcControllers {
       nsImports.Add("System.Net");
 
       var inputFileFullPath = Path.GetFullPath(cfg.inputFile);
+      Program.AddResolvePath(Path.GetDirectoryName(inputFileFullPath));
       Assembly ass = Assembly.LoadFile(inputFileFullPath);
-
+ 
       Type[] svcInterfaces;
       try {
         svcInterfaces = ass.GetTypes();

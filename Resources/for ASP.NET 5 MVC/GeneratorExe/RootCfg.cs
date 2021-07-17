@@ -19,6 +19,9 @@ namespace CodeGeneration {
     public string outputNamespace = "";
     public String[] customImports = new String[] {};
 
+    //DEBUGGING
+    public int waitForDebuggerSec = 0;
+
   }
 
 }

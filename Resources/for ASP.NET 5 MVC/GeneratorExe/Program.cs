@@ -1,6 +1,8 @@
 ﻿using CodeGeneration.Languages;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -13,6 +15,8 @@ namespace CodeGeneration {
     static int Main(string[] args) {
       String cfgRawJson = null;
       RootCfg rootCfg = null;
+
+      AppDomain.CurrentDomain.AssemblyResolve += AppDomain_AssemblyResolve;
 
       try {
 
@@ -39,6 +43,16 @@ namespace CodeGeneration {
           Console.WriteLine("*/");
           System.Threading.Thread.Sleep(200);
           throw new Exception("ERROR: wrong input: invalid configuration content!");
+        }
+
+        if(rootCfg.waitForDebuggerSec > 0) {
+          var timeout = DateTime.Now.AddSeconds(rootCfg.waitForDebuggerSec);
+          while (!Debugger.IsAttached && DateTime.Now < timeout) {
+            Thread.Sleep(250);
+          }
+          if (Debugger.IsAttached) {
+            Debugger.Break();
+          }
         }
 
         XmlCommentAccessExtensions.RequireXmlDocForNamespaces = rootCfg.requireXmlDocForNamespaces;
@@ -102,6 +116,62 @@ namespace CodeGeneration {
       Thread.Sleep(1000);
       return 0;
 
+    }
+
+    private static Assembly AppDomain_AssemblyResolve(object sender, ResolveEventArgs e) {
+      var assN = new AssemblyName(e.Name);
+      string assemblyFullFileName = null;
+      if (TryFindAssemblyFileByName(assN.Name + ".dll", ref assemblyFullFileName)) {
+        try {
+          return Assembly.LoadFrom(assemblyFullFileName);
+        }
+        catch {
+        }
+      }
+
+      if (TryFindAssemblyFileByName(assN.Name + ".exe", ref assemblyFullFileName)) {
+        try {
+          return Assembly.LoadFrom(assemblyFullFileName);
+        }
+        catch {
+        }
+      }
+
+      return null;
+    }
+
+    public static void AddResolvePath(string p) {
+      _ResolvePaths.Add(p);
+    }
+
+    private static List<string> _ResolvePaths = new List<string>();
+
+    public static bool TryFindAssemblyFileByName(string assemblyName, ref string assemblyFullFileName) {
+      string assemblyFilePath;
+      FileInfo assemblyFileInfo;
+      foreach (var resolvePath in _ResolvePaths) {
+        assemblyFilePath = Path.Combine(resolvePath, assemblyName);
+        assemblyFileInfo = new FileInfo(assemblyFilePath);
+        if (assemblyFileInfo.Exists && assemblyFileInfo.Length > 0L) {
+          assemblyFullFileName = assemblyFilePath;
+          return true;
+        }
+      }
+
+      var sc = StringComparison.CurrentCultureIgnoreCase;
+      if (!assemblyName.EndsWith(".dll", sc) && !assemblyName.EndsWith(".exe", sc)) {
+        string argassemblyFullFileName = assemblyFullFileName + ".dll";
+        if (TryFindAssemblyFileByName(assemblyName, ref argassemblyFullFileName)) {
+          return true;
+        }
+
+        string argassemblyFullFileName1 = assemblyFullFileName + ".exe";
+        if (TryFindAssemblyFileByName(assemblyName, ref argassemblyFullFileName1)) {
+          return true;
+        }
+      }
+
+      return false;
     }
 
   }

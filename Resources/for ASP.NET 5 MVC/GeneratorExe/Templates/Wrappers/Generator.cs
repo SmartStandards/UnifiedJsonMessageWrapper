@@ -1,4 +1,5 @@
-﻿using CodeGeneration.Languages;
+﻿using CodeGeneration.Inspection;
+using CodeGeneration.Languages;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -28,6 +29,7 @@ namespace CodeGeneration.Wrappers {
       var wrapperContent = new StringBuilder(10000);
 
       var inputFileFullPath = Path.GetFullPath(cfg.inputFile);
+      Program.AddResolvePath(Path.GetDirectoryName(inputFileFullPath));
       Assembly ass = Assembly.LoadFile(inputFileFullPath);
 
       Type[] svcInterfaces;
@@ -125,16 +127,19 @@ namespace CodeGeneration.Wrappers {
 
             String pType;
             String initializer = "";
+
+            bool nullable;
             if (svcMthPrm.IsOut) {
-              pType = svcMthPrm.ParameterType.GetElementType().Name;
+              pType = svcMthPrm.ParameterType.GetElementType().GetTypeNameSave(out nullable);
             }
             else {
-              pType = svcMthPrm.ParameterType.Name;
+              pType = svcMthPrm.ParameterType.GetTypeNameSave(out nullable);
             }
-            if (svcMthPrm.IsOptional && svcMthPrm.ParameterType.IsValueType) {
+            if (nullable || (svcMthPrm.IsOptional && svcMthPrm.ParameterType.IsValueType)) {
               pType = pType + "?";
               initializer = " = null;";
             }
+
             if (!svcMthPrm.IsOut) {
               requestWrapperContent.AppendLine();
               if (!String.IsNullOrWhiteSpace(svcMthPrmDoc)) {

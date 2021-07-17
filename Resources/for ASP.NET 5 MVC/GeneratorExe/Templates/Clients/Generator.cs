@@ -1,4 +1,5 @@
-﻿using CodeGeneration.Languages;
+﻿using CodeGeneration.Inspection;
+using CodeGeneration.Languages;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -26,6 +27,7 @@ namespace CodeGeneration.Clients {
       nsImports.Add("System.Net");
 
       var inputFileFullPath = Path.GetFullPath(cfg.inputFile);
+      Program.AddResolvePath(Path.GetDirectoryName(inputFileFullPath));
       Assembly ass = Assembly.LoadFile(inputFileFullPath);
 
       Type[] svcInterfaces;
@@ -155,6 +157,13 @@ namespace CodeGeneration.Clients {
                 pfx = "out ";
               }
             }
+
+            bool nullable;
+            var ptName = pt.GetTypeNameSave(out nullable);
+            if (nullable) {
+              ptName = ptName + "?";
+            }
+
             if (svcMthPrm.IsOptional) {
               //were implementing the interface "as it is"
 
@@ -170,18 +179,18 @@ namespace CodeGeneration.Clients {
                 defaultValueString = " = " + svcMthPrm.DefaultValue.ToString() + "";
               }
 
-              paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name}" + defaultValueString);
+              paramSignature.Add($"{pfx}{ptName} {svcMthPrm.Name}" + defaultValueString);
 
-              //paramSignature.Add($"{pt} {svcMthPrm.Name} = default({pt.Name})");
+              //paramSignature.Add($"{pt} {svcMthPrm.Name} = default({ptName})");
               //if (pt.IsValueType) {
-              //  paramSignature.Add($"{pfx}{pt.Name}? {svcMthPrm.Name} = null");
+              //  paramSignature.Add($"{pfx}{ptName}? {svcMthPrm.Name} = null");
               //}
               //else {
-              //  paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name} = null");
+              //  paramSignature.Add($"{pfx}{ptName} {svcMthPrm.Name} = null");
               //}
             }
             else {
-              paramSignature.Add($"{pfx}{pt.Name} {svcMthPrm.Name}");
+              paramSignature.Add($"{pfx}{ptName} {svcMthPrm.Name}");
             }
 
           }

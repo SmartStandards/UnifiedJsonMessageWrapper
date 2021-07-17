@@ -19,6 +19,8 @@ namespace MyBusinessNamespace {
     /// <param name="errorCode"> Bbbbbb </param>
     void AVoid(TestModel errorCode);
 
+    bool TestNullableDt(DateTime? dt);
+
   }
 
 

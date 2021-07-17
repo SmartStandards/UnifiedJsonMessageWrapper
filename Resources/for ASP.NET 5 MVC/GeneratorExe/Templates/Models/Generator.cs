@@ -34,6 +34,7 @@ namespace CodeGeneration.Models {
       var modelContent = new StringBuilder(10000);
 
       var inputFileFullPath = Path.GetFullPath(cfg.inputFile);
+      Program.AddResolvePath(Path.GetDirectoryName(inputFileFullPath));
       Assembly ass = Assembly.LoadFile(inputFileFullPath);
 
       Type[] svcInterfaces;

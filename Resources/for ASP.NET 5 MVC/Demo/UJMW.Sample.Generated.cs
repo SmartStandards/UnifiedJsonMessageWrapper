@@ -82,4 +82,28 @@ namespace MyBusinessNamespace.WebApi {
   
   }
   
+  /// <summary>
+  /// Contains arguments for calling 'TestNullableDt'.
+  /// </summary>
+  public class TestNullableDtRequest {
+  
+    /// <summary> Required Argument for 'TestNullableDt' (DateTime?) </summary>
+    [Required]
+    public DateTime? dt { get; set; }
+  
+  }
+  
+  /// <summary>
+  /// Contains results from calling 'TestNullableDt'.
+  /// </summary>
+  public class TestNullableDtResponse {
+  
+    /// <summary> This field contains error text equivalent to an Exception message! (note that only 'fault' XOR 'return' can have a value != null)  </summary>
+    public string fault { get; set; } = null;
+  
+    /// <summary> Return-Value of 'TestNullableDt' (Boolean) </summary>
+    public Boolean @return { get; set; }
+  
+  }
+  
 }
