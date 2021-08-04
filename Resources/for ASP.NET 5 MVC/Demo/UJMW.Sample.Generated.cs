@@ -89,7 +89,7 @@ namespace MyBusinessNamespace.WebApi {
   
     /// <summary> Required Argument for 'TestNullableDt' (DateTime?) </summary>
     [Required]
-    public DateTime? dt { get; set; }
+    public DateTime? dt { get; set; } = null;
   
   }
   

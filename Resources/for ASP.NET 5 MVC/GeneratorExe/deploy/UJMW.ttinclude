@@ -1,6 +1,7 @@
 ﻿<#@ assembly name="Newtonsoft.Json" #>
 <#@ assembly name="System.Core" #>
 <#@ assembly name="System.Xml" #>
+<#@ assembly name="EnvDTE" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.IO" #>
 <#@ import namespace="System.Diagnostics" #>
@@ -36,22 +37,15 @@
     generatorExe = generatorExe.Replace("%USERPROFILE%", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     var buffer = new StringBuilder(2000);
 
-    bool notFound = false;
-    if(Path.IsPathRooted(generatorExe)){
-      if(!File.Exists(generatorExe)){
-        notFound = true;
-      }
+ if(!Path.IsPathRooted(generatorExe)){
+      var serviceProvider = this.Host as IServiceProvider;
+      var dte = serviceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+      var solutionDir = Path.GetDirectoryName(dte.Solution.FileName);
+      generatorExe = Path.Combine(solutionDir, generatorExe);
     }
-    else {
-      try {
-        generatorExe = Host.ResolvePath(generatorExe);
-      }
-      catch {
-        notFound = true;
-        generatorExe = "<location-of-UJMW.ttinclude>\\" + generatorExe;
-      }
-    }
-    if(notFound){
+    
+    generatorExe = Path.GetFullPath(generatorExe);
+    if(!File.Exists(generatorExe)){
       throw new Exception("NUGET-PKG: 'UJMW.Tools.CodeGen' IS NOT INSTALLED PROPERLY: '" + generatorExe + "' was not found!");
     }
 

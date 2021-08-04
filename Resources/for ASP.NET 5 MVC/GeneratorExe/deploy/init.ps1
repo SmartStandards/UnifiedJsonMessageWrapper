@@ -23,12 +23,18 @@ if (!(test-path $deployTarget)) {
 Copy-Item "$deploySource/*" $deployTarget -Recurse -Force
 
 $ttIncludeFile = join-path $deployTarget 'UJMW.ttinclude'
+
+$newInstall = "N"
+if (!(test-path $ttIncludeFile)) {
+  $newInstall = "Y"
+}
+
 $profileDir = $Env:USERPROFILE
 $escapedProfileDir = [regex]::escape($profileDir)
 
 #if pkg-path starts with solution-dir (or one above), then use a relative path!
-$pkgBinaries = $pkgBinaries -replace [regex]::escape((Get-Item $solutionFileName).Directory.fullname), '..'
-$pkgBinaries = $pkgBinaries -replace [regex]::escape((Get-Item $solutionFileName).Directory.parent.fullname), '..\..'
+$pkgBinaries = $pkgBinaries -replace [regex]::escape((Get-Item $solutionFileName).Directory.fullname), '.'
+$pkgBinaries = $pkgBinaries -replace [regex]::escape((Get-Item $solutionFileName).Directory.parent.fullname), '..'
 
 #if pkg-path starts is within the global directory in userprofile, then use placeholder
 $pkgBinaries = $pkgBinaries -replace $escapedProfileDir, '%USERPROFILE%'
@@ -38,6 +44,8 @@ $pkgBinaries = $pkgBinaries -replace [regex]::escape('\'), '\\'
 (Get-Content $ttIncludeFile) | foreach-object { $_ -replace [regex]::escape('PATH-NOT-CONFIGURED'), $pkgBinaries } | Set-Content $ttIncludeFile
 
 Write-Host "UJMW-Tools installed..."
+
+#if ($newInstall -eq "Y") {
 
 # create the solution items folder if it doesn't exist
 $deployFolder = $solution.Projects | where-object { $_.ProjectName -eq "Solution Items" } | select -first 1
@@ -54,3 +62,5 @@ ls $deployTarget | where-object { $_.Name -eq "UJMW.Readme.txt" } | foreach-obje
 ls $deployTarget | where-object { $_.Name -eq "UJMW.Sample.tt" } | foreach-object { 
     $folderItems.AddFromFile($_.FullName) > $null
 } > $null
+
+#}
