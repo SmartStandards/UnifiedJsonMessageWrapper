@@ -112,7 +112,7 @@ Is also a constant name which is magic-value **representing an Exception**. This
 }
 ```
 
-Please note that the "fault"-Property should only used for critical, non-business Errors - like Exceptions. All regular possible failures of the executed operation should be transferred over other channels. For that were recommending the "returnCode"-Pattern as described below (maybe in combination with the "lastError" - SideChannel.
+Please note that the "fault"-Property should only used for critical, non-business Errors - like Exceptions. All regular possible failures of the executed operation should be transferred over other channels. For that were recommending the "returnCode"-Pattern as described below (maybe in combination with the "lastError" - SideChannel. Nevertheless also Exceptions from our BL should not affect the transport-layer technology. However, even exceptions from the BL should not affect the transport layer technology, and because of this, the usage of the fault-Property MUST NOT be accompanied by an http-response code other than 200!
 
 
 
