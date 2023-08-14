@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>UJMW.DynamicController</id>
+    <version>1.0.0-localbuild</version>
+    <title>UJMW.DynamicController</title>
+    <authors>SmartStandards</authors>
+    <owners>(public domain)</owners>
+    <copyright>SmartStandards</copyright>
+    <description>UJMW.DynamicController</description>
+    <tags>UJMW REST JSON RPC WebService</tags>
+    <!-- https://spdx.org/licenses/ -->
+    <license type="expression">GPL-3.0-only</license>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <icon>PackageIcon.png</icon>
+    <projectUrl>https://github.com/SmartStandards/AuthTokenHandling</projectUrl>
+    <dependencies>
+      <group targetFramework="net6.0">
+        <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
+        <dependency id="Microsoft.AspNetCore.Mvc.Core" version="[2.2.5,2.9999]" />
+        <dependency id="System.Text.Encodings.Web" version="[6.0.0,6.9999]" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <!-- https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package#from-a-convention-based-working-directory -->
+    <file src="PackageIcon.png" target="" />
+    <!-- .NET 6.0 -->
+    <file src="dist\bin-net6.0\UJMW.DynamicController.dll" target="lib/net6.0" />
+    <file src="dist\bin-net6.0\UJMW.DynamicController.xml" target="lib/net6.0" />
+    <file src="dist\bin-net6.0\UJMW.DynamicController.pdb" target="lib/net6.0" />
+  </files>
+</package>

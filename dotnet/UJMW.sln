@@ -1,0 +1,113 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33627.172
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4130D21C-FE8F-4925-93E7-217B4AF1B7D9}"
+	ProjectSection(SolutionItems) = preProject
+		..\vers\changelog.md = ..\vers\changelog.md
+		..\readme.md = ..\readme.md
+		UJMW.DynamicClient.nuspec = UJMW.DynamicClient.nuspec
+		UJMW.DynamicController.nuspec = UJMW.DynamicController.nuspec
+		UJMW.DynamicWcfHost.nuspec = UJMW.DynamicWcfHost.nuspec
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{EFB5135D-039A-4D92-8FDD-9EA5D070F991}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{C5272353-539E-4138-93FD-9DF437F6DA47}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "UJMW.DynamicClient", "src\UJMW.DynamicClient\UJMW.DynamicClient.shproj", "{CF0A161A-99BA-4F01-AF5E-16C6FCBC85AE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UJMW.DynamicClient.net6.0", "src\UJMW.DynamicClient.net6.0\UJMW.DynamicClient.net6.0.csproj", "{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DynamicClient.net461", "src\UJMW.DynamicClient.net461\UJMW.DynamicClient.net461.csproj", "{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "UJMW.Tests", "test\UJMW.Tests\UJMW.Tests.shproj", "{5E17C8E8-0BC8-4F7C-A022-C8104A415628}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UJMW.Tests.net6.0", "test\UJMW.Tests.net6.0\UJMW.Tests.net6.0.csproj", "{A6925214-F00D-4F5B-8C3A-60343769A83E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.Tests.net461", "test\UJMW.Tests.net461\UJMW.Tests.net461.csproj", "{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "UJMW.DynamicController", "src\UJMW.DynamicController\UJMW.DynamicController.shproj", "{CF0A161A-99BA-4F01-AF5E-16C6FCBC95AE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Targets", "Targets", "{ADA576B9-92C4-4C75-9605-06023D1026B2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UJMW.DynamicController.net6.0", "src\UJMW.DynamicController.net6.0\UJMW.DynamicController.net6.0.csproj", "{4AF041BF-8D36-46D6-9E83-737231CFCB26}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Targets", "Targets", "{5EFC1751-7CFC-47C3-A462-7316FF3AF497}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "UJMW.DynamicWcfHost", "src\UJMW.DynamicWcfHost\UJMW.DynamicWcfHost.shproj", "{4237C0F2-10DB-431F-BF52-1F85DF08CD2B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DynamicWcfHost.net461", "src\UJMW.DynamicWcfHost.net461\UJMW.DynamicWcfHost.net461.csproj", "{42328584-178C-440D-B3D0-F51BFABEF419}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DemoWcfService", "test\UJMW.DemoWcfService\UJMW.DemoWcfService.csproj", "{F0D13C7F-68C5-4004-9321-5BFB44A39315}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6925214-F00D-4F5B-8C3A-60343769A83E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6925214-F00D-4F5B-8C3A-60343769A83E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6925214-F00D-4F5B-8C3A-60343769A83E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6925214-F00D-4F5B-8C3A-60343769A83E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4AF041BF-8D36-46D6-9E83-737231CFCB26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4AF041BF-8D36-46D6-9E83-737231CFCB26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4AF041BF-8D36-46D6-9E83-737231CFCB26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4AF041BF-8D36-46D6-9E83-737231CFCB26}.Release|Any CPU.Build.0 = Release|Any CPU
+		{42328584-178C-440D-B3D0-F51BFABEF419}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42328584-178C-440D-B3D0-F51BFABEF419}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42328584-178C-440D-B3D0-F51BFABEF419}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42328584-178C-440D-B3D0-F51BFABEF419}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0D13C7F-68C5-4004-9321-5BFB44A39315}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0D13C7F-68C5-4004-9321-5BFB44A39315}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0D13C7F-68C5-4004-9321-5BFB44A39315}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0D13C7F-68C5-4004-9321-5BFB44A39315}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CF0A161A-99BA-4F01-AF5E-16C6FCBC85AE} = {EFB5135D-039A-4D92-8FDD-9EA5D070F991}
+		{7B5BAEA8-7E79-4A30-B6C1-4DA4831AF970} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{5E17C8E8-0BC8-4F7C-A022-C8104A415628} = {C5272353-539E-4138-93FD-9DF437F6DA47}
+		{A6925214-F00D-4F5B-8C3A-60343769A83E} = {5EFC1751-7CFC-47C3-A462-7316FF3AF497}
+		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13} = {5EFC1751-7CFC-47C3-A462-7316FF3AF497}
+		{CF0A161A-99BA-4F01-AF5E-16C6FCBC95AE} = {EFB5135D-039A-4D92-8FDD-9EA5D070F991}
+		{ADA576B9-92C4-4C75-9605-06023D1026B2} = {EFB5135D-039A-4D92-8FDD-9EA5D070F991}
+		{4AF041BF-8D36-46D6-9E83-737231CFCB26} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{5EFC1751-7CFC-47C3-A462-7316FF3AF497} = {C5272353-539E-4138-93FD-9DF437F6DA47}
+		{4237C0F2-10DB-431F-BF52-1F85DF08CD2B} = {EFB5135D-039A-4D92-8FDD-9EA5D070F991}
+		{42328584-178C-440D-B3D0-F51BFABEF419} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{F0D13C7F-68C5-4004-9321-5BFB44A39315} = {C5272353-539E-4138-93FD-9DF437F6DA47}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D2F37C1D-32F0-4BF2-AAEB-46B9D8C07D23}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		src\UJMW.DynamicWcfHost\UJMW.DynamicWcfHost.projitems*{42328584-178c-440d-b3d0-f51bfabef419}*SharedItemsImports = 4
+		src\UJMW.DynamicWcfHost\UJMW.DynamicWcfHost.projitems*{4237c0f2-10db-431f-bf52-1f85df08cd2b}*SharedItemsImports = 13
+		src\UJMW.DynamicController\UJMW.DynamicController.projitems*{4af041bf-8d36-46d6-9e83-737231cfcb26}*SharedItemsImports = 5
+		test\UJMW.Tests\UJMW.Tests.projitems*{5e17c8e8-0bc8-4f7c-a022-c8104a415628}*SharedItemsImports = 13
+		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{7b5baea8-7e79-4a30-b6c1-4da4831af970}*SharedItemsImports = 5
+		test\UJMW.Tests\UJMW.Tests.projitems*{a6925214-f00d-4f5b-8c3a-60343769a83e}*SharedItemsImports = 5
+		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{b0ba06fe-6437-4b9e-8c76-3adfc8d191d2}*SharedItemsImports = 4
+		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{cf0a161a-99ba-4f01-af5e-16c6fcbc85ae}*SharedItemsImports = 13
+		src\UJMW.DynamicController\UJMW.DynamicController.projitems*{cf0a161a-99ba-4f01-af5e-16c6fcbc95ae}*SharedItemsImports = 13
+		test\UJMW.Tests\UJMW.Tests.projitems*{d0b8734c-340f-4b2a-80ee-c00afdd59e13}*SharedItemsImports = 4
+	EndGlobalSection
+EndGlobal

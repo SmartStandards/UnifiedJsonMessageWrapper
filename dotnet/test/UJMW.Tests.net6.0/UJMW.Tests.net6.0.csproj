@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>Security</RootNamespace>
+
+    <IsPackable>false</IsPackable>
+
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
+
+    <Version>0.0.0</Version>
+
+    <AssemblyName>UJMW.Tests</AssemblyName>
+
+    <PackageId>Tests</PackageId>
+
+    <Product>Tests</Product>
+
+    <Company />
+
+    <Authors>Tests</Authors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>DEBUG;TRACE;NET5</DefineConstants>
+    <OutputPath>..\(Stage)\Bin\net5.0\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;NET5</DefineConstants>
+    <OutputPath>..\(Stage)\Bin\net5.0\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.2" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.0.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.0.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Text.Encodings.Web" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net6.0\UJMW.DynamicClient.net6.0.csproj" />
+    <ProjectReference Include="..\..\src\UJMW.DynamicController.net6.0\UJMW.DynamicController.net6.0.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\UJMW.Tests\UJMW.Tests.projitems" Label="Shared" />
+
+</Project>

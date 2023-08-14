@@ -1,0 +1,1 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="UJMW.DemoWcfService.DemoService" CodeBehind="DemoService.svc.cs" Factory="System.Web.UJMW.UjmwServiceHostFactory" %>
