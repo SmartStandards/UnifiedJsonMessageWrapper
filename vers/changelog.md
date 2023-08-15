@@ -6,5 +6,5 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+got wcf-facade and dynamic client running... got compatible with previous **MVP**
 

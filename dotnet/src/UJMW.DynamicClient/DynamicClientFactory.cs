@@ -9,33 +9,39 @@ using System.Text;
 
 namespace System.Web.UJMW {
 
-  //special thanks to:
-  //https://www.codeproject.com/Tips/138388/Dynamic-Generation-of-Client-Proxy-at-Runtime-in
-  //https://www.codeproject.com/Articles/121568/Dynamic-Type-Using-Reflection-Emit
+  public delegate void RequestSidechannelCaptureMethod(IDictionary<string, string> requestSidechannelContainer);
+  public delegate void ResponseSidechannelProcessingMethod(IEnumerable<KeyValuePair<string, string>> responseSidechannelContainer);
+
+  //developed on base of https://github.com/KornSW/DynamicProxy
 
   public abstract class DynamicClientFactory {
 
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-    private IDynamicProxyInvoker _Invoker;
+    private IAbstractWebcallInvoker _Invoker;
 
-    public delegate string HttpPostMethod(string ur, string jsonContent);
+    public delegate string HttpPostMethod(string url, string jsonContent);
+
+    public static TApplicable CreateInstance<TApplicable>(string url) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u, j) => InvokeCallViaHttpClient(new HttpClient(), u, j), ()=>url, (c) => { }, (c) => { });
+      return CreateInstance<TApplicable>(invoker);
+    }
 
     public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter) {
-      WebCallInvoker invoker = new WebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
       return CreateInstance<TApplicable>(invoker);
     }
 
     public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter) {
-      WebCallInvoker invoker = new WebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
       return CreateInstance(applicableType, invoker);
     }
-    public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelRestoreMethod responseSidechannelRestoreMethod) {
-      WebCallInvoker invoker = new WebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
+    public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelProcessor) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelProcessor);
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelRestoreMethod responseSidechannelRestoreMethod) {
-      WebCallInvoker invoker = new WebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
+    public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelProcessor) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelProcessor);
       return CreateInstance(applicableType, invoker);
     }
 
@@ -50,32 +56,29 @@ namespace System.Web.UJMW {
     }
 
     public static TApplicable CreateInstance<TApplicable>(HttpPostMethod httpPostMethod, Func<string> urlGetter) {
-      WebCallInvoker invoker = new WebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, (c) => { }, (c) => { });
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, (c) => { }, (c) => { });
       return CreateInstance<TApplicable>(invoker);
     }
 
     public static object CreateInstance(HttpPostMethod httpPostMethod, Type applicableType, Func<string> urlGetter) {
-      WebCallInvoker invoker = new WebCallInvoker(applicableType,  httpPostMethod, urlGetter, (c) => { }, (c) => { });
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType,  httpPostMethod, urlGetter, (c) => { }, (c) => { });
       return CreateInstance(applicableType, invoker);
     }
-    public static TApplicable CreateInstance<TApplicable>(HttpPostMethod httpPostMethod, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelRestoreMethod responseSidechannelRestoreMethod) {
-      WebCallInvoker invoker = new WebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
+    public static TApplicable CreateInstance<TApplicable>(HttpPostMethod httpPostMethod, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelRestoreMethod) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static object CreateInstance(HttpPostMethod httpPostMethod, Type applicableType, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelRestoreMethod responseSidechannelRestoreMethod) {
-      WebCallInvoker invoker = new WebCallInvoker(applicableType,  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
+    public static object CreateInstance(HttpPostMethod httpPostMethod, Type applicableType, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelRestoreMethod) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType,  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
       return CreateInstance(applicableType, invoker);
     }
-    //
-    // EVERYTHING STARTING FROM HERE WAS COPIED FROM https://github.com/KornSW/DynamicProxy:
-    //
 
-    private static TApplicable CreateInstance<TApplicable>(IDynamicProxyInvoker invoker, params object[] constructorArgs) {
+    private static TApplicable CreateInstance<TApplicable>(IAbstractWebcallInvoker invoker, params object[] constructorArgs) {
       return (TApplicable)CreateInstance(typeof(TApplicable), invoker, constructorArgs);
     }
 
-    private static object CreateInstance(Type applicableType, IDynamicProxyInvoker invoker, params object[] constructorArgs) {
+    private static object CreateInstance(Type applicableType, IAbstractWebcallInvoker invoker, params object[] constructorArgs) {
       Type dynamicType = BuildDynamicType(applicableType);
       var extendedConstructorArgs = constructorArgs.ToList();
       extendedConstructorArgs.Add(invoker);
@@ -89,8 +92,8 @@ namespace System.Web.UJMW {
 
     internal static Type BuildDynamicType(Type applicableType) {
 
-      Type iDynamicProxyInvokerType = typeof(IDynamicProxyInvoker);
-      MethodInfo iDynamicProxyInvokerTypeInvokeMethod = iDynamicProxyInvokerType.GetMethod("InvokeMethod");
+      Type iDynamicProxyInvokerType = typeof(IAbstractWebcallInvoker);
+      MethodInfo iDynamicProxyInvokerTypeInvokeMethod = iDynamicProxyInvokerType.GetMethod(nameof(IAbstractWebcallInvoker.InvokeWebCall));
 
       AssemblyBuilder assemblyBuilder = null;
       Type baseType = null;
@@ -139,7 +142,7 @@ namespace System.Web.UJMW {
           var constructorArgs = new List<Type>();
           foreach (var p in constructorOnBase.GetParameters())
             constructorArgs.Add(p.ParameterType);
-          constructorArgs.Add(typeof(IDynamicProxyInvoker));
+          constructorArgs.Add(typeof(IAbstractWebcallInvoker));
           var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, CallingConventions.Standard, constructorArgs.ToArray());
           // CODE: Public Sub New([...],dynamicProxyInvoker As IDynamicProxyInvoker)
 
@@ -166,7 +169,11 @@ namespace System.Web.UJMW {
       }
       else // THIS IS WHEN WERE IMPLEMENTING AN INTERFACE INSTEAD OF INHERITING A CLASS
       {
-        var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, CallingConventions.HasThis, new[] { typeof(IDynamicProxyInvoker) });
+        var constructorBuilder = typeBuilder.DefineConstructor(
+          MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
+          CallingConventions.HasThis,
+          new[] { typeof(IAbstractWebcallInvoker) }
+        );
 
         // CODE: Public Sub New(dynamicProxyInvoker As IDynamicProxyInvoker)
 

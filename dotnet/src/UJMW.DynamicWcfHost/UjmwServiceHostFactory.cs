@@ -1,15 +1,19 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.Extensions.Hosting;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
+using System.ServiceModel.Web;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Xml;
 using Message = System.ServiceModel.Channels.Message;
 using ServiceDescription = System.ServiceModel.Description.ServiceDescription;
@@ -29,56 +33,14 @@ namespace System.Web.UJMW {
     public UjmwServiceHostFactory() {
     }
 
-    public delegate bool ServiceContractInterfaceSelector(
-      Type serviceImplementationType,
-      string url,
-      out Type serviceContractInterfaceType
-    );
-
-    public static bool ForceHttps { get; set; } = false;
-    public static ServiceContractInterfaceSelector ContractSelector { get; set; } = (
-      (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => {
-
-        Type[] contractInterfaces = serviceImplementationType.GetInterfaces().Where(
-          (i) => i.GetCustomAttributes(true).Where((a) => a.GetType() == typeof(System.ServiceModel.ServiceContractAttribute)).Any()
-        ).ToArray();
-
-        if (contractInterfaces.Length == 0) {
-          serviceContractInterfaceType = serviceImplementationType;
-          return false;
-        }
-
-        if (contractInterfaces.Length > 1) {
-          string[] urlTokens = url.Split('/');
-          string versionFromUrl = null;
-          for (int i = urlTokens.Length - 1; i > 0; i--) {
-            if (Regex.IsMatch(urlTokens[i], "^([vV][0-9]{1,})$")) {
-              versionFromUrl = urlTokens[i].ToLower();
-              break;
-            }
-          }
-          if (versionFromUrl != null) {
-            var versionMatchingInterface = contractInterfaces.Where((i) => ("." + i.FullName.ToLower() + ".").Contains(versionFromUrl)).FirstOrDefault();
-            if (versionMatchingInterface != null) {
-              serviceContractInterfaceType = versionMatchingInterface;
-              return true;
-            }
-          }
-        }
-
-        serviceContractInterfaceType = contractInterfaces.First();
-        return true;
-      }
-    );
-
     protected override ServiceHost CreateServiceHost(Type serviceImplementationType, Uri[] baseAddresses) {
       Uri primaryUri = baseAddresses[0];
 
-      if (ForceHttps) {
+      if (UjmwServiceBehaviour.ForceHttps) {
         primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
       }
 
-      ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+      UjmwServiceBehaviour.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
 
       ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
 
@@ -111,7 +73,7 @@ namespace System.Web.UJMW {
         host.Description.Behaviors.Add(metadataBehaviour);
       }
 
-      if (ForceHttps) {
+      if (UjmwServiceBehaviour.ForceHttps) {
         metadataBehaviour.HttpsGetEnabled = true;
         metadataBehaviour.HttpGetEnabled = false;
       }
@@ -127,7 +89,7 @@ namespace System.Web.UJMW {
         debugBehaviour = new ServiceDebugBehavior();
         host.Description.Behaviors.Add(debugBehaviour);
       }
-      debugBehaviour.IncludeExceptionDetailInFaults = (!ForceHttps);
+      debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwServiceBehaviour.ForceHttps);
 
       SideChannelServiceBehavior customizedServiceBehaviour;
       if (host.Description.Behaviors.Contains(typeof(SideChannelServiceBehavior))) {
@@ -145,7 +107,7 @@ namespace System.Web.UJMW {
     private static WebHttpBinding _CustomizedWebHttpBinding = null;
 
     private WebHttpBinding GetCustomizedWebHttpBinding() {
-      if (ForceHttps) {
+      if (UjmwServiceBehaviour.ForceHttps) {
 
         if (_CustomizedWebHttpBindingSecured == null) {
           _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
@@ -154,7 +116,7 @@ namespace System.Web.UJMW {
 
         return _CustomizedWebHttpBindingSecured;
       }
-      else { 
+      else {
         if (_CustomizedWebHttpBinding == null) {
           _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.None);
         }
@@ -174,20 +136,20 @@ namespace System.Web.UJMW {
       }
 
       foreach (var od in defaultContractDescription.Operations) {
-        var outMessages = od.Messages.Where((m)=> m.Direction == MessageDirection.Output);
+        var outMessages = od.Messages.Where((m) => m.Direction == MessageDirection.Output);
         foreach (var om in outMessages) {
 
-          if(om.Body != null && om.Body.ReturnValue != null) {
+          if (om.Body != null && om.Body.ReturnValue != null) {
 
-             var customizedReturnValueDescription = new MessagePartDescription("return", om.Body.ReturnValue.Namespace);
+            var customizedReturnValueDescription = new MessagePartDescription("return", om.Body.ReturnValue.Namespace);
 
-             customizedReturnValueDescription.Type = om.Body.ReturnValue.Type;
-             customizedReturnValueDescription.ProtectionLevel = om.Body.ReturnValue.ProtectionLevel;
-             customizedReturnValueDescription.Index = om.Body.ReturnValue.Index;
-             customizedReturnValueDescription.Multiple = om.Body.ReturnValue.Multiple;
-             customizedReturnValueDescription.MemberInfo = om.Body.ReturnValue.MemberInfo;
+            customizedReturnValueDescription.Type = om.Body.ReturnValue.Type;
+            customizedReturnValueDescription.ProtectionLevel = om.Body.ReturnValue.ProtectionLevel;
+            customizedReturnValueDescription.Index = om.Body.ReturnValue.Index;
+            customizedReturnValueDescription.Multiple = om.Body.ReturnValue.Multiple;
+            customizedReturnValueDescription.MemberInfo = om.Body.ReturnValue.MemberInfo;
 
-             om.Body.ReturnValue = customizedReturnValueDescription;
+            om.Body.ReturnValue = customizedReturnValueDescription;
           }
         }
       }
@@ -195,254 +157,326 @@ namespace System.Web.UJMW {
       return defaultContractDescription;
     }
 
-  }
+    internal class CustomizedJsonContentTypeMapper : WebContentTypeMapper {
 
-  internal class CustomizedJsonContentTypeMapper : WebContentTypeMapper {
-
-    public override WebContentFormat GetMessageFormatForContentType(string contentType) {
-      return WebContentFormat.Raw;
-    }
-  }
-
-  internal class SideChannelServiceBehavior : IServiceBehavior {
-
-    public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters) {
-    }
-
-    public void ApplyDispatchBehavior(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
-      Type contractType = serviceDescription.Endpoints[0].Contract.ContractType;
-
-      if (contractType == null) {
-        throw new Exception($"ContractType for Service '{serviceDescription.Name}' was not found!");
+      public override WebContentFormat GetMessageFormatForContentType(string contentType) {
+        return WebContentFormat.Raw;
       }
-      else {
-        foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
-          foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
-            endpoint.DispatchRuntime.MessageInspectors.Add(new SideChannelDispatchMessageInspector());
+    }
+
+    internal class SideChannelServiceBehavior : IServiceBehavior {
+
+      public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters) {
+      }
+
+      public void ApplyDispatchBehavior(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
+        Type contractType = serviceDescription.Endpoints[0].Contract.ContractType;
+
+        if (contractType == null) {
+          throw new Exception($"ContractType for Service '{serviceDescription.Name}' was not found!");
+        }
+        else {
+          foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
+            foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
+              endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector());
+            }
           }
         }
       }
-    }
 
-    public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
-    }
-
-  }
-
-  internal class SideChannelDispatchMessageInspector : IDispatchMessageInspector {
-
-    public void BeforeSendReply(ref Message outgoingReply, Object correlationState) {
-
-      //TODO: SEITENKANAL
-
-    }
-
-    public Object AfterReceiveRequest(ref Message incomingSoapRequest, IClientChannel  channel, InstanceContext instanceContext) {
-
-      //TODO: SEITENKANAL
-
-      return null;
-    }
-
-  }
-
-  internal class CustomizedWebHttpBehaviourForJson : WebHttpBehavior { 
-
-    public CustomizedWebHttpBehaviourForJson() {
-      this.DefaultOutgoingRequestFormat = System.ServiceModel.Web.WebMessageFormat.Json;
-      this.DefaultOutgoingResponseFormat = System.ServiceModel.Web.WebMessageFormat.Json;
-      this.DefaultBodyStyle = System.ServiceModel.Web.WebMessageBodyStyle.Wrapped;
-    }
-
-    protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-      return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
-    }
-
-    protected override IDispatchMessageFormatter GetReplyDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-      return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
-    }
-
-    protected override IClientMessageFormatter GetRequestClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-      return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
-    }
-
-    protected override IClientMessageFormatter GetReplyClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-      return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
-    }
-
-  }
-
-  internal class CustomizedJsonFormatter : IDispatchMessageFormatter, IClientMessageFormatter {
-
-    private OperationDescription _OperationSchema;
-    private Dictionary<String, int> _ParameterIndicesPerName;
-    private MessageDescription _RelevantMessageDesc;
-    private Uri _Uri;
-
-    public CustomizedJsonFormatter(OperationDescription operation, bool isRequest, Uri uri) {
-
-      _OperationSchema = operation;
-      _Uri = new Uri(uri.ToString() + "/" + operation.Name);
-
-      if (isRequest) {
-        _RelevantMessageDesc = operation.Messages.Where((m) => m.Direction == MessageDirection.Input).First();
-      }
-      else {
-        _RelevantMessageDesc = operation.Messages.Where((m) => m.Direction == MessageDirection.Output).First();
-      }
-
-      _ParameterIndicesPerName = new Dictionary<String, int>();
-
-      for (int i = 0; i < _RelevantMessageDesc.Body.Parts.Count; i++) {
-        _ParameterIndicesPerName.Add(_RelevantMessageDesc.Body.Parts[i].Name, i);
+      public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
       }
 
     }
 
-    //1. Client packt REQUEST ein 
-    public Message SerializeRequest(MessageVersion messageVersion, Object[] parameters) {
-      return this.SerializeOutgoingMessage(messageVersion, parameters, null, false);
+    internal class DispatchMessageInspector : IDispatchMessageInspector {
+
+      private Dictionary<String, MethodInfo> _MethodInfoCache = new Dictionary<String, MethodInfo>();
+
+      public Object AfterReceiveRequest(ref Message incomingSoapRequest, IClientChannel channel, InstanceContext instanceContext) {
+
+        if (UjmwServiceBehaviour.AuthHeaderEvaluator == null && UjmwServiceBehaviour.RequestSidechannelProcessor == null) {
+          return null;
+        }
+
+        RemoteEndpointMessageProperty clientEndpoint = OperationContext.Current.IncomingMessageProperties[RemoteEndpointMessageProperty.Name] as RemoteEndpointMessageProperty;
+        string callingMachine = clientEndpoint.Address.ToString();
+
+        string methodName = null;
+        string fullCallUrl = null;
+        if (incomingSoapRequest.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
+          methodName = httpOperationName?.ToString();
+        }
+        if (incomingSoapRequest.Properties.TryGetValue("Via", out object via)) {
+          fullCallUrl = via?.ToString();
+        }
+        if (methodName == null || fullCallUrl == null) {
+          return null;
+        }
+
+        MethodInfo calledContractMethod;
+        lock (_MethodInfoCache) {
+          if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
+
+            //HACK: instead of serviceImplementationType we should evaluate the merhodinfo for the contract!
+            Type serviceContractType = instanceContext.Host.Description.ServiceType;
+
+            calledContractMethod = serviceContractType.GetMethod(methodName);
+            _MethodInfoCache[fullCallUrl] = calledContractMethod;
+          }
+        }
+
+        if (UjmwServiceBehaviour.AuthHeaderEvaluator == null) {
+          this.ProcessRequestSideChannel(calledContractMethod);
+          return null;
+        }
+
+        int httpReturnCode = 200;
+
+        string rawAuthHeader = null;
+        HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingSoapRequest.Properties[HttpRequestMessageProperty.Name];
+
+        if (httpRequest.Headers.AllKeys.Contains("Authorization")) {
+          rawAuthHeader = httpRequest.Headers["Authorization"];
+        }
+
+        bool continueProcessing = UjmwServiceBehaviour.AuthHeaderEvaluator.Invoke(
+          rawAuthHeader, calledContractMethod, callingMachine, ref httpReturnCode
+        );
+
+        if (continueProcessing) {
+          this.ProcessRequestSideChannel(calledContractMethod);
+          return null;
+        }
+        else {
+          if (httpReturnCode == 200) {
+            //default, if no specific code has been provided!
+            throw new WebFaultException(HttpStatusCode.Forbidden);
+          }
+          throw new WebFaultException((HttpStatusCode)httpReturnCode);
+        }
+
+      }
+
+      private void ProcessRequestSideChannel(MethodInfo calledContractMethod) {
+        if (UjmwServiceBehaviour.RequestSidechannelProcessor != null) {
+
+          //TODO: extract request side channel...
+          //UjmwServiceBehaviour.RequestSidechannelProcessor.Invoke(calledContractMethod, extractedContainer);
+
+        }
+      }
+
+      public void BeforeSendReply(ref Message outgoingReply, Object correlationState) {
+        if (UjmwServiceBehaviour.ResponseSidechannelCapturer != null) {
+
+          //UjmwServiceBehaviour.ResponseSidechannelCapturer.Invoke(calledContractMethod, containerToReply);
+          //TODO: inject response side channel...
+
+        }
+      }
+
     }
 
-    //2. Server packt REQUEST aus
-    public void DeserializeRequest(Message message, Object[] parameters) {
-      this.DeserializeIncommingMessage(message, parameters, false);
+    internal class CustomizedWebHttpBehaviourForJson : WebHttpBehavior {
+
+      public CustomizedWebHttpBehaviourForJson() {
+        this.DefaultOutgoingRequestFormat = System.ServiceModel.Web.WebMessageFormat.Json;
+        this.DefaultOutgoingResponseFormat = System.ServiceModel.Web.WebMessageFormat.Json;
+        this.DefaultBodyStyle = System.ServiceModel.Web.WebMessageBodyStyle.Wrapped;
+      }
+
+      protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
+        return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
+      }
+
+      protected override IDispatchMessageFormatter GetReplyDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
+        return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
+      }
+
+      protected override IClientMessageFormatter GetRequestClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
+        return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
+      }
+
+      protected override IClientMessageFormatter GetReplyClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
+        return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
+      }
+
     }
 
-    //3. Server packt RESPONSE ein
-    public Message SerializeReply(MessageVersion messageVersion, Object[] parameters, Object result) {
-      return this.SerializeOutgoingMessage(messageVersion, parameters, result, true);
-    }
+    internal class CustomizedJsonFormatter : IDispatchMessageFormatter, IClientMessageFormatter {
 
-    //4. Client packt RESPONSE aus
-    public Object DeserializeReply(Message message, Object[] parameters) {
-      return this.DeserializeIncommingMessage(message, parameters, true);
-    }
+      private OperationDescription _OperationSchema;
+      private Dictionary<String, int> _ParameterIndicesPerName;
+      private MessageDescription _RelevantMessageDesc;
+      private Uri _Uri;
 
-    public Message SerializeOutgoingMessage(MessageVersion messageVersion, Object[] parameters, Object result, bool isReply) {
-      Byte[] body;
-      var serializer = new Newtonsoft.Json.JsonSerializer();
+      public CustomizedJsonFormatter(OperationDescription operation, bool isRequest, Uri uri) {
 
-      using (var ms = new MemoryStream()) {
-        using (var sw = new StreamWriter(ms, Encoding.UTF8)) {
-          using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw)) {
-            //'writer.Formatting = Newtonsoft.Json.Formatting.Indented;
+        _OperationSchema = operation;
+        _Uri = new Uri(uri.ToString() + "/" + operation.Name);
 
-            writer.WriteStartObject();
+        if (isRequest) {
+          _RelevantMessageDesc = operation.Messages.Where((m) => m.Direction == MessageDirection.Input).First();
+        }
+        else {
+          _RelevantMessageDesc = operation.Messages.Where((m) => m.Direction == MessageDirection.Output).First();
+        }
 
-            foreach (var p in _RelevantMessageDesc.Body.Parts.OrderBy((prt) => prt.Index)) {
-              String byRefPropName = p.Name;
-              Object byRefValue = parameters[p.Index];
-              if (Char.IsUpper(byRefPropName[0])) {
-                byRefPropName = Char.ToLower(byRefPropName[0]) + byRefPropName.Substring(1);
+        _ParameterIndicesPerName = new Dictionary<String, int>();
+
+        for (int i = 0; i < _RelevantMessageDesc.Body.Parts.Count; i++) {
+          _ParameterIndicesPerName.Add(_RelevantMessageDesc.Body.Parts[i].Name, i);
+        }
+
+      }
+
+      //1. Client packt REQUEST ein 
+      public Message SerializeRequest(MessageVersion messageVersion, Object[] parameters) {
+        return this.SerializeOutgoingMessage(messageVersion, parameters, null, false);
+      }
+
+      //2. Server packt REQUEST aus
+      public void DeserializeRequest(Message message, Object[] parameters) {
+        this.DeserializeIncommingMessage(message, parameters, false);
+      }
+
+      //3. Server packt RESPONSE ein
+      public Message SerializeReply(MessageVersion messageVersion, Object[] parameters, Object result) {
+        return this.SerializeOutgoingMessage(messageVersion, parameters, result, true);
+      }
+
+      //4. Client packt RESPONSE aus
+      public Object DeserializeReply(Message message, Object[] parameters) {
+        return this.DeserializeIncommingMessage(message, parameters, true);
+      }
+
+      public Message SerializeOutgoingMessage(MessageVersion messageVersion, Object[] parameters, Object result, bool isReply) {
+        Byte[] body;
+        var serializer = new Newtonsoft.Json.JsonSerializer();
+
+        using (var ms = new MemoryStream()) {
+          using (var sw = new StreamWriter(ms, Encoding.UTF8)) {
+            using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw)) {
+              //'writer.Formatting = Newtonsoft.Json.Formatting.Indented;
+
+              writer.WriteStartObject();
+
+              foreach (var p in _RelevantMessageDesc.Body.Parts.OrderBy((prt) => prt.Index)) {
+                String byRefPropName = p.Name;
+                Object byRefValue = parameters[p.Index];
+                if (Char.IsUpper(byRefPropName[0])) {
+                  byRefPropName = Char.ToLower(byRefPropName[0]) + byRefPropName.Substring(1);
+                }
+                writer.WritePropertyName(byRefPropName);
+                serializer.Serialize(writer, byRefValue);
               }
-              writer.WritePropertyName(byRefPropName);
-              serializer.Serialize(writer, byRefValue);
+
+              if (_RelevantMessageDesc.Body.ReturnValue != null &&
+                _RelevantMessageDesc.Body.ReturnValue.Type != typeof(void) &&
+                !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
+                //should be "result" as customized on another place
+                writer.WritePropertyName(_RelevantMessageDesc.Body.ReturnValue.Name);
+                serializer.Serialize(writer, result);
+              }
+
+              writer.WriteEndObject();
+
+              sw.Flush();
+              body = ms.ToArray();
+
             }
-
-            if (_RelevantMessageDesc.Body.ReturnValue != null &&
-              _RelevantMessageDesc.Body.ReturnValue.Type != typeof(void) &&
-              !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
-              //should be "result" as customized on another place
-              writer.WritePropertyName(_RelevantMessageDesc.Body.ReturnValue.Name);
-              serializer.Serialize(writer, result);
-            }
-
-            writer.WriteEndObject();
-
-            sw.Flush();
-            body = ms.ToArray();
-
           }
         }
+
+        Message replyMessage = Message.CreateMessage(messageVersion, _OperationSchema.Messages[1].Action, new RawBodyWriter(body));
+        replyMessage.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
+
+        var respProp = new HttpResponseMessageProperty();
+        respProp.Headers[HttpResponseHeader.ContentType] = "application/json";
+        replyMessage.Properties.Add(HttpResponseMessageProperty.Name, respProp);
+
+        replyMessage.Headers.To = _Uri;
+        replyMessage.Properties.Via = _Uri;
+
+        return replyMessage;
       }
 
-      Message replyMessage = Message.CreateMessage(messageVersion, _OperationSchema.Messages[1].Action, new RawBodyWriter(body));
-      replyMessage.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
+      public Object DeserializeIncommingMessage(Message message, Object[] parameters, bool isReply) {
 
-      var respProp = new HttpResponseMessageProperty();
-      respProp.Headers[HttpResponseHeader.ContentType] = "application/json";
-      replyMessage.Properties.Add(HttpResponseMessageProperty.Name, respProp);
+        Object bodyFormatProperty = null;
 
-      replyMessage.Headers.To = _Uri;
-      replyMessage.Properties.Via = _Uri;
-
-      return replyMessage;
-    }
-
-    public Object DeserializeIncommingMessage(Message message, Object[] parameters, bool isReply) {
-
-      Object bodyFormatProperty = null;
-
-      if(!message.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out bodyFormatProperty)) {
-        //occours for example on a incomming http-GET request (without a body)
-        return null;
-      }
-
-      if (((WebBodyFormatMessageProperty)bodyFormatProperty).Format != WebContentFormat.Raw) {
-        throw new InvalidOperationException("Incoming messages must have a body format of Raw. Is a ContentTypeMapper set on the WebHttpBinding?");
-      }
-
-      Type returnValueType = null;
-      Object returnValue = null;
-      String returnValueName = null;
-  
-      if(_RelevantMessageDesc.Body.ReturnValue != null && !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
-        returnValueName = _RelevantMessageDesc.Body.ReturnValue.Name;
-        returnValueType = _RelevantMessageDesc.Body.ReturnValue.Type;
-      }
-
-      var bodyReader = message.GetReaderAtBodyContents();
-      bodyReader.ReadStartElement("Binary");
-
-      Byte[] rawBody = bodyReader.ReadContentAsBase64();
-      var ms = new MemoryStream(rawBody);
-      var sr = new StreamReader(ms);
-      var serializer = new Newtonsoft.Json.JsonSerializer();
-
-      Newtonsoft.Json.JsonReader reader = new Newtonsoft.Json.JsonTextReader(sr);
-      reader.Read();
-      if (reader.TokenType != Newtonsoft.Json.JsonToken.StartObject) {
-        throw new InvalidOperationException("Input needs to be wrapped in an object");
-      }
-
-      reader.Read();
-
-      while (reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName) {
-        String parameterName = reader.Value?.ToString();
-        reader.Read();
-        if(!string.IsNullOrWhiteSpace(returnValueName) && parameterName.Equals(returnValueName, StringComparison.InvariantCultureIgnoreCase)) {
-          returnValue = serializer.Deserialize(reader, returnValueType);
+        if (!message.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out bodyFormatProperty)) {
+          //occours for example on a incomming http-GET request (without a body)
+          return null;
         }
-        else if (_ParameterIndicesPerName.ContainsKey(parameterName)) {
-          int parameterIndex = _ParameterIndicesPerName[parameterName];
-          parameters[parameterIndex] = serializer.Deserialize(reader, _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type);
+
+        if (((WebBodyFormatMessageProperty)bodyFormatProperty).Format != WebContentFormat.Raw) {
+          throw new InvalidOperationException("Incoming messages must have a body format of Raw. Is a ContentTypeMapper set on the WebHttpBinding?");
         }
-      else{ 
-          reader.Skip();
-      }
+
+        Type returnValueType = null;
+        Object returnValue = null;
+        String returnValueName = null;
+
+        if (_RelevantMessageDesc.Body.ReturnValue != null && !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
+          returnValueName = _RelevantMessageDesc.Body.ReturnValue.Name;
+          returnValueType = _RelevantMessageDesc.Body.ReturnValue.Type;
+        }
+
+        var bodyReader = message.GetReaderAtBodyContents();
+        bodyReader.ReadStartElement("Binary");
+
+        Byte[] rawBody = bodyReader.ReadContentAsBase64();
+        var ms = new MemoryStream(rawBody);
+        var sr = new StreamReader(ms);
+        var serializer = new Newtonsoft.Json.JsonSerializer();
+
+        Newtonsoft.Json.JsonReader reader = new Newtonsoft.Json.JsonTextReader(sr);
         reader.Read();
+        if (reader.TokenType != Newtonsoft.Json.JsonToken.StartObject) {
+          throw new InvalidOperationException("Input needs to be wrapped in an object");
+        }
+
+        reader.Read();
+
+        while (reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName) {
+          String parameterName = reader.Value?.ToString();
+          reader.Read();
+          if (!string.IsNullOrWhiteSpace(returnValueName) && parameterName.Equals(returnValueName, StringComparison.InvariantCultureIgnoreCase)) {
+            returnValue = serializer.Deserialize(reader, returnValueType);
+          }
+          else if (_ParameterIndicesPerName.ContainsKey(parameterName)) {
+            int parameterIndex = _ParameterIndicesPerName[parameterName];
+            parameters[parameterIndex] = serializer.Deserialize(reader, _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type);
+          }
+          else {
+            reader.Skip();
+          }
+          reader.Read();
+        }
+
+        reader.Close();
+        sr.Close();
+        ms.Close();
+
+        return returnValue;
       }
 
-      reader.Close();
-      sr.Close();
-      ms.Close();
+      private class RawBodyWriter : BodyWriter {
 
-      return returnValue;
-    }
+        private Byte[] _Content;
 
-    private class RawBodyWriter : BodyWriter {
+        public RawBodyWriter(Byte[] content) : base(true) {
+          _Content = content;
+        }
 
-      private Byte[] _Content;
+        protected override void OnWriteBodyContents(XmlDictionaryWriter writer) {
+          writer.WriteStartElement("Binary");
+          writer.WriteBase64(_Content, 0, _Content.Length);
+          writer.WriteEndElement();
+        }
 
-      public RawBodyWriter(Byte[] content) : base(true) {
-        _Content = content;
-      }
-
-      protected override void OnWriteBodyContents(XmlDictionaryWriter writer) {
-        writer.WriteStartElement("Binary");
-        writer.WriteBase64(_Content, 0, _Content.Length);
-        writer.WriteEndElement();
       }
 
     }

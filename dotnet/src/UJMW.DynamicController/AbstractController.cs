@@ -13,10 +13,10 @@ namespace Security.AccessTokenHandling.OAuthServer {
   [Route("Foo")]
   public partial class FooServiceController : ControllerBase {
 
-    private readonly ILogger<OAuthServiceController> _Logger;
+    private readonly ILogger<FooServiceController> _Logger;
 
-    public OAuthServiceController( ILogger<OAuthServiceController> logger, object authService ) { 
-      _Logger = logger;
+    public FooServiceController( ILogger<FooServiceController> logger, object authService ) { 
+      
      
 
 

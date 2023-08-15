@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>UJMW.DynamicController</id>
-    <version>1.0.0-localbuild</version>
+    <version>999.0.0-localbuild</version>
     <title>UJMW.DynamicController</title>
     <authors>SmartStandards</authors>
     <owners>(public domain)</owners>

@@ -1,14 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Reflection;
-using System.Security.Policy;
-using System.Text;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static System.Web.UJMW.DynamicClientFactory;
 
 namespace System.Web.UJMW {
@@ -27,14 +17,43 @@ namespace System.Web.UJMW {
           if (methodName == nameof(IMyService.ThisIsAVoid)) {
             return "{\n}";
           }
+          else if (methodName == nameof(IMyService.Calculate)) {
+            return "{ \"_\":{ \"lastError\":null }, \"return\": 42}";
+          }
+          else if (methodName == nameof(IMyService.IntByRef)) {
+            return "{ \"foo\": 43}";
+          }
+          else if (methodName == nameof(IMyService.IntOut)) {
+            return "{ \"foo\": 44}";
+          }
+          else if (methodName == nameof(IMyService.ProcessABag)) {
+            return "{ \"return\": true}";
+          }
           return "{ \"fault\":\"UNKNOWN-METHOD\"}";
         }
       );
 
-      var client = DynamicClientFactory.CreateInstance<IMyService>(mockHttpCaller, ()=>dummyRootUrl);
+      var client = DynamicClientFactory.CreateInstance<IMyService>(
+        mockHttpCaller,
+        () => dummyRootUrl,
+        (outChannel) => {
+          outChannel["Tenant"] = "NASA";
+        },
+        (retChannel) => {
+        }
+       );
 
+      var result = client.Calculate( 1, 2);
+      Assert.AreEqual(42,result);
 
-      client.ThisIsAVoid();
+      Assert.IsTrue(client.ProcessABag(new BeautifulPropertyBag()));
+
+      int foo1 = 33;
+      client.IntByRef(ref  foo1);
+      Assert.AreEqual(43, foo1);
+
+      client.IntOut(out int foo);
+      Assert.AreEqual(44, foo);
 
     }
 

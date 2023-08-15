@@ -10,8 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IUjmwSideChannelHook.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)WebCallInvoker.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IDynamicProxyInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwFaultException.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwWebCallInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IAbstractWebcallInvoker.cs" />
   </ItemGroup>
 </Project>
