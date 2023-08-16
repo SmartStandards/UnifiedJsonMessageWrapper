@@ -1,4 +1,5 @@
-﻿using System.Web.UJMW;
+﻿using System.Net.Http;
+using System.Web.UJMW;
 
   Console.WriteLine("Please enter a number:");
   if(int.TryParse(Console.ReadLine(),out int number)) {
@@ -19,8 +20,11 @@
       Console.WriteLine("EXCEPTION: " + ex.Message);
     }
 
+    svc.Dispose();
+
   }
   else {
     Console.WriteLine("Invalid number!");
   }
+
   Console.ReadLine();

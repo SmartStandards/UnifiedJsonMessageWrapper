@@ -1,10 +1,11 @@
-﻿using System.Runtime.Serialization;
+﻿using System;
+using System.Runtime.Serialization;
 using System.ServiceModel;
 
 namespace UJMW.DemoWcfService {
 
   [ServiceContract]
-  public interface IDemoService {
+  public interface IDemoService : IDisposable{
 
     [OperationContract]
     string GetData(int value);

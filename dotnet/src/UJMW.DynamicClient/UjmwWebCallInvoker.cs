@@ -17,22 +17,34 @@ namespace System.Web.UJMW {
     private Func<string> _UrlGetter;
     private RequestSidechannelCaptureMethod _RequestSidechannelCaptureMethod;
     private ResponseSidechannelProcessingMethod _ResponseSidechannelProcessor;
+    private Action _OnDisposeInvoked;
 
     public UjmwWebCallInvoker(
       Type applicableType,
       HttpPostMethod httpPostMethod,
       Func<string> urlGetter,
       RequestSidechannelCaptureMethod requestSidechannelCaptureMethod,
-      ResponseSidechannelProcessingMethod responseSidechannelProcessor
+      ResponseSidechannelProcessingMethod responseSidechannelProcessor,
+      Action onDisposeInvoked = null
     ) {
       _ContractType = applicableType;
       _HttpPostMethod = httpPostMethod;
       _UrlGetter = urlGetter;
       _RequestSidechannelCaptureMethod = requestSidechannelCaptureMethod;
       _ResponseSidechannelProcessor = responseSidechannelProcessor;
+      _OnDisposeInvoked = onDisposeInvoked;
+      if(_OnDisposeInvoked == null) {
+        _OnDisposeInvoked = (() => { });
+      }
     } 
 
     public object InvokeWebCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+
+      if(methodName == nameof(IDisposable.Dispose)) {
+        _OnDisposeInvoked.Invoke();
+        return null;
+      }
+
       string rootUrl = _UrlGetter.Invoke();
       if (!rootUrl.EndsWith("/")) {
         rootUrl += "/";

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace System.Web.UJMW {
@@ -22,7 +23,8 @@ namespace System.Web.UJMW {
     public delegate string HttpPostMethod(string url, string jsonContent);
 
     public static TApplicable CreateInstance<TApplicable>(string url) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u, j) => InvokeCallViaHttpClient(new HttpClient(), u, j), ()=>url, (c) => { }, (c) => { });
+      var hc = new HttpClient();
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u, j) => InvokeCallViaHttpClient(hc, u, j), ()=>url, (c) => { }, (c) => { }, hc.Dispose);
       return CreateInstance<TApplicable>(invoker);
     }
 
@@ -189,7 +191,10 @@ namespace System.Web.UJMW {
 
       // ##### METHOD DEFINITIONs #####
 
-      foreach (var mi in applicableType.GetMethods()) {
+      var allMethods = new List<MethodInfo>();
+      CollectAllMethodsForType(applicableType, allMethods);
+
+      foreach (var mi in allMethods) {
         var methodSignatureString = mi.ToString();
         var methodNameBlacklist = new[] { "ToString", "GetHashCode", "GetType", "Equals" };
         if (!mi.IsSpecialName && !methodNameBlacklist.Contains(mi.Name)) {
@@ -375,6 +380,18 @@ namespace System.Web.UJMW {
       var dynamicType = typeBuilder.CreateType();
       // assemblyBuilder.Save("Dynassembly.dll")
       return dynamicType;
+    }
+
+    private static void CollectAllMethodsForType(Type t, List<MethodInfo> target) {
+      foreach (MethodInfo mi in t.GetMethods()) {
+        target.Add(mi);
+      }
+      if(t.BaseType != null) {
+        CollectAllMethodsForType(t.BaseType, target);
+      }
+      foreach (Type intf in t.GetInterfaces()) {
+        CollectAllMethodsForType(intf, target);
+      }
     }
 
   }
