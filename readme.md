@@ -140,8 +140,6 @@ To avoid conflicts with the regular arguments, we need a sub-structure which is 
 }
 ```
 
-
-
 ## Reserved / well known Side-Channel names
 
 | Channel Name          | Direction     | Description                          |
@@ -150,7 +148,75 @@ To avoid conflicts with the regular arguments, we need a sub-structure which is 
 | **"ambientDataFlow"** | REQUEST ONLY  | TBD                                  |
 | **"transactionId"**   | REQUEST ONLY  | used to transfer Transaction-Handles |
 
+-----
+
+# About the Tooling
+
+## Clients
+
+### for .NET Framework & .NET core
+  **IS STABLE** (see '/dotnet/UJMW.sln')
+  The NuGet-Package ID is 'UJMW.DynamicClient'
+
+### for JavaScript / TypeScript
+  *IS COMMING SOON*
+  The NPM-Package ID is 'UJMW.DynamicClient'
+
+## Server Facades
+
+## A Dynamic ServiceHost Factory for WCF (.NET fx 461)
+  **IS STABLE** (see '/dotnet/UJMW.sln' ) - a Demo-Service is also included...
+  The NuGet-Package ID is 'UJMW.DynamicWcfHost'  
+
+```xml
+<system.serviceModel>
+  <serviceHostingEnvironment aspNetCompatibilityEnabled="false" multipleSiteBindingsEnabled="true" >
+    <serviceActivations>
+      <add relativeAddress="YourService.svc" service="TheNamespace.YourService, AssName"
+           factory="System.Web.UJMW.UjmwServiceHostFactory, UJMW.DynamicWcfHost" />
+```
 
 
-​    
+this could also be necessary:
+```xml
+<runtime>
+  <assemblyBinding xmlns = "urn:schemas-microsoft-com:asm.v1" >
+    <dependentAssembly>
+      <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
+      <bindingRedirect oldVersion = "0.0.0.0-14.0.0.0" newVersion="8.0.0.0" />
+    </dependentAssembly>
+```
+
+you can configure behavior in this way:
+
+```xml
+<system.webServer>
+ <modules runAllManagedModulesForAllRequests="true">
+   <add name="ConfigurativeEntryPointModule" type="UJMW.DemoWcfService.EntryModule"/>
+```
+
+```c#
+public class EntryModule : IHttpModule {
+    
+  public void Init(HttpApplication context) {
+    UjmwServiceBehaviour.AuthHeaderEvaluator = ...
+    UjmwServiceBehaviour.RequestSidechannelProcessor = ...
+    UjmwServiceBehaviour.ResponseSidechannelCapturer = ...
+    UjmwServiceBehaviour.ContractSelector = ...
+    UjmwServiceBehaviour.ForceHttps = true;
+  }
+    
+  public void Dispose() { }
+}
+```
+
+
+
+## A Dynamic Controller Factory for ASP.NET core WebAPI
+  *IS COMMING SOON*
+  The NuGet-Package ID is 'UJMW.DynamicController'
+
+## Controller Code Generator for ASP.NET core WebAPI
+  **IS STABLE** but discontinued (see '/Resources/for ASP.NET 5 MVC/...')
+  The NuGet-Package ID is 'UJMW.Tools.CodeGen'
 

@@ -33,6 +33,11 @@ namespace System.Web.UJMW {
       ref int httpReturnCode
     );
 
+    //UNDER DEVELOPMENT...
+    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
+    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
+    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
+
     public static RequestSidechannelProcessingMethod RequestSidechannelProcessor { get; set; } = null;
 
     public static ResponseSidechannelCaptureMethod ResponseSidechannelCapturer { get; set; } = null;
@@ -40,14 +45,19 @@ namespace System.Web.UJMW {
     public static ServiceContractInterfaceSelectorMethod ContractSelector { get; set; } = (
       (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => {
 
-        Type[] contractInterfaces = serviceImplementationType.GetInterfaces().Where(
-          (i) => i.GetCustomAttributes(true).Where((a) => a.GetType() == typeof(System.ServiceModel.ServiceContractAttribute)).Any()
+        Type[] allInterfaces = serviceImplementationType.GetInterfaces().Where(
+         (i) => (i != typeof(IDisposable))
         ).ToArray();
 
-        if (contractInterfaces.Length == 0) {
+        if (allInterfaces.Length == 0) {
+          //use the concrete impl. type only if there is relly no interface implemented
           serviceContractInterfaceType = serviceImplementationType;
           return false;
         }
+
+        Type[] contractInterfaces = allInterfaces.Where(
+          (i) => i.GetCustomAttributes(true).Where((a) => a.GetType() == typeof(System.ServiceModel.ServiceContractAttribute)).Any()
+        ).ToArray();
 
         if (contractInterfaces.Length > 1) {
           string[] urlTokens = url.Split('/');
@@ -62,13 +72,23 @@ namespace System.Web.UJMW {
             var versionMatchingInterface = contractInterfaces.Where((i) => ("." + i.FullName.ToLower() + ".").Contains(versionFromUrl)).FirstOrDefault();
             if (versionMatchingInterface != null) {
               serviceContractInterfaceType = versionMatchingInterface;
+              //prefer a interface (with a 'ServiceContractAttribute') wich is matching the version
               return true;
             }
           }
         }
 
-        serviceContractInterfaceType = contractInterfaces.First();
-        return true;
+        if (contractInterfaces.Length > 0) {
+          //prefer the first interface (with a 'ServiceContractAttribute')
+          serviceContractInterfaceType = contractInterfaces.First();
+          return true;
+        }
+        else {
+          //otherwise use the first interface (without a 'ServiceContractAttribute')
+          serviceContractInterfaceType = allInterfaces.First();
+          return false;
+        }
+
       }
     );
 

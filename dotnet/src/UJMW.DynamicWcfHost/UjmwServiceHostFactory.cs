@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -20,11 +21,24 @@ using ServiceDescription = System.ServiceModel.Description.ServiceDescription;
 
 namespace System.Web.UJMW {
 
+
+  //-------------------------------------------------------------------------------------------------------------------
   //  <system.serviceModel>
   //    <serviceHostingEnvironment aspNetCompatibilityEnabled="false" multipleSiteBindingsEnabled="true" >
   //      <serviceActivations>
   //        <add relativeAddress="v1/the-url.svc" service="TpeTpeTpe, AssAssAss"
   //             factory="System.Web.UJMW.UjmwServiceHostFactory, UJMW.DynamicWcfHost" />
+  //-------------------------------------------------------------------------------------------------------------------
+
+  //-------------------------------------------------------------------------------------------------------------------
+  // could also be neccessary
+  //-------------------------------------------------------------------------------------------------------------------
+  //  <runtime>
+  //    <assemblyBinding xmlns = "urn:schemas-microsoft-com:asm.v1" >
+  //      <dependentAssembly>
+  //        <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
+  //        <bindingRedirect oldVersion = "0.0.0.0-14.0.0.0" newVersion="8.0.0.0" />
+  //      </dependentAssembly>
 
   public class UjmwServiceHostFactory : ServiceHostFactory {
 
@@ -124,7 +138,6 @@ namespace System.Web.UJMW {
       }
     }
 
-
     private static ContractDescription CreateCustomizedContractDescription(Type contractType, Type serviceType = null) {
 
       ContractDescription defaultContractDescription = null;
@@ -164,7 +177,7 @@ namespace System.Web.UJMW {
       }
     }
 
-    internal class SideChannelServiceBehavior : IServiceBehavior {
+    internal class SideChannelServiceBehavior : IServiceBehavior, IErrorHandler {
 
       public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters) {
       }
@@ -182,11 +195,59 @@ namespace System.Web.UJMW {
             }
           }
         }
+
+        //foreach (ChannelDispatcherBase channelDispatcherBase in serviceHostBase.ChannelDispatchers) {
+        //  ChannelDispatcher channelDispatcher = channelDispatcherBase as ChannelDispatcher;
+        //  if (channelDispatcher != null) {
+        //    channelDispatcher.ErrorHandlers.Add(this);
+        //  }
+        //}
+
       }
 
+      #region " IErrorHandler "
+
+      public bool HandleError(Exception error) {
+        //return (error is FaultException);
+        return false;
+       // return true;
+      }
+      public void ProvideFault(Exception error, MessageVersion version, ref Message fault) {
+        fault = null;
+        return;
+
+        //MessageFault MF = FE.CreateMessageFault();
+        //fault = Message.CreateMessage(version, MF, null);
+
+        //BUG: this will return a body content of: 
+        // <string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">{ "fault":"error message" }</string>
+        //string body = $"{{ \"fault\":\"{error.Message}\" }}";
+        //fault = Message.CreateMessage(version, action: null, body: body);
+
+        //BodyWriter bodyWriter = new CustomFaultBodyWriter(error);
+        //fault = Message.CreateMessage(version, action: null, bodyWriter);
+
+      }
       public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
       }
 
+      #endregion
+    }
+
+    internal class CustomFaultBodyWriter : BodyWriter {
+      private string _Message;
+      public CustomFaultBodyWriter(Exception e) : base(false) {
+        _Message = e.Message;
+      }
+
+      protected override void OnWriteBodyContents(System.Xml.XmlDictionaryWriter writer) {
+        //HACK: WCF PITA required to have an XML ROOT NODE before writing raw - OH MY GOD
+        //because of this our standard needs to allow XML-encapsulated messages like
+        //<UJMW>{ ... }</UJMW>
+        writer.WriteStartElement("UJMW");
+        writer.WriteRaw($"{{ \"fault\":\"{_Message}\" }}");
+        writer.WriteEndElement();
+      }
     }
 
     internal class DispatchMessageInspector : IDispatchMessageInspector {
@@ -308,9 +369,12 @@ namespace System.Web.UJMW {
 
       private OperationDescription _OperationSchema;
       private Dictionary<String, int> _ParameterIndicesPerName;
+      private Dictionary<String, object> _ParameterDefaults;
       private MessageDescription _RelevantMessageDesc;
       private Uri _Uri;
 
+      //NOTE: this formatter will be constrcuted ONCE per CONTRACT-METHOD
+      //but is recylced over several requests - so we have no performance problem here
       public CustomizedJsonFormatter(OperationDescription operation, bool isRequest, Uri uri) {
 
         _OperationSchema = operation;
@@ -323,8 +387,18 @@ namespace System.Web.UJMW {
           _RelevantMessageDesc = operation.Messages.Where((m) => m.Direction == MessageDirection.Output).First();
         }
 
+        //we need to prefetch the default-values for OPTIONAL parameters
+        _ParameterDefaults = new Dictionary<String, object>();
+        foreach (var param in operation.SyncMethod.GetParameters()) {
+          if(param.IsOptional && param.HasDefaultValue) {
+            _ParameterDefaults.Add(param.Name, param.DefaultValue);
+          }
+          else {
+            _ParameterDefaults.Add(param.Name, null);
+          }
+        }
+        
         _ParameterIndicesPerName = new Dictionary<String, int>();
-
         for (int i = 0; i < _RelevantMessageDesc.Body.Parts.Count; i++) {
           _ParameterIndicesPerName.Add(_RelevantMessageDesc.Body.Parts[i].Name, i);
         }
@@ -427,6 +501,14 @@ namespace System.Web.UJMW {
         var bodyReader = message.GetReaderAtBodyContents();
         bodyReader.ReadStartElement("Binary");
 
+        lock (_ParameterDefaults) {
+          int i = 0; //init the default-values for OPTIONAL parameters
+          foreach (var kvp in _ParameterDefaults) {
+            parameters[i] = kvp.Value;
+            i++;
+          }
+        } 
+
         Byte[] rawBody = bodyReader.ReadContentAsBase64();
         var ms = new MemoryStream(rawBody);
         var sr = new StreamReader(ms);
@@ -440,20 +522,22 @@ namespace System.Web.UJMW {
 
         reader.Read();
 
-        while (reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName) {
-          String parameterName = reader.Value?.ToString();
-          reader.Read();
-          if (!string.IsNullOrWhiteSpace(returnValueName) && parameterName.Equals(returnValueName, StringComparison.InvariantCultureIgnoreCase)) {
-            returnValue = serializer.Deserialize(reader, returnValueType);
+        lock (_ParameterIndicesPerName) {
+          while (reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName) {
+            String parameterName = reader.Value?.ToString();
+            reader.Read();
+            if (!string.IsNullOrWhiteSpace(returnValueName) && parameterName.Equals(returnValueName, StringComparison.InvariantCultureIgnoreCase)) {
+              returnValue = serializer.Deserialize(reader, returnValueType);
+            }
+            else if (_ParameterIndicesPerName.ContainsKey(parameterName)) {
+              int parameterIndex = _ParameterIndicesPerName[parameterName];
+              parameters[parameterIndex] = serializer.Deserialize(reader, _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type);
+            }
+            else {
+              reader.Skip();
+            }
+            reader.Read();
           }
-          else if (_ParameterIndicesPerName.ContainsKey(parameterName)) {
-            int parameterIndex = _ParameterIndicesPerName[parameterName];
-            parameters[parameterIndex] = serializer.Deserialize(reader, _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type);
-          }
-          else {
-            reader.Skip();
-          }
-          reader.Read();
         }
 
         reader.Close();

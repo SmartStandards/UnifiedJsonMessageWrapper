@@ -9,7 +9,7 @@
   
   <PropertyGroup>
     <PackageId>UJMW.DynamicClient</PackageId>
-    <Description>UJMW.DynamicClient</Description>
+    <Description>A dynamic web api client, using the 'Unified JSON Message Wrapper' standard</Description>
     <Product>UJMW</Product>
     <Company>(public domain)</Company>
     <Copyright>SmartStandards</Copyright>

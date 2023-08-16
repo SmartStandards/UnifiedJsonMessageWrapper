@@ -9,7 +9,7 @@
   
   <PropertyGroup>
     <PackageId>UJMW.DynamicController</PackageId>
-    <Description>UJMW.DynamicController</Description>
+    <Description>A dynamic Service-Facade (Controller) for ASP core WebApi, using the 'Unified JSON Message Wrapper' standard</Description>
     <Product>UJMW</Product>
     <Company>(public domain)</Company>
     <Copyright>SmartStandards</Copyright>

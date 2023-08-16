@@ -3,20 +3,20 @@
   <metadata>
     <id>UJMW.DynamicWcfHost</id>
     <version>999.0.0-localbuild</version>
-    <title>UJMW.DynamicWcfHost</title>
+    <title>UJMW.DynamicWcfHost (for WCF applications)</title>
     <authors>SmartStandards</authors>
     <owners>(public domain)</owners>
     <copyright>SmartStandards</copyright>
-    <description>UJMW.DynamicClient</description>
-    <tags>UJMW REST JSON RPC WebService</tags>
+    <description>A dynamic Service-Facade for WCF, using the 'Unified JSON Message Wrapper' standard</description>
+    <tags>UJMW REST JSON RPC WebService WCF</tags>
     <!-- https://spdx.org/licenses/ -->
     <license type="expression">GPL-3.0-only</license>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <icon>PackageIcon.png</icon>
-    <projectUrl>https://github.com/SmartStandards/AuthTokenHandling</projectUrl>
+    <projectUrl>https://github.com/SmartStandards/UnifiedJsonMessageWrapper</projectUrl>
     <dependencies>
       <group targetFramework=".NETFramework4.6">
-        <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
+        <!--<dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />-->
       </group>
     </dependencies>
   </metadata>

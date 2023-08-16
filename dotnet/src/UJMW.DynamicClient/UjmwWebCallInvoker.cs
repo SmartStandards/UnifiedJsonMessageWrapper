@@ -83,7 +83,16 @@ namespace System.Web.UJMW {
 
       object returnValue = null;
 
+      // ############### HTTP POST #############################################
       string rawJsonResponse = _HttpPostMethod.Invoke(fullUrl, rawJsonContent);
+      // #######################################################################
+
+      //some old technologies can only return XML-encapulated replies
+      //this is an hack to support this
+      if (rawJsonResponse.StartsWith("<UJMW>")) {
+        rawJsonResponse = rawJsonResponse.Substring(6, rawJsonResponse.Length - 13);
+      }
+
       var objectDeserializer = new JsonSerializer();
       using (StringReader sr = new StringReader(rawJsonResponse)) {
         using (JsonTextReader jr = new JsonTextReader(sr)) {

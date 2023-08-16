@@ -42,7 +42,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DynamicWcfHost.net461"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DemoWcfService", "test\UJMW.DemoWcfService\UJMW.DemoWcfService.csproj", "{F0D13C7F-68C5-4004-9321-5BFB44A39315}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DemoClient", "test\UJMW.DemoClient\UJMW.DemoClient.csproj", "{279BA276-94EA-491A-B737-6C6A6F462292}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UJMW.DemoClient", "test\UJMW.DemoClient\UJMW.DemoClient.csproj", "{279BA276-94EA-491A-B737-6C6A6F462292}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

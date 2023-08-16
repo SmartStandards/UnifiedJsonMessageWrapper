@@ -68,6 +68,7 @@
     <Compile Include="DemoService.svc.cs">
       <DependentUpon>DemoService.svc</DependentUpon>
     </Compile>
+    <Compile Include="EntryModule.cs" />
     <Compile Include="IDemoService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

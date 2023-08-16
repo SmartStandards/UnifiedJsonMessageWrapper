@@ -3,9 +3,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("AuthTokenHandling")]
-[assembly: AssemblyDescription("AuthTokenHandling")]
-[assembly: AssemblyProduct("AuthTokenHandling")]
+[assembly: AssemblyTitle("UJMW.DynamicWcfHost")]
+[assembly: AssemblyDescription("A dynamic Service-Facade for WCF, using the 'Unified JSON Message Wrapper' standard")]
+[assembly: AssemblyProduct("UJMW")]
 
 [assembly: AssemblyCompany("(public domain)")]
 [assembly: AssemblyCopyright("SmartStandards")]
