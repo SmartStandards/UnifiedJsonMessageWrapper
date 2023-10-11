@@ -1,15 +1,29 @@
 ﻿using System;
 using System.Net.Http;
+using System.Threading;
 using System.Web.UJMW;
 
   Console.WriteLine("Please enter a number:");
   if(int.TryParse(Console.ReadLine(),out int number)) {
 
-    //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>("http://localhost:55202/DemoService.svc");
+  AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
+  var currentTenant = new AmbientField("currentTenant", true);
+  currentTenant.Value = "Rabbit";
 
-    var httpClient = new HttpClient();
-    var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(httpClient,()=>"http://localhost:55202/DemoService.svc");
-    httpClient.DefaultRequestHeaders.Add("Authorization", "its me");
+  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>("http://localhost:55202/DemoService.svc");
+
+  var httpClient = new HttpClient();
+
+  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+  //  httpClient, () => "http://localhost:55202/DemoService.svc"
+  //);
+
+  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+    httpClient, () => "http://localhost:55202/DemoService.svc",
+    AmbienceHub.CaptureCurrentValuesTo, AmbienceHub.RestoreValuesFrom
+  );
+
+  httpClient.DefaultRequestHeaders.Add("Authorization", "its me");
 
     try {
 

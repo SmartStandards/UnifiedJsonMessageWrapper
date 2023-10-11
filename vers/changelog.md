@@ -6,9 +6,8 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
-
-
+- **new Feature**: dynamic (MVC-)controllers for asp.net core webapi
+- 
 
 ## v 1.0.0
 released **2023-08-16**, including:

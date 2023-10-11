@@ -1,6 +1,8 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.ServiceModel;
+using System.Threading;
 using System.Web;
 using System.Web.UJMW;
 
@@ -16,6 +18,10 @@ namespace UJMW.DemoWcfService {
 
     public void Init(HttpApplication context) {
 
+      if(AmbientField.ContextAdapter == null) {
+        AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
+      }
+
       UjmwServiceBehaviour.AuthHeaderEvaluator = (
         (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
           //in this demo - any auth header is ok - but there must be one ;-)
@@ -27,17 +33,25 @@ namespace UJMW.DemoWcfService {
         }
       );
 
+
+
+      UjmwServiceBehaviour.SetRequestSidechannelProcessor(AmbienceHub.RestoreValuesFrom);
+      UjmwServiceBehaviour.SetResponseSidechannelCapturer(AmbienceHub.CaptureCurrentValuesTo);
+
+
+
+
       //OTHER POSSIBLE OPTIONS...
 
       //UjmwServiceBehaviour.RequestSidechannelProcessor = (
       //  (MethodInfo calledContractMethod, IEnumerable<KeyValuePair<string, string>> requestSidechannelContainer) => {
-      //    ... here you gona extract flowed binding identifiers and apply them to your ambience room
+      //    //... here you gona extract flowed binding identifiers and apply them to your ambience room
       //  }
       //);
 
       //UjmwServiceBehaviour.ResponseSidechannelCapturer = (
       //  (MethodInfo calledContractMethod, IEnumerable<KeyValuePair<string, string>> responseSidechannelContainer) => {
-      //    ... here you gona collect some additional processing information (like may be performace counters) to send them back
+      //    //... here you gona collect some additional processing information(like may be performace counters) to send them back
       //  }
       //);
 

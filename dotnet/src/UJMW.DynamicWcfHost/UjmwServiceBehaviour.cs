@@ -38,9 +38,29 @@ namespace System.Web.UJMW {
     //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
     //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
 
-    public static RequestSidechannelProcessingMethod RequestSidechannelProcessor { get; set; } = null;
+    internal static RequestSidechannelProcessingMethod RequestSidechannelProcessor { get; set; } = null;
 
-    public static ResponseSidechannelCaptureMethod ResponseSidechannelCapturer { get; set; } = null;
+    internal static ResponseSidechannelCaptureMethod ResponseSidechannelCapturer { get; set; } = null;
+
+    public static void SetRequestSidechannelProcessor(RequestSidechannelProcessingMethod method) {
+      RequestSidechannelProcessor = method;
+    }
+    /// <summary> Overload that is compatible to the signature of 'AmbienceHub.RestoreValuesFrom' (from the 'SmartAmbience' Nuget Package) </summary>
+    public static void SetRequestSidechannelProcessor(Action<IEnumerable<KeyValuePair<string, string>>> method) {
+      ResponseSidechannelCapturer = (mi, container) => {
+        method.Invoke(container);
+      };
+    }
+
+    public static void SetResponseSidechannelCapturer(ResponseSidechannelCaptureMethod method) {
+      ResponseSidechannelCapturer = method;
+    }
+    /// <summary> Overload that is compatible to the signature of 'AmbienceHub.CaptureCurrentValuesTo' (from the 'SmartAmbience' Nuget Package) </summary>
+    public static void SetResponseSidechannelCapturer(Action<IDictionary<string, string>> method) {
+      ResponseSidechannelCapturer = (mi, container) => {
+        method.Invoke(container);
+      };
+    }
 
     public static ServiceContractInterfaceSelectorMethod ContractSelector { get; set; } = (
       (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => {

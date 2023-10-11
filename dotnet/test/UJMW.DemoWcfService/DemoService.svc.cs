@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Threading;
 
 namespace UJMW.DemoWcfService {
 
@@ -13,6 +14,8 @@ namespace UJMW.DemoWcfService {
 
   public class DemoService : IDemoService {
 
+    AmbientField currentTenant = new AmbientField("currentTenant", true);
+
     /*
      *  To test the demo send a HTTP-POST to
      *  http://localhost:55202/DemoService.svc/GetData
@@ -20,7 +23,8 @@ namespace UJMW.DemoWcfService {
      *  As response, you should receive a HTTP-200 with a body content '{ "return": "You entered: 42"}'.
      */
     public string GetData(int value) {
-      return string.Format("You entered: {0}", value);
+      //return string.Format("You entered: {0}", value);
+      return string.Format("You entered: {0} (current Tenant is {1})", value, currentTenant.Value);
     }
 
     public CompositeType GetDataUsingDataContract(CompositeType composite) {

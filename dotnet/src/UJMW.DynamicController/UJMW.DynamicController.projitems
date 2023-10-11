@@ -9,6 +9,12 @@
     <Import_RootNamespace>System</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)AbstractController.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DtoValueMapper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DynamicControllerBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwServiceBehaviour.cs" />
   </ItemGroup>
 </Project>

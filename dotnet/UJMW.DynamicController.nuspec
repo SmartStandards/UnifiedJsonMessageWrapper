@@ -17,8 +17,10 @@
     <dependencies>
       <group targetFramework="net6.0">
         <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
+        <dependency id="Microsoft.AspNetCore" version="[2.2.0,2.9999]" />
+        <dependency id="Microsoft.AspNetCore.Mvc" version="[2.2.0,2.9999]" />
         <dependency id="Microsoft.AspNetCore.Mvc.Core" version="[2.2.5,2.9999]" />
-        <dependency id="System.Text.Encodings.Web" version="[6.0.0,6.9999]" />
+        <dependency id="System.Text.Encodings.Web" version="[6.0.0,6.9999]" />      
       </group>
     </dependencies>
   </metadata>
