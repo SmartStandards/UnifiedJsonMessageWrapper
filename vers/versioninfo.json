@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.0.0",
-  "currentVersionWithSuffix": "1.0.0",
+  "currentVersion": "1.1.0",
+  "currentVersionWithSuffix": "1.1.0",
   "releaseType": "official",
-  "previousVersion": "0.0.0",
-  "changeGrade": "patch",
+  "previousVersion": "1.0.0",
+  "changeGrade": "minor",
   "currentMajor": 1,
-  "currentMinor": 0,
+  "currentMinor": 1,
   "currentPatch": 0,
-  "versionDateInfo": "2023-08-16",
-  "versionTimeInfo": "12:08:48",
-  "versionNotes": "- got wcf-facade and dynamic client running... got compatible with previous **MVP**\n"
+  "versionDateInfo": "2023-10-11",
+  "versionTimeInfo": "15:38:42",
+  "versionNotes": "- new Feature: dynamic (MVC-)controllers for asp.net core webapi\n- -\n"
 }
