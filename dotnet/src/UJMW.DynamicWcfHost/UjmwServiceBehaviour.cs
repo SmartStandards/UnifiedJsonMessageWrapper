@@ -42,7 +42,7 @@ namespace System.Web.UJMW {
     /// <summary>
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
     /// </summary>
-    internal static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex)=> Trace.TraceError(ex.Message);
+    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex)=> Trace.TraceError(ex.Message);
 
     internal static RequestSidechannelProcessingMethod RequestSidechannelProcessor { get; set; } = null;
 
