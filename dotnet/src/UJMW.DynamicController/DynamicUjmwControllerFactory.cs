@@ -8,10 +8,10 @@ using System.Reflection.Emit;
 namespace System.Web.UJMW {
 
   //TODO: es fehlen noch ein paar Features zum MVP:
-  // - dynamisch via emit generiertes RouteAttribute am controller damit pfad reingegeben werden kann
-  // - mapping von exceptions in eine "fault"-property am response dto
   // - konfiguriertbarkeit, ob in der fault-property richtige exceptiondetails drin stehen
   // - logger injecten lassen und nutzen
+  // - name für controller angeben (getrennt von url) -> ist Titel im swagger
+  // - code xml-doc für swagger
 
   public sealed partial class DynamicUjmwControllerFactory {
 

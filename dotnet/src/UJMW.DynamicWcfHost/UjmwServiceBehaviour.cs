@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -37,6 +38,11 @@ namespace System.Web.UJMW {
     //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
     //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
     //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
+
+    /// <summary>
+    /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
+    /// </summary>
+    internal static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex)=> Trace.TraceError(ex.Message);
 
     internal static RequestSidechannelProcessingMethod RequestSidechannelProcessor { get; set; } = null;
 

@@ -48,73 +48,88 @@ namespace System.Web.UJMW {
     }
 
     protected override ServiceHost CreateServiceHost(Type serviceImplementationType, Uri[] baseAddresses) {
-      Uri primaryUri = baseAddresses[0];
+      try {
 
-      if (UjmwServiceBehaviour.ForceHttps) {
-        primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
+        Uri primaryUri = baseAddresses[0];
+
+        if (UjmwServiceBehaviour.ForceHttps) {
+          primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
+        }
+
+        UjmwServiceBehaviour.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+
+        ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
+
+        var behavior = host.Description.Behaviors.Find<ServiceBehaviorAttribute>();
+        behavior.InstanceContextMode = InstanceContextMode.Single;
+        behavior.ConcurrencyMode = ConcurrencyMode.Multiple;
+
+        var customizedContractDescription = CreateCustomizedContractDescription(contractInterface, serviceImplementationType);
+
+        var endpoint = new ServiceEndpoint(
+          customizedContractDescription,
+          GetCustomizedWebHttpBinding(),
+          new EndpointAddress(primaryUri)
+        );
+        host.AddServiceEndpoint(endpoint);
+
+        CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
+        WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();
+        encodingBindingElement.ContentTypeMapper = new CustomizedJsonContentTypeMapper();
+        endpoint.Binding = customizedBinding;
+
+        endpoint.Behaviors.Add(new CustomizedWebHttpBehaviourForJson());
+
+        ServiceMetadataBehavior metadataBehaviour;
+        if (host.Description.Behaviors.Contains(typeof(ServiceMetadataBehavior))) {
+          metadataBehaviour = host.Description.Behaviors.Find<ServiceMetadataBehavior>();
+        }
+        else {
+          metadataBehaviour = new ServiceMetadataBehavior();
+          host.Description.Behaviors.Add(metadataBehaviour);
+        }
+
+        if (UjmwServiceBehaviour.ForceHttps) {
+          metadataBehaviour.HttpsGetEnabled = true;
+          metadataBehaviour.HttpGetEnabled = false;
+        }
+        else {
+          metadataBehaviour.HttpGetEnabled = true;
+        }
+
+        ServiceDebugBehavior debugBehaviour;
+        if (host.Description.Behaviors.Contains(typeof(ServiceDebugBehavior))) {
+          debugBehaviour = host.Description.Behaviors.Find<ServiceDebugBehavior>();
+        }
+        else {
+          debugBehaviour = new ServiceDebugBehavior();
+          host.Description.Behaviors.Add(debugBehaviour);
+        }
+        debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwServiceBehaviour.ForceHttps);
+
+        SideChannelServiceBehavior customizedServiceBehaviour;
+        if (host.Description.Behaviors.Contains(typeof(SideChannelServiceBehavior))) {
+          customizedServiceBehaviour = host.Description.Behaviors.Find<SideChannelServiceBehavior>();
+        }
+        else {
+          customizedServiceBehaviour = new SideChannelServiceBehavior();
+          host.Description.Behaviors.Add(customizedServiceBehaviour);
+        }
+
+        return host;
       }
+      catch (Exception ex) {
+        if (UjmwServiceBehaviour.FactoryExceptionVisitor != null) {
+          UjmwServiceBehaviour.FactoryExceptionVisitor.Invoke(ex);
 
-      UjmwServiceBehaviour.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+          //HACK: wir wissen nicht, ob das gut ist -> WCF soll einfach den service skippen
+          return null;
 
-      ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
-
-      var behavior = host.Description.Behaviors.Find<ServiceBehaviorAttribute>();
-      behavior.InstanceContextMode = InstanceContextMode.Single;
-      behavior.ConcurrencyMode = ConcurrencyMode.Multiple;
-
-      var customizedContractDescription = CreateCustomizedContractDescription(contractInterface, serviceImplementationType);
-
-      var endpoint = new ServiceEndpoint(
-        customizedContractDescription,
-        GetCustomizedWebHttpBinding(),
-        new EndpointAddress(primaryUri)
-      );
-      host.AddServiceEndpoint(endpoint);
-
-      CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
-      WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();
-      encodingBindingElement.ContentTypeMapper = new CustomizedJsonContentTypeMapper();
-      endpoint.Binding = customizedBinding;
-
-      endpoint.Behaviors.Add(new CustomizedWebHttpBehaviourForJson());
-
-      ServiceMetadataBehavior metadataBehaviour;
-      if (host.Description.Behaviors.Contains(typeof(ServiceMetadataBehavior))) {
-        metadataBehaviour = host.Description.Behaviors.Find<ServiceMetadataBehavior>();
+        }
+        else {
+          throw;
+        }
       }
-      else {
-        metadataBehaviour = new ServiceMetadataBehavior();
-        host.Description.Behaviors.Add(metadataBehaviour);
-      }
-
-      if (UjmwServiceBehaviour.ForceHttps) {
-        metadataBehaviour.HttpsGetEnabled = true;
-        metadataBehaviour.HttpGetEnabled = false;
-      }
-      else {
-        metadataBehaviour.HttpGetEnabled = true;
-      }
-
-      ServiceDebugBehavior debugBehaviour;
-      if (host.Description.Behaviors.Contains(typeof(ServiceDebugBehavior))) {
-        debugBehaviour = host.Description.Behaviors.Find<ServiceDebugBehavior>();
-      }
-      else {
-        debugBehaviour = new ServiceDebugBehavior();
-        host.Description.Behaviors.Add(debugBehaviour);
-      }
-      debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwServiceBehaviour.ForceHttps);
-
-      SideChannelServiceBehavior customizedServiceBehaviour;
-      if (host.Description.Behaviors.Contains(typeof(SideChannelServiceBehavior))) {
-        customizedServiceBehaviour = host.Description.Behaviors.Find<SideChannelServiceBehavior>();
-      }
-      else {
-        customizedServiceBehaviour = new SideChannelServiceBehavior();
-        host.Description.Behaviors.Add(customizedServiceBehaviour);
-      }
-
-      return host;
     }
 
     private static WebHttpBinding _CustomizedWebHttpBindingSecured = null;

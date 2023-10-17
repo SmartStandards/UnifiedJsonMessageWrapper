@@ -6,9 +6,9 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* added hook for logging of exceptions which were thrown during host creation (when WCF is using our factory)
 
-
+  
 
 ## v 1.1.0
 released **2023-10-11**, including:
