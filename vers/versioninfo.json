@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.1.0",
-  "currentVersionWithSuffix": "1.1.0",
+  "currentVersion": "1.1.1",
+  "currentVersionWithSuffix": "1.1.1",
   "releaseType": "official",
-  "previousVersion": "1.0.0",
-  "changeGrade": "minor",
+  "previousVersion": "1.1.0",
+  "changeGrade": "patch",
   "currentMajor": 1,
   "currentMinor": 1,
-  "currentPatch": 0,
-  "versionDateInfo": "2023-10-11",
-  "versionTimeInfo": "15:38:42",
-  "versionNotes": "- new Feature: dynamic (MVC-)controllers for asp.net core webapi\n- -\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2023-10-17",
+  "versionTimeInfo": "07:28:16",
+  "versionNotes": "- added hook for logging of exceptions which were thrown during host creation (when WCF is using our factory)\n"
 }
