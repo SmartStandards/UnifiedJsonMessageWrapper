@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SmartAmbience" Version="1.1.0" />
-    <PackageReference Include="System.ServiceModel.Primitives" Version="6.0.0" />
+    <PackageReference Include="SmartAmbience" Version="2.0.1" />
+    <PackageReference Include="System.ServiceModel.Primitives" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -29,6 +29,7 @@ namespace System.Web.UJMW {
 
       private TServiceInterface _ServiceInstance;
 
+
       public DynamicControllerBase(TServiceInterface serviceInstance) {
         if (serviceInstance == null) {
           throw new Exception($"The dynamic asp controller base requires to get an '{typeof(TServiceInterface)}' injected - but got null!");
@@ -83,6 +84,9 @@ namespace System.Web.UJMW {
           PropertyInfo requestSidechannelProp = requestDtoType.GetProperty(UjmwSideChannelPropertyName);
           PropertyInfo responseSidechannelProp = responseDtoType.GetProperty(UjmwSideChannelPropertyName);
 
+          IncommingRequestSideChannelConfiguration inboundSideChannelCfg = UjmwHostConfiguration.GetRequestSideChannelConfiguration(typeof(TServiceInterface));
+          OutgoingResponseSideChannelConfiguration outboundSideChannelCfg = UjmwHostConfiguration.GetResponseSideChannelConfiguration(typeof(TServiceInterface));
+
           /////////// lambda (mth) ////////////////////////////////////////////
           Func<TServiceInterface, object, object> mth = (
             (svc, requestDto) => {
@@ -96,9 +100,10 @@ namespace System.Web.UJMW {
 
               try {
 
-                if (UjmwServiceBehaviour.RequestSidechannelProcessor != null && requestSidechannelProp != null) {
+                //TODO: andere header auch auslesen bzw über alles iteriereun und am ende fallback
+                if (inboundSideChannelCfg.UnderlinePropertyIsAccepted && requestSidechannelProp != null) {
                   var container = (Dictionary<string, string>)requestSidechannelProp.GetValue(requestDto);
-                  UjmwServiceBehaviour.RequestSidechannelProcessor.Invoke(serviceMethod, container);
+                  inboundSideChannelCfg.ProcessingMethod.Invoke(serviceMethod, container);
                 }
 
                 //invoke the service method
@@ -125,13 +130,20 @@ namespace System.Web.UJMW {
                   faultProp.SetValue(responseDto, ex.Message);
                 }
               }
+              if (outboundSideChannelCfg.ChannelsToProvide.Any()) {
+                var backChannelContent = new Dictionary<string, string>();
 
-              if (UjmwServiceBehaviour.ResponseSidechannelCapturer != null && responseSidechannelProp != null) {
-                var container = new Dictionary<string, string>();
-                UjmwServiceBehaviour.ResponseSidechannelCapturer.Invoke(serviceMethod, container);
-                responseSidechannelProp.SetValue(responseDto, container);
+                ////// CAPTURE //////
+                outboundSideChannelCfg.CaptureMethod.Invoke(serviceMethod, backChannelContent);
+
+                if (outboundSideChannelCfg.UnderlinePropertyIsProvided && responseSidechannelProp != null) {
+                  responseSidechannelProp.SetValue(responseDto, backChannelContent);
+                }
+              
+                //TODO: die restlichen header auch noch
+
               }
-
+     
               return responseDto;
             }
           );/////// end of lambda (mth) ////////////////////////////////////////

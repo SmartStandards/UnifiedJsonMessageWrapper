@@ -14,67 +14,43 @@ namespace System.Web.UJMW {
   public delegate void ResponseSidechannelProcessingMethod(IEnumerable<KeyValuePair<string, string>> responseSidechannelContainer);
 
   //developed on base of https://github.com/KornSW/DynamicProxy
-
   public abstract class DynamicClientFactory {
 
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     private IAbstractWebcallInvoker _Invoker;
 
-    public delegate string HttpPostMethod(string url, string jsonContent);
+    #region " CreateInstance - Convenience overloads " 
 
     public static TApplicable CreateInstance<TApplicable>(string url) {
-      var hc = new HttpClient();
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u, j) => InvokeCallViaHttpClient(hc, u, j), ()=>url, (c) => { }, (c) => { }, hc.Dispose);
+      var httpClient = new HttpClient();
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, () => url, httpClient.Dispose);
       return CreateInstance<TApplicable>(invoker);
     }
 
     public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);
       return CreateInstance<TApplicable>(invoker);
     }
 
     public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, (c) => { }, (c) => { });
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
       return CreateInstance(applicableType, invoker);
     }
-    public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelProcessor) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelProcessor);
+
+    public static TApplicable CreateInstance<TApplicable>(HttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelProcessor) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, (u,j)=>InvokeCallViaHttpClient(httpClient,u,j), urlGetter, requestSidechannelCaptureMethod, responseSidechannelProcessor);
+    public static object CreateInstance(Type applicableType, HttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
       return CreateInstance(applicableType, invoker);
     }
 
-    private static string InvokeCallViaHttpClient(HttpClient httpClient, string url, string jsonContent) {
-      HttpContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-      var task = httpClient.PostAsync(url, content);
-      task.Wait(); 
-      var task2 = task.Result.Content.ReadAsStringAsync();
-      task2.Wait();
-      string rawResponeJsonContent = task2.Result;
-      return rawResponeJsonContent;
-    }
-
-    public static TApplicable CreateInstance<TApplicable>(HttpPostMethod httpPostMethod, Func<string> urlGetter) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, (c) => { }, (c) => { });
-      return CreateInstance<TApplicable>(invoker);
-    }
-
-    public static object CreateInstance(HttpPostMethod httpPostMethod, Type applicableType, Func<string> urlGetter) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType,  httpPostMethod, urlGetter, (c) => { }, (c) => { });
-      return CreateInstance(applicableType, invoker);
-    }
-    public static TApplicable CreateInstance<TApplicable>(HttpPostMethod httpPostMethod, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelRestoreMethod) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable),  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
-      return CreateInstance<TApplicable>(invoker);
-    }
-
-    public static object CreateInstance(HttpPostMethod httpPostMethod, Type applicableType, Func<string> urlGetter, RequestSidechannelCaptureMethod requestSidechannelCaptureMethod, ResponseSidechannelProcessingMethod responseSidechannelRestoreMethod) {
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType,  httpPostMethod, urlGetter, requestSidechannelCaptureMethod, responseSidechannelRestoreMethod);
-      return CreateInstance(applicableType, invoker);
-    }
+    #endregion
 
     private static TApplicable CreateInstance<TApplicable>(IAbstractWebcallInvoker invoker, params object[] constructorArgs) {
       return (TApplicable)CreateInstance(typeof(TApplicable), invoker, constructorArgs);

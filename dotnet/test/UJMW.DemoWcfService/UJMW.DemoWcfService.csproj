@@ -18,9 +18,9 @@
     <UseIISExpress>true</UseIISExpress>
     <Use64BitIISExpress />
     <IISExpressSSLPort />
-    <IISExpressAnonymousAuthentication />
-    <IISExpressWindowsAuthentication />
-    <IISExpressUseClassicPipelineMode />
+    <IISExpressAnonymousAuthentication>disabled</IISExpressAnonymousAuthentication>
+    <IISExpressWindowsAuthentication>enabled</IISExpressWindowsAuthentication>
+    <IISExpressUseClassicPipelineMode>false</IISExpressUseClassicPipelineMode>
     <UseGlobalApplicationHostFile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -42,8 +42,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="SmartAmbience, Version=999.0.0.20789, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartAmbience.1.1.0\lib\net46\SmartAmbience.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="SmartAmbience, Version=999.0.0.21576, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartAmbience.2.0.1\lib\net46\SmartAmbience.dll</HintPath>
+    </Reference>
+    <Reference Include="SwaggerWcf, Version=1.2.16.414, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\KornSW.SwaggerWcf.1.2.16.414\lib\net46\SwaggerWcf.dll</HintPath>
     </Reference>
     <Reference Include="System.Web.DynamicData" />
     <Reference Include="System.Web.Entity" />
@@ -74,6 +80,7 @@
     <Compile Include="EntryModule.cs" />
     <Compile Include="IDemoService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SwaggerEndpoints\Swagger.cs" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

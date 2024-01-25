@@ -9,12 +9,15 @@
     <Import_RootNamespace>System</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)(Setup)\IncommingRequestSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)(Setup)\OutgoingResponseSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)(Setup)\UjmwHostConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DtoValueMapper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DynamicControllerBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)UjmwServiceBehaviour.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\..\..\..\..\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicController\%28Setup%29\UjmwServiceBehaviour_.cs" />
   </ItemGroup>
 </Project>

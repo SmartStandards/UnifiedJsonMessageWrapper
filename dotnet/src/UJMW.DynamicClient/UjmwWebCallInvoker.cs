@@ -1,10 +1,10 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using static System.Web.UJMW.DynamicClientFactory;
 
 namespace System.Web.UJMW {
 
@@ -13,30 +13,48 @@ namespace System.Web.UJMW {
   internal class UjmwWebCallInvoker: IAbstractWebcallInvoker {
 
     private Type _ContractType;
-    private HttpPostMethod _HttpPostMethod;
+    private HttpPostExecutor _HttpPostExecutor;
     private Func<string> _UrlGetter;
-    private RequestSidechannelCaptureMethod _RequestSidechannelCaptureMethod;
-    private ResponseSidechannelProcessingMethod _ResponseSidechannelProcessor;
+    private OutgoingRequestSideChannelConfiguration _RequestSidechannelCfg;
+    private IncommingResponseSideChannelConfiguration _ResponseSidechannelCfg;
     private Action _OnDisposeInvoked;
 
     public UjmwWebCallInvoker(
       Type applicableType,
-      HttpPostMethod httpPostMethod,
+      HttpPostExecutor httpPostExecutor,
       Func<string> urlGetter,
-      RequestSidechannelCaptureMethod requestSidechannelCaptureMethod,
-      ResponseSidechannelProcessingMethod responseSidechannelProcessor,
       Action onDisposeInvoked = null
     ) {
       _ContractType = applicableType;
-      _HttpPostMethod = httpPostMethod;
+      _HttpPostExecutor = httpPostExecutor;
       _UrlGetter = urlGetter;
-      _RequestSidechannelCaptureMethod = requestSidechannelCaptureMethod;
-      _ResponseSidechannelProcessor = responseSidechannelProcessor;
+      _RequestSidechannelCfg = UjmwClientConfiguration.GetRequestSideChannelConfiguration(applicableType);
+      _ResponseSidechannelCfg = UjmwClientConfiguration.GetResponseSideChannelConfiguration(applicableType);
       _OnDisposeInvoked = onDisposeInvoked;
-      if(_OnDisposeInvoked == null) {
+      if (_OnDisposeInvoked == null) {
         _OnDisposeInvoked = (() => { });
       }
-    } 
+    }
+
+    private static MethodInfo FindMethod(Type declaringType,string methodName) {
+      MethodInfo m = declaringType.GetMethod(methodName);
+      if(m != null) {
+        return m; //99%
+      }
+      if(declaringType.BaseType != null) {
+        m = FindMethod(declaringType.BaseType, methodName);
+        if (m != null) {
+          return m;
+        }
+      }
+      foreach (Type iType in declaringType.GetInterfaces()){
+        m = FindMethod(iType, methodName);
+        if (m != null) {
+          return m;
+        }
+      }
+      return null;
+    }
 
     public object InvokeWebCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
 
@@ -51,15 +69,32 @@ namespace System.Web.UJMW {
       }  
       string fullUrl = rootUrl + methodName;
 
-      MethodInfo method = _ContractType.GetMethod(methodName);
-
+      MethodInfo method = FindMethod(_ContractType, methodName);
       var requestContent = new Dictionary<string, object>();
-    
-      if(_RequestSidechannelCaptureMethod != null) {
+      Dictionary<string, string> requestHeaders = null;
+
+      //SIDECHANNEL PREPARATION
+      if (_RequestSidechannelCfg.UnderlinePropertyIsProvided || _RequestSidechannelCfg.ChannelsToProvide.Any()) {
         var sideChannelContent = new Dictionary<string, string>();
-        _RequestSidechannelCaptureMethod.Invoke(sideChannelContent);
-        requestContent["_"] = sideChannelContent;
-      }
+        string sideChannelJson = null;
+
+        ////// CAPTURE //////
+        _RequestSidechannelCfg.CaptureMethod.Invoke(method, sideChannelContent);
+
+        foreach (string channel in _RequestSidechannelCfg.ChannelsToProvide) {
+          if (channel == "_") {
+            requestContent["_"] = sideChannelContent;
+          }
+          else { 
+            if(requestHeaders == null) {
+              requestHeaders = new Dictionary<string, string>();
+              //will be done once, if we need in as json
+              sideChannelJson = JsonConvert.SerializeObject(sideChannelContent);
+            }
+            requestHeaders[channel] = sideChannelJson;
+          }
+        }
+      }//END SIDECHANNEL PREPARATION
 
       var parameters = method.GetParameters();
 
@@ -91,13 +126,15 @@ namespace System.Web.UJMW {
       jss.Formatting = Formatting.Indented;
       jss.DateFormatHandling = DateFormatHandling.IsoDateFormat;
       jss.ContractResolver = new CamelCasePropertyNamesContractResolver();
-      string rawJsonContent = JsonConvert.SerializeObject(requestContent, jss);
-
-      object returnValue = null;
+      string rawJsonRequest = JsonConvert.SerializeObject(requestContent, jss);
 
       // ############### HTTP POST #############################################
-      string rawJsonResponse = _HttpPostMethod.Invoke(fullUrl, rawJsonContent);
-      // #######################################################################
+       
+      int httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
+        fullUrl,
+        rawJsonRequest, requestHeaders,
+        out string rawJsonResponse, out var responseHeaders
+      );
 
       //some old technologies can only return XML-encapulated replies
       //this is an hack to support this
@@ -105,7 +142,10 @@ namespace System.Web.UJMW {
         rawJsonResponse = rawJsonResponse.Substring(6, rawJsonResponse.Length - 13);
       }
 
+      // #######################################################################
+
       var objectDeserializer = new JsonSerializer();
+      object returnValue = null;
       using (StringReader sr = new StringReader(rawJsonResponse)) {
         using (JsonTextReader jr = new JsonTextReader(sr)) {
           jr.Read();
@@ -113,7 +153,7 @@ namespace System.Web.UJMW {
             throw new Exception("Response is no valid JSON: " + rawJsonResponse);
           }
 
-          Dictionary<string, string> responseSideChannelContent = null;
+          IDictionary<string, string> backChannelContent = null;
           string currentPropName = "";
           while(jr.Read()) {
 
@@ -121,7 +161,7 @@ namespace System.Web.UJMW {
               currentPropName = jr.Value.ToString();
               if (currentPropName == "_") {
                 jr.Read();
-                responseSideChannelContent = objectDeserializer.Deserialize<Dictionary<string, string>>(jr);
+                backChannelContent = objectDeserializer.Deserialize<Dictionary<string, string>>(jr);
               }
               else if(currentPropName.Equals("return",StringComparison.InvariantCultureIgnoreCase)) {
                 jr.Read();
@@ -132,7 +172,7 @@ namespace System.Web.UJMW {
               else if (currentPropName.Equals("fault", StringComparison.InvariantCultureIgnoreCase)) {
                 string faultMessage = jr.ReadAsString();
                 if (!String.IsNullOrWhiteSpace(faultMessage)) {
-                  throw new UjmwFaultException(fullUrl, method, faultMessage);
+                  UjmwClientConfiguration.FaultRepsonseHandler.Invoke(fullUrl, method, faultMessage);
                 }
               }
               else {
@@ -156,9 +196,51 @@ namespace System.Web.UJMW {
             }
           }
 
-          if (_ResponseSidechannelProcessor != null) {
-            _ResponseSidechannelProcessor.Invoke(responseSideChannelContent);
-          }
+          //BACKCHANNEL PROCESSING
+          if (_ResponseSidechannelCfg.UnderlinePropertyIsAccepted || _ResponseSidechannelCfg.AcceptedChannels.Length > 0) {
+
+            bool backChannelreceived = false;
+            foreach (string channelName in _ResponseSidechannelCfg.AcceptedChannels) {
+              if (channelName == "_") {
+                if (backChannelContent != null) {
+                  ////// PROCESS //////
+                  _ResponseSidechannelCfg.ProcessingMethod.Invoke(method, backChannelContent);
+                  backChannelreceived = true;
+                  break;
+                }
+              }
+              else if (responseHeaders != null) {
+                var hdr = responseHeaders.Where((h)=>h.Key == channelName);
+                if (hdr.Any()) {
+                  //will be done once, if we need in as json
+                  string sideChannelFromHeader = hdr.First().Value.ToString();
+                  backChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(sideChannelFromHeader);
+                  ////// PROCESS //////
+                  _ResponseSidechannelCfg.ProcessingMethod.Invoke(method, backChannelContent);
+                  backChannelreceived = true;
+                  break;
+                }
+              }
+            }
+
+            if (!backChannelreceived) {
+              if (_ResponseSidechannelCfg.SkipAllowed) {
+                //if the whole getter is null, then (and only in this case) it will be a 'silent skip'
+                if(_ResponseSidechannelCfg.DefaultsGetterOnSkip != null) {
+                  backChannelContent = new Dictionary<string, string>();
+                  _ResponseSidechannelCfg.DefaultsGetterOnSkip.Invoke(ref backChannelContent);
+                  //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
+                  //passed to the processing method...
+                  _ResponseSidechannelCfg.ProcessingMethod.Invoke(method, backChannelContent);
+                }
+              }
+              else {
+                Trace.TraceWarning("Rejected incomming response because of missing side channel");
+                throw new Exception("Response has no SideChannel");
+              }
+            }
+
+          }//END BACKCHANNEL PROCESSING
 
         }
       }

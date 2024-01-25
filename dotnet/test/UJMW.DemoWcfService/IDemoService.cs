@@ -1,16 +1,33 @@
-﻿using System;
+﻿using DistributedDataFlow;
+using System;
 using System.Runtime.Serialization;
 using System.ServiceModel;
+using System.Threading;
+#if NET5_0_OR_GREATER
+#else
+  using SwaggerWcf.Attributes;
+  using System.ServiceModel.Web;
+#endif
 
 namespace UJMW.DemoWcfService {
 
-  [ServiceContract]
+#if NET5_0_OR_GREATER
+#else
+  [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("DemoService", "v1")]
+#endif
+  [HasDataFlowSideChannel("tenant-identifiers")]
   public interface IDemoService : IDisposable{
 
-    [OperationContract]
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
     string GetData(int value);
 
-    [OperationContract]
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
     CompositeType GetDataUsingDataContract(CompositeType composite);
 
   }

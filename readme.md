@@ -140,15 +140,9 @@ To avoid conflicts with the regular arguments, we need a sub-structure which is 
 }
 ```
 
-## Reserved / well known Side-Channel names
+'Ambience' is a very complex concern, so that we cant give a full introduction here. It relates to 'aspect orientation' (AOP) and 'contextual' programming principles. Our [SmartAmbience](https://github.com/SmartStandards/SmartAmbience) Library will provide convenience for that and can easy be coupled with the UJMW side channel.
 
-| Channel Name          | Direction     | Description                          |
-| --------------------- | ------------- | ------------------------------------ |
-| **"lastError"**       | RESPONSE ONLY | TDB (documentation / derVodi)        |
-| **"ambientDataFlow"** | REQUEST ONLY  | TBD                                  |
-| **"transactionId"**   | REQUEST ONLY  | used to transfer Transaction-Handles |
 
------
 
 # About the Tooling
 

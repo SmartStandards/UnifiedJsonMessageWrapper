@@ -1,7 +1,10 @@
 ﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -52,20 +55,28 @@ namespace System.Web.UJMW {
 
         Uri primaryUri = baseAddresses[0];
 
-        if (UjmwServiceBehaviour.ForceHttps) {
+        if (UjmwHostConfiguration.ForceHttps) {
           primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
         }
 
-        UjmwServiceBehaviour.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+        UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
 
         ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
+
+        var inboundSideChannelCfg = UjmwHostConfiguration.GetRequestSideChannelConfiguration(contractInterface);
+        var outboundSideChannelCfg = UjmwHostConfiguration.GetResponseSideChannelConfiguration(contractInterface);
 
         var behavior = host.Description.Behaviors.Find<ServiceBehaviorAttribute>();
         behavior.InstanceContextMode = InstanceContextMode.Single;
         behavior.ConcurrencyMode = ConcurrencyMode.Multiple;
 
-        var customizedContractDescription = CreateCustomizedContractDescription(contractInterface, serviceImplementationType);
-
+        var customizedContractDescription = CreateCustomizedContractDescription(
+          contractInterface,
+          inboundSideChannelCfg.UnderlinePropertyIsAccepted,
+          outboundSideChannelCfg.UnderlinePropertyIsProvided,
+          serviceImplementationType
+        );
+        
         var endpoint = new ServiceEndpoint(
           customizedContractDescription,
           GetCustomizedWebHttpBinding(),
@@ -73,12 +84,26 @@ namespace System.Web.UJMW {
         );
         host.AddServiceEndpoint(endpoint);
 
+
+        //https://weblogs.asp.net/scottgu/437027
+
+        if(UjmwHostConfiguration.DiableNtlm) {
+          host.Authentication.AuthenticationSchemes = AuthenticationSchemes.Anonymous;
+        }
+        else {
+          host.Authentication.AuthenticationSchemes = AuthenticationSchemes.Ntlm;
+        }
+
         CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
         WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();
         encodingBindingElement.ContentTypeMapper = new CustomizedJsonContentTypeMapper();
         endpoint.Binding = customizedBinding;
-
-        endpoint.Behaviors.Add(new CustomizedWebHttpBehaviourForJson());
+    
+        bool requestWrapperContainsUnderline = inboundSideChannelCfg.AcceptedChannels.Contains("_");
+        bool responseWrapperContainsUnderline = outboundSideChannelCfg.ChannelsToProvide.Contains("_");
+        endpoint.Behaviors.Add(new CustomizedWebHttpBehaviourForJson(
+          requestWrapperContainsUnderline, responseWrapperContainsUnderline
+        ));
 
         ServiceMetadataBehavior metadataBehaviour;
         if (host.Description.Behaviors.Contains(typeof(ServiceMetadataBehavior))) {
@@ -88,8 +113,8 @@ namespace System.Web.UJMW {
           metadataBehaviour = new ServiceMetadataBehavior();
           host.Description.Behaviors.Add(metadataBehaviour);
         }
-
-        if (UjmwServiceBehaviour.ForceHttps) {
+    
+        if (UjmwHostConfiguration.ForceHttps) {
           metadataBehaviour.HttpsGetEnabled = true;
           metadataBehaviour.HttpGetEnabled = false;
         }
@@ -105,22 +130,23 @@ namespace System.Web.UJMW {
           debugBehaviour = new ServiceDebugBehavior();
           host.Description.Behaviors.Add(debugBehaviour);
         }
-        debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwServiceBehaviour.ForceHttps);
+        debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwHostConfiguration.ForceHttps);
 
-        SideChannelServiceBehavior customizedServiceBehaviour;
-        if (host.Description.Behaviors.Contains(typeof(SideChannelServiceBehavior))) {
-          customizedServiceBehaviour = host.Description.Behaviors.Find<SideChannelServiceBehavior>();
+   
+        ServiceBehaviorToApplyDispatchHooks customizedServiceBehaviour;
+        if (host.Description.Behaviors.Contains(typeof(ServiceBehaviorToApplyDispatchHooks))) {
+          customizedServiceBehaviour = host.Description.Behaviors.Find<ServiceBehaviorToApplyDispatchHooks>();
         }
-        else {
-          customizedServiceBehaviour = new SideChannelServiceBehavior();
+        else { 
+          customizedServiceBehaviour = new ServiceBehaviorToApplyDispatchHooks(inboundSideChannelCfg, outboundSideChannelCfg);
           host.Description.Behaviors.Add(customizedServiceBehaviour);
         }
-
+        
         return host;
       }
       catch (Exception ex) {
-        if (UjmwServiceBehaviour.FactoryExceptionVisitor != null) {
-          UjmwServiceBehaviour.FactoryExceptionVisitor.Invoke(ex);
+        if (UjmwHostConfiguration.FactoryExceptionVisitor != null) {
+          UjmwHostConfiguration.FactoryExceptionVisitor.Invoke(ex);
 
           //HACK: wir wissen nicht, ob das gut ist -> WCF soll einfach den service skippen
           return null;
@@ -136,24 +162,41 @@ namespace System.Web.UJMW {
     private static WebHttpBinding _CustomizedWebHttpBinding = null;
 
     private WebHttpBinding GetCustomizedWebHttpBinding() {
-      if (UjmwServiceBehaviour.ForceHttps) {
+      if (UjmwHostConfiguration.ForceHttps) {
 
         if (_CustomizedWebHttpBindingSecured == null) {
-          _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
-          _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
+          if (UjmwHostConfiguration.DiableNtlm) {
+            _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
+            _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
+          }
+          else {
+            _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
+            _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.Ntlm;
+          }
         }
-
         return _CustomizedWebHttpBindingSecured;
+
       }
       else {
+
         if (_CustomizedWebHttpBinding == null) {
-          _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.None);
+          if (UjmwHostConfiguration.DiableNtlm) {
+            _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.None);
+            _CustomizedWebHttpBinding.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
+          }
+          else {
+            _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.TransportCredentialOnly);
+            _CustomizedWebHttpBinding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Ntlm;
+          }
         }
         return _CustomizedWebHttpBinding;
+
       }
     }
 
-    private static ContractDescription CreateCustomizedContractDescription(Type contractType, Type serviceType = null) {
+    private static ContractDescription CreateCustomizedContractDescription(
+      Type contractType, bool addUnderlineToRequest, bool addUnderlineToResponse, Type serviceType = null
+    ) {
 
       ContractDescription defaultContractDescription = null;
       if (serviceType == null) {
@@ -164,22 +207,47 @@ namespace System.Web.UJMW {
       }
 
       foreach (var od in defaultContractDescription.Operations) {
+        if (addUnderlineToRequest) {
+          var inMessages = od.Messages.Where((m) => m.Direction == MessageDirection.Input);
+          foreach (var im in inMessages) {
+
+            var underlinePropertyDescription = new MessagePartDescription("_", im.Body.WrapperNamespace);
+            underlinePropertyDescription.Type = typeof(Dictionary<string,string>);
+            underlinePropertyDescription.Multiple = false;
+            underlinePropertyDescription.ProtectionLevel = Net.Security.ProtectionLevel.None;
+            //underlinePropertyDescription.Index = om.Body.ReturnValue.Index;
+            //underlinePropertyDescription.MemberInfo = om.Body.ReturnValue.MemberInfo;
+            im.Body.Parts.Add(underlinePropertyDescription);
+
+          }
+        }
         var outMessages = od.Messages.Where((m) => m.Direction == MessageDirection.Output);
         foreach (var om in outMessages) {
 
+          if (addUnderlineToResponse) {
+
+            //TODO: _ property in den contract injecten
+            //x
+            //  om.Body.Parts.
+
+          }
+
+          //TODO: add FAULT PROPERTY!!!
+
+
           if (om.Body != null && om.Body.ReturnValue != null) {
-
             var customizedReturnValueDescription = new MessagePartDescription("return", om.Body.ReturnValue.Namespace);
-
             customizedReturnValueDescription.Type = om.Body.ReturnValue.Type;
             customizedReturnValueDescription.ProtectionLevel = om.Body.ReturnValue.ProtectionLevel;
             customizedReturnValueDescription.Index = om.Body.ReturnValue.Index;
             customizedReturnValueDescription.Multiple = om.Body.ReturnValue.Multiple;
             customizedReturnValueDescription.MemberInfo = om.Body.ReturnValue.MemberInfo;
-
             om.Body.ReturnValue = customizedReturnValueDescription;
           }
+
         }
+
+  
       }
 
       return defaultContractDescription;
@@ -192,7 +260,17 @@ namespace System.Web.UJMW {
       }
     }
 
-    internal class SideChannelServiceBehavior : IServiceBehavior, IErrorHandler {
+
+
+    internal class ServiceBehaviorToApplyDispatchHooks : IServiceBehavior, IErrorHandler {
+
+      private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
+      private OutgoingResponseSideChannelConfiguration _OutboundSideChannelCfg;
+
+      public ServiceBehaviorToApplyDispatchHooks(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg) {
+        _InboundSideChannelCfg = inboundSideChannelCfg;
+        _OutboundSideChannelCfg = outboundSideChannelCfg;
+      }
 
       public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters) {
       }
@@ -206,7 +284,7 @@ namespace System.Web.UJMW {
         else {
           foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
             foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
-              endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector());
+              endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector(_InboundSideChannelCfg, _OutboundSideChannelCfg));
             }
           }
         }
@@ -227,6 +305,7 @@ namespace System.Web.UJMW {
         return false;
        // return true;
       }
+
       public void ProvideFault(Exception error, MessageVersion version, ref Message fault) {
         fault = null;
         return;
@@ -246,8 +325,27 @@ namespace System.Web.UJMW {
       public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
       }
 
+      //internal sealed class WebHttpErrorHandler : IErrorHandler {
+      //  //private static readonly ILog logger = LogManager.GetLogger(typeof(WebHttpErrorHandler));
+
+      //  public void ProvideFault(Exception error, MessageVersion version, ref Message fault) {
+      //    var exception = new FaultException("Web Server error encountered. All details have been logged.");
+      //    var messageFault = exception.CreateMessageFault();
+
+      //    fault = Message.CreateMessage(version, messageFault, exception.Action);
+      //  }
+
+      //  public bool HandleError(Exception error) {
+      //    logger.Error(string.Format("An error has occurred in the Web service {0}", error));
+
+      //    return !(error is FaultException);
+      //  }
+      //}
+
       #endregion
     }
+
+
 
     internal class CustomFaultBodyWriter : BodyWriter {
       private string _Message;
@@ -256,22 +354,32 @@ namespace System.Web.UJMW {
       }
 
       protected override void OnWriteBodyContents(System.Xml.XmlDictionaryWriter writer) {
-        //HACK: WCF PITA required to have an XML ROOT NODE before writing raw - OH MY GOD
-        //because of this our standard needs to allow XML-encapsulated messages like
-        //<UJMW>{ ... }</UJMW>
+        //HACK: WCF PITA required (at elast for faultbody) to have an XML ROOT NODE before
+        //writing raw - OH MY GOD!!!
         writer.WriteStartElement("UJMW");
         writer.WriteRaw($"{{ \"fault\":\"{_Message}\" }}");
         writer.WriteEndElement();
+        //because of this our standard needs to allow XML-encapsulated messages like
+        //<UJMW>{ ... }</UJMW>
       }
     }
 
     internal class DispatchMessageInspector : IDispatchMessageInspector {
 
+      private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
+      private OutgoingResponseSideChannelConfiguration _OutboundSideChannelCfg;
+
+      public DispatchMessageInspector(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg) {
+        _InboundSideChannelCfg = inboundSideChannelCfg;
+        _OutboundSideChannelCfg = outboundSideChannelCfg;
+      }
+
       private Dictionary<String, MethodInfo> _MethodInfoCache = new Dictionary<String, MethodInfo>();
 
-      public Object AfterReceiveRequest(ref Message incomingSoapRequest, IClientChannel channel, InstanceContext instanceContext) {
+      public Object AfterReceiveRequest(ref Message incomingWcfMessage, IClientChannel channel, InstanceContext instanceContext) {
 
-        if (UjmwServiceBehaviour.AuthHeaderEvaluator == null && UjmwServiceBehaviour.RequestSidechannelProcessor == null) {
+        //no hook neccessarry
+        if (UjmwHostConfiguration.AuthHeaderEvaluator == null && _InboundSideChannelCfg.AcceptedChannels.Length == 0) {
           return null;
         }
 
@@ -280,10 +388,10 @@ namespace System.Web.UJMW {
 
         string methodName = null;
         string fullCallUrl = null;
-        if (incomingSoapRequest.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
+        if (incomingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
           methodName = httpOperationName?.ToString();
         }
-        if (incomingSoapRequest.Properties.TryGetValue("Via", out object via)) {
+        if (incomingWcfMessage.Properties.TryGetValue("Via", out object via)) {
           fullCallUrl = via?.ToString();
         }
         if (methodName == null || fullCallUrl == null) {
@@ -294,60 +402,181 @@ namespace System.Web.UJMW {
         lock (_MethodInfoCache) {
           if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
 
-            //HACK: instead of serviceImplementationType we should evaluate the merhodinfo for the contract!
+            //HACK: instead of serviceImplementationType we would like to get the CONTRACT!
             Type serviceContractType = instanceContext.Host.Description.ServiceType;
 
             calledContractMethod = serviceContractType.GetMethod(methodName);
+
             _MethodInfoCache[fullCallUrl] = calledContractMethod;
           }
         }
 
-        if (UjmwServiceBehaviour.AuthHeaderEvaluator == null) {
-          this.ProcessRequestSideChannel(calledContractMethod);
-          return null;
-        }
-
         int httpReturnCode = 200;
+        bool authFailed = false;
 
-        string rawAuthHeader = null;
-        HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingSoapRequest.Properties[HttpRequestMessageProperty.Name];
+        if (UjmwHostConfiguration.AuthHeaderEvaluator != null) {
+  
+          string rawAuthHeader = null;
+          HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
 
-        if (httpRequest.Headers.AllKeys.Contains("Authorization")) {
-          rawAuthHeader = httpRequest.Headers["Authorization"];
-        }
-
-        bool continueProcessing = UjmwServiceBehaviour.AuthHeaderEvaluator.Invoke(
-          rawAuthHeader, calledContractMethod, callingMachine, ref httpReturnCode
-        );
-
-        if (continueProcessing) {
-          this.ProcessRequestSideChannel(calledContractMethod);
-          return null;
-        }
-        else {
-          if (httpReturnCode == 200) {
-            //default, if no specific code has been provided!
-            throw new WebFaultException(HttpStatusCode.Forbidden);
+          if (httpRequest.Headers.AllKeys.Contains("Authorization")) {
+            rawAuthHeader = httpRequest.Headers["Authorization"];
           }
-          throw new WebFaultException((HttpStatusCode)httpReturnCode);
+
+          bool authSuccess = UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
+            rawAuthHeader, calledContractMethod, callingMachine, ref httpReturnCode
+          );
+
+          if (!authSuccess) {
+
+            //TODO: logging hook!!!
+            Trace.TraceWarning("Rejected incomming request because AuthHeaderEvaluator returned false!");
+
+            if (httpReturnCode == 200) {
+              //default, if no specific code has been provided!
+              throw new WebFaultException(HttpStatusCode.Forbidden);
+            }
+            throw new WebFaultException((HttpStatusCode)httpReturnCode);
+          }
+
         }
 
-      }
+        bool sideChannelReceived = false;
+        IDictionary<string, string> sideChannelContent = null;
+        foreach (string acceptedChannel in _InboundSideChannelCfg.AcceptedChannels) {
+          //TODO: ausimpleemtneiren
 
-      private void ProcessRequestSideChannel(MethodInfo calledContractMethod) {
-        if (UjmwServiceBehaviour.RequestSidechannelProcessor != null) {
 
-          //TODO: extract request side channel...
-          //UjmwServiceBehaviour.RequestSidechannelProcessor.Invoke(calledContractMethod, extractedContainer);
+
+          var x = System.Text.Encoding.UTF8.GetString(incomingWcfMessage.GetBody<byte[]>());
+          var sr = new StringReader(x);
+          var rdr = new JsonTextReader(sr);
+       
+
+          rdr.Read();
+          string found = null;
+          while (rdr.TokenType != JsonToken.None) {
+            if (rdr.TokenType == JsonToken.PropertyName) {
+              if (rdr.Value.ToString() == "_") {
+                rdr.Read();
+                var serializer = new Newtonsoft.Json.JsonSerializer();
+                //xxx = serializer.Deserialize<Dictionary<string, string>>(rdr);
+
+
+                break;
+              }
+              else {
+                rdr.Skip();
+              }
+            }
+            rdr.Read();
+          }
+
+
+          //while ( rdr.TokenType != JsonToken.PropertyName || rdr.Value.ToString() != "_") {
+
+          //  rdr.Read();
+
+          //}
+
+          //rdr.Read();
+          //var y = rdr.ReadAsString();
+
+
+
+          //x.ToString();
+          //_InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+
 
         }
+
+        if (!sideChannelReceived && _InboundSideChannelCfg.AcceptedChannels.Length > 0) {
+          if (_InboundSideChannelCfg.SkipAllowed) {
+            //if the whole getter is null, then (and only in this case) it will be a 'silent skip'
+            if (_InboundSideChannelCfg.DefaultsGetterOnSkip != null) {
+              sideChannelContent = new Dictionary<string, string>();
+              _InboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
+              //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
+              //passed to the processing method...
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+            }
+          }
+          else {
+            //TODO: logging hook!!! 
+            Trace.TraceWarning("Rejected incomming request because of missing side channel");
+            throw new WebFaultException(HttpStatusCode.BadRequest);
+          }
+         
+        }
+
+        return null;
       }
 
-      public void BeforeSendReply(ref Message outgoingReply, Object correlationState) {
-        if (UjmwServiceBehaviour.ResponseSidechannelCapturer != null) {
+      public void BeforeSendReply(ref Message outgoingWcfMessage, Object correlationState) {
+        if (_OutboundSideChannelCfg.ChannelsToProvide.Length > 0) {
 
-          //UjmwServiceBehaviour.ResponseSidechannelCapturer.Invoke(calledContractMethod, containerToReply);
-          //TODO: inject response side channel...
+          //string methodName = null;
+          //string fullCallUrl = null;
+          //if (outgoingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
+          //  methodName = httpOperationName?.ToString();
+          //}
+          //if (outgoingWcfMessage.Properties.TryGetValue("Via", out object via)) {
+          //  fullCallUrl = via?.ToString();
+          //}
+          //if (methodName == null || fullCallUrl == null) {
+          //  //TODO: is this allowed???
+          //  return;
+          //}
+   
+
+
+          //TODO: da müssen wir noch rankommen!!!
+          MethodInfo calledContractMethod = null;
+          
+
+
+          //lock (_MethodInfoCache) {
+          //  if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
+
+          //    //HACK: instead of serviceImplementationType we should evaluate the merhodinfo for the contract!
+          //    Type serviceContractType = instanceContext.Host.Description.ServiceType;
+
+          //    calledContractMethod = serviceContractType.GetMethod(methodName);
+          //    _MethodInfoCache[fullCallUrl] = calledContractMethod;
+          //  }
+          //}
+
+          //prepare some ugly WCF hacking
+          HttpRequestMessageProperty outgoingHttpRequest = null;
+          if (outgoingWcfMessage.Properties.ContainsKey(HttpRequestMessageProperty.Name)) {
+            outgoingHttpRequest = (HttpRequestMessageProperty) outgoingWcfMessage.Properties[HttpRequestMessageProperty.Name];
+          }
+          else {
+            outgoingHttpRequest = new HttpRequestMessageProperty();
+            outgoingWcfMessage.Properties.Add(HttpRequestMessageProperty.Name, outgoingHttpRequest);
+          }
+
+          //COLLECT THE DATA
+          var snapshotContainer = new Dictionary<string,string>(); 
+          _OutboundSideChannelCfg.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
+
+          string serializedSnapshot = JsonConvert.SerializeObject(snapshotContainer);
+          bool injectUnderlineProp = false;
+          foreach (string channelName in _OutboundSideChannelCfg.ChannelsToProvide) {
+            if(channelName == "_") {
+              injectUnderlineProp = true;
+            }
+            else {
+              outgoingHttpRequest.Headers.Add(channelName, serializedSnapshot);
+            }
+          }
+
+          if (injectUnderlineProp) {
+
+            //TODO: _ property injecten!!!!
+            //outgoingWcfMessage.Properties.
+
+          }
 
         }
       }
@@ -356,32 +585,67 @@ namespace System.Web.UJMW {
 
     internal class CustomizedWebHttpBehaviourForJson : WebHttpBehavior {
 
-      public CustomizedWebHttpBehaviourForJson() {
+      private bool _RequestWrapperContainsUnderline;
+      private bool _ResponseWrapperContainsUnderline;
+
+      public CustomizedWebHttpBehaviourForJson(bool requestWrapperContainsUnderline, bool responseWrapperContainsUnderline) {
+        _RequestWrapperContainsUnderline = requestWrapperContainsUnderline;
+        _ResponseWrapperContainsUnderline = responseWrapperContainsUnderline;
+
         this.DefaultOutgoingRequestFormat = System.ServiceModel.Web.WebMessageFormat.Json;
         this.DefaultOutgoingResponseFormat = System.ServiceModel.Web.WebMessageFormat.Json;
         this.DefaultBodyStyle = System.ServiceModel.Web.WebMessageBodyStyle.Wrapped;
+
       }
 
       protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-        return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
+        return new CustomizedJsonFormatter(
+          operationDescription, true, endpoint.ListenUri,
+          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+        );
       }
 
       protected override IDispatchMessageFormatter GetReplyDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-        return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
+        return new CustomizedJsonFormatter(
+          operationDescription, false, endpoint.ListenUri,
+          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+        );
       }
 
       protected override IClientMessageFormatter GetRequestClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-        return new CustomizedJsonFormatter(operationDescription, true, endpoint.ListenUri);
+        return new CustomizedJsonFormatter(
+          operationDescription, true, endpoint.ListenUri,
+          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+        );
       }
 
       protected override IClientMessageFormatter GetReplyClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
-        return new CustomizedJsonFormatter(operationDescription, false, endpoint.ListenUri);
+        return new CustomizedJsonFormatter(
+          operationDescription, false, endpoint.ListenUri,
+          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+        );
+      }
+
+      protected override void AddServerErrorHandlers(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher) {
+        base.AddServerErrorHandlers(endpoint, endpointDispatcher);
+
+        //TODO: TEST THIS ERROR HOOK
+        //https://stackoverflow.com/questions/23212705/wcf-how-to-handle-errors-globally
+        //endpointDispatcher.DispatchRuntime.ChannelDispatcher.ErrorHandlers.Add(new WebHttpErrorHandler());
+
+        //IErrorHandler errorHandler = new CustomErrorHandler();
+        //foreach (var channelDispatcher in serviceHostBase.ChannelDispatchers) {
+        //  channelDispatcher.ErrorHandlers.Add(errorHandler);
+        //}
+
       }
 
     }
 
     internal class CustomizedJsonFormatter : IDispatchMessageFormatter, IClientMessageFormatter {
 
+      private bool _RequestWrapperContainsUnderline;
+      private bool _ResponseWrapperContainsUnderline;
       private OperationDescription _OperationSchema;
       private Dictionary<String, int> _ParameterIndicesPerName;
       private Dictionary<String, object> _ParameterDefaults;
@@ -390,7 +654,13 @@ namespace System.Web.UJMW {
 
       //NOTE: this formatter will be constrcuted ONCE per CONTRACT-METHOD
       //but is recylced over several requests - so we have no performance problem here
-      public CustomizedJsonFormatter(OperationDescription operation, bool isRequest, Uri uri) {
+      public CustomizedJsonFormatter(
+        OperationDescription operation, bool isRequest, Uri uri,
+        bool requestWrapperContainsUnderline, bool responseWrapperContainsUnderline
+      ) {
+
+        _RequestWrapperContainsUnderline = requestWrapperContainsUnderline;
+        _ResponseWrapperContainsUnderline = responseWrapperContainsUnderline;
 
         _OperationSchema = operation;
         _Uri = new Uri(uri.ToString() + "/" + operation.Name);

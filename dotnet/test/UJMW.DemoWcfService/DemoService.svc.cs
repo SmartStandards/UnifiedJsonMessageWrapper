@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.ServiceModel;
-using System.ServiceModel.Web;
 using System.Text;
 using System.Threading;
+#if NET5_0_OR_GREATER
+#else
+using System.ServiceModel.Web;
+#endif
 
 namespace UJMW.DemoWcfService {
 

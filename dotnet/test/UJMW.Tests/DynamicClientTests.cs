@@ -1,4 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Text;
 using static System.Web.UJMW.DynamicClientFactory;
 
 namespace System.Web.UJMW {
@@ -8,40 +11,53 @@ namespace System.Web.UJMW {
 
     internal const string dummyRootUrl = "https://dummy/";
 
+    internal class MockHttpPostSimulator : HttpPostExecutor {
+
+      public MockHttpPostSimulator() {
+      }
+
+      public int ExecuteHttpPost(
+        string url,
+        string requestContent, IDictionary<string, string> requestHeaders,
+        out string responseContent, out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders
+      ) {
+        string methodName = url.Substring(dummyRootUrl.Length);
+        responseHeaders = null;
+        if (methodName == nameof(IMyService.ThisIsAVoid)) {
+          responseContent = "{\n}";
+        }
+        else if (methodName == nameof(IMyService.Calculate)) {
+          responseContent = "{ \"_\":{ \"lastError\":null }, \"return\": 42}";
+        }
+        else if (methodName == nameof(IMyService.IntByRef)) {
+          responseContent = "{ \"foo\": 43}";
+        }
+        else if (methodName == nameof(IMyService.IntOut)) {
+          responseContent = "{ \"foo\": 44}";
+        }
+        else if (methodName == nameof(IMyService.ProcessABag)) {
+          responseContent = "{ \"return\": true}";
+        }
+        else {
+          responseContent = "{ \"fault\":\"UNKNOWN-METHOD\"}";
+        }
+        return 200;
+      }
+    }
+
+    private void CaptureMockAmbientData(IDictionary<string, string> targetSnapshot) {
+      targetSnapshot["Tenant"] = "NASA";
+    }
+
     [TestMethod]
     public void DynamicClientTest1() {
 
-      HttpPostMethod mockHttpCaller = (
-        (string targetUrl, string rawJsonContent) => {
-          string methodName = targetUrl.Substring(dummyRootUrl.Length);
-          if (methodName == nameof(IMyService.ThisIsAVoid)) {
-            return "{\n}";
-          }
-          else if (methodName == nameof(IMyService.Calculate)) {
-            return "{ \"_\":{ \"lastError\":null }, \"return\": 42}";
-          }
-          else if (methodName == nameof(IMyService.IntByRef)) {
-            return "{ \"foo\": 43}";
-          }
-          else if (methodName == nameof(IMyService.IntOut)) {
-            return "{ \"foo\": 44}";
-          }
-          else if (methodName == nameof(IMyService.ProcessABag)) {
-            return "{ \"return\": true}";
-          }
-          return "{ \"fault\":\"UNKNOWN-METHOD\"}";
-        }
-      );
+      UjmwClientConfiguration.ConfigureRequestSidechannel((t, sideChannel) => {
+        sideChannel.ProvideUjmwUnderlineProperty();
+        sideChannel.CaptureDataVia(this.CaptureMockAmbientData);
+      });
 
-      var client = DynamicClientFactory.CreateInstance<IMyService>(
-        mockHttpCaller,
-        () => dummyRootUrl,
-        (outChannel) => {
-          outChannel["Tenant"] = "NASA";
-        },
-        (retChannel) => {
-        }
-       );
+      var client = DynamicClientFactory.CreateInstance<IMyService>(new MockHttpPostSimulator(), () => dummyRootUrl);
 
       var result = client.Calculate( 1, 2);
       Assert.AreEqual(42,result);

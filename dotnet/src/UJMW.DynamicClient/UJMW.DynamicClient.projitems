@@ -10,8 +10,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\OutgoingRequestSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\IncommingResponseSideChannelConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwFaultException.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\UjmwClientConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HttpPostExecutor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwWebCallInvoker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IAbstractWebcallInvoker.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)%28Setup%29\" />
   </ItemGroup>
 </Project>

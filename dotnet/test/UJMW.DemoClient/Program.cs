@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DistributedDataFlow;
+using System;
 using System.Net.Http;
 using System.Threading;
 using System.Web.UJMW;
@@ -18,9 +19,11 @@ using System.Web.UJMW;
   //  httpClient, () => "http://localhost:55202/DemoService.svc"
   //);
 
+  UjmwClientConfiguration.ConfigureStandardUjmwRequestSidechannel(AmbienceHub.CaptureCurrentValuesTo);
+
+
   var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-    httpClient, () => "http://localhost:55202/DemoService.svc",
-    AmbienceHub.CaptureCurrentValuesTo, AmbienceHub.RestoreValuesFrom
+    httpClient, () => "http://localhost:55202/DemoService.svc"
   );
 
   httpClient.DefaultRequestHeaders.Add("Authorization", "its me");

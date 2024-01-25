@@ -9,7 +9,9 @@
     <Import_RootNamespace>System</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)UjmwServiceBehaviour.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Setup\IncommingRequestSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Setup\OutgoingResponseSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Setup\UjmwHostConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwServiceHostFactory.cs" />
   </ItemGroup>
 </Project>
