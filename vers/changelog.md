@@ -6,7 +6,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* completet impl. the new Feature of full sidechannel support for WCF and ASP.net core WebAPI
+*(none)*
+
+
+
+## v 1.2.0
+released **2024-02-15**, including:
+ - completet impl. the **new Feature** of full sidechannel support for WCF and ASP.net core WebAPI
 
 
 

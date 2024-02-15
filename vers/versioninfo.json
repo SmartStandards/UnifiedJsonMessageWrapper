@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.1.2",
-  "currentVersionWithSuffix": "1.1.2",
+  "currentVersion": "1.2.0",
+  "currentVersionWithSuffix": "1.2.0",
   "releaseType": "official",
-  "previousVersion": "1.1.1",
-  "changeGrade": "patch",
+  "previousVersion": "1.1.2",
+  "changeGrade": "minor",
   "currentMajor": 1,
-  "currentMinor": 1,
-  "currentPatch": 2,
-  "versionDateInfo": "2023-10-17",
-  "versionTimeInfo": "09:02:26",
-  "versionNotes": "- new revision without significant changes\n"
+  "currentMinor": 2,
+  "currentPatch": 0,
+  "versionDateInfo": "2024-02-15",
+  "versionTimeInfo": "19:35:32",
+  "versionNotes": "- completet impl. the new Feature of full sidechannel support for WCF and ASP.net core WebAPI\n"
 }
