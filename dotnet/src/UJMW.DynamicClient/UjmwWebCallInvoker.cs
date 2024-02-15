@@ -73,12 +73,11 @@ namespace System.Web.UJMW {
       var requestContent = new Dictionary<string, object>();
       Dictionary<string, string> requestHeaders = null;
 
-      //SIDECHANNEL PREPARATION
+      ///// CAPTURE OUTGOING SIDECHANNEL /////
       if (_RequestSidechannelCfg.UnderlinePropertyIsProvided || _RequestSidechannelCfg.ChannelsToProvide.Any()) {
         var sideChannelContent = new Dictionary<string, string>();
         string sideChannelJson = null;
 
-        ////// CAPTURE //////
         _RequestSidechannelCfg.CaptureMethod.Invoke(method, sideChannelContent);
 
         foreach (string channel in _RequestSidechannelCfg.ChannelsToProvide) {
@@ -94,7 +93,8 @@ namespace System.Web.UJMW {
             requestHeaders[channel] = sideChannelJson;
           }
         }
-      }//END SIDECHANNEL PREPARATION
+      }
+      ///// (end) CAPTURE OUTGOING SIDECHANNEL /////
 
       var parameters = method.GetParameters();
 
@@ -196,7 +196,7 @@ namespace System.Web.UJMW {
             }
           }
 
-          //BACKCHANNEL PROCESSING
+          ///// RESTORE INCOMMING BACKCHANNEL /////
           if (_ResponseSidechannelCfg.UnderlinePropertyIsAccepted || _ResponseSidechannelCfg.AcceptedChannels.Length > 0) {
 
             bool backChannelreceived = false;
@@ -240,7 +240,8 @@ namespace System.Web.UJMW {
               }
             }
 
-          }//END BACKCHANNEL PROCESSING
+          }
+          ///// (end) RESTORE INCOMMING BACKCHANNEL /////
 
         }
       }

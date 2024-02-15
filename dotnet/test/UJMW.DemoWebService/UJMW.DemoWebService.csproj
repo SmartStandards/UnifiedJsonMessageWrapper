@@ -85,8 +85,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
-    <Folder Include="DemoService %28shared%29\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 

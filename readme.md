@@ -4,8 +4,8 @@
 | ---------- | ------------------------------------------------------------ |
 | author:    | [KornSW](https://github.com/KornSW) + [derVodi](https://github.com/derVodi) |
 | license:   | [Apache-2](https://choosealicense.com/licenses/apache-2.0/)  |
-| version:   | 1.0.0                                                        |
-| timestamp: | 2020-01-16                                                   |
+| version:   | 1.1.0                                                        |
+| timestamp: | 2024-01-21                                                   |
 
 ### Contents
 
@@ -25,21 +25,23 @@
 
 # Motivation:
 
-#### Problems of SOAP and its "Call-based" style
+The world divides between two approaches. One is the idea of invoking a service-method on server side - we know this under the name **Remote-Procedure-Call** (**RPC**). The other idea is completely focused on the use cases, that are relevant to **Create**, **Read**, **Update** or **Delete** objects (formally known as **CRUD**-Operations), as they are seen in the role as a Data-Record over an repository.
 
-TBD
+In our meaning, **REST** is based on ideas, that are dead. What we mean specifically is the use of HTTP verbs (Get, Put, Post, Delete) to represent the CRUD operations! Also often mentioned is the alleged reliability that you always receive the same response via GET. Personally, i don't know of a single REST interface that does this cleanly. The mere fact that it is so incredibly widespread is no proof of the wisdom of continuing to rely on this horse in today's world. It actually uses the http protocol in exactly the way it was last 'planned', but the world has moved on. The demands regarding ever new security mechanisms on the web, firewalls, proxies and load balancing aspects have permanently affected the http transport layer. The layer is now definitely too deep to mix the use cases of the repository access level with it.
 
-#### Problems of REST and its "CRUD" style
+A second problem with REST is, that it is not really scalable. The hard patterns for the urls (containing the record ids) makes problems when using composite-keys. Pagination-Support or advanced Filtering scenarios were completely ignored during the design phase. At the end, **GraphQL** is the proof of the truth of all this.
 
-TBD
+But at least **we still see any CRUD operations implicitly as a procedure call**. This means that there can be standards for access to uniform repository services, but the problem domain of **CRUD must have NOTHING to do with transport technology!**
 
-#### The truth within the middle
+So the question is now: **What RPC-Protocol is the best**?
 
-What we want is .......       TBD
+Ok - **forget SOAP** (we gonna skip this instead of writing a book of complexity here -> use Google, if you are still a fan of SOAP)
 
-#### a quick look on classical WCF-Wrappers
+Using JSON-Serialization is state-of-the-art. Now we just wanted to have a very-very lightweight and smart standard :-), to declare the so-called **"*Message-Wrapper*"** It is just the **root-object**, which is invisible for the BL programmer and just existing **to bundle the method-parameters for the procedure call**.
 
-TBD
+Yes, we know that there are other standards (like JsonRpc, gRpc, ...), but for all of them we've found some issues when using them vanilla.
+
+So we've designed this specification:
 
 
 
@@ -124,7 +126,41 @@ This is just a propose for using an OUT-Arg which usually should have a name lik
 
 * If an returnCode was delivered, which indicated an error, then some additional details can be placed within the "lastError"-SideChannel (as described below)
 
-  
+
+
+
+# File/Binary transfers 
+
+There is an exception (coming with version 1.1) in which the use of a JSON wrapper should not be used. Whenever **files need to be transferred**! Here we want to stick as closely as possible to the **traditional transmission methods**, as this has some advantages if the client component is a single page application in the browser. On the server side, it also makes sense that files do not end up in RAM as byte[], but rather the streaming support of the respective transport technology (if available) can in principle be used.
+
+So we now define **method conventions**, if they apply, the UJMW layers should automatically choose a different form of transmission:
+
+**downloads a simple byte-stream response** (=classic browser download) and **uploads in the form of a ['multipart/form-data'](https://stackoverflow.com/questions/8659808/how-does-http-file-upload -work) posts** take place.
+
+### Convention for downloads (in C#)
+
+Is fulfilled/activated by **using the type 'Stream' as the return type**, thereby enacting the following behavior:
+
+* There may (optionally) be an OUT parameter named '*fileName*' of type string
+
+* There may (optionally) be an OUT parameter named '*fileContentType*' of type string
+
+* **Additional OUT or REF parameters are prohibited**
+
+* The handling of IN parameters remains unaffected and can take place through a request with the JSON wrapper
+
+
+### Convention for uploads (in C#)
+
+Is fulfilled/activated by **using the Stream type as the type for at least one IN parameter**, thereby enacting the following behavior:
+
+* **Additional IN parameters** that are not of the 'Stream' type are exceptionally **transferred as query parameters** within the URL
+
+* Any IN parameters that are of type 'Stream' each represent a file to be uploaded
+
+* IN parameters of the string type can bind additional information for one file at a time using a further convention (well-known names): the **Parameter name corresponds to the pattern** `<name-of-the-corresponding-Steam-Paramter>ContentType` (**=ContentType of that file**) OR `<name-of-the-corresponding-Steam-Parameter>Name`  (**=Name of that file**) these are automatically transmitted by the transport layer via the relevant transport protocols (body/headers).
+
+
 
 # Side-Channels
 
@@ -141,6 +177,7 @@ To avoid conflicts with the regular arguments, we need a sub-structure which is 
 ```
 
 'Ambience' is a very complex concern, so that we cant give a full introduction here. It relates to 'aspect orientation' (AOP) and 'contextual' programming principles. Our [SmartAmbience](https://github.com/SmartStandards/SmartAmbience) Library will provide convenience for that and can easy be coupled with the UJMW side channel.
+
 
 
 
@@ -207,8 +244,9 @@ public class EntryModule : IHttpModule {
 
 
 ## A Dynamic Controller Factory for ASP.NET core WebAPI
-  *IS COMMING SOON*
-  The NuGet-Package ID is 'UJMW.DynamicController'
+ The NuGet-Package ID is 'UJMW.DynamicController'
+
+
 
 ## Controller Code Generator for ASP.NET core WebAPI
   **IS STABLE** but discontinued (see '/Resources/for ASP.NET 5 MVC/...')

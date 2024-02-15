@@ -21,8 +21,11 @@ namespace System.Web.UJMW {
 
     #region " CreateInstance - Convenience overloads " 
 
-    public static TApplicable CreateInstance<TApplicable>(string url) {
+    public static TApplicable CreateInstance<TApplicable>(string url, string httpAuthHeader = null) {
       var httpClient = new HttpClient();
+      if (!string.IsNullOrWhiteSpace(httpAuthHeader)) {
+        httpClient.DefaultRequestHeaders.Add("Authorization", httpAuthHeader);
+      }
       var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, () => url, httpClient.Dispose);
       return CreateInstance<TApplicable>(invoker);

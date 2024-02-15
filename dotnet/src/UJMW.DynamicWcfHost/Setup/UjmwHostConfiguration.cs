@@ -18,6 +18,7 @@ namespace System.Web.UJMW {
     ref int httpReturnCode
   );
 
+  /// <summary> (specific to WCF) </summary>
   public class UjmwHostConfiguration {
 
     private UjmwHostConfiguration() {

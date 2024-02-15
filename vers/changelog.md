@@ -6,7 +6,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* completet impl. the new Feature of full sidechannel support for WCF and ASP.net core WebAPI
 
 
 

@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Net.Http;
 using UJMW.DemoWcfService;
 using Microsoft.AspNetCore;
+using DistributedDataFlow;
 
 namespace Security {
 
@@ -87,10 +88,64 @@ namespace Security {
 
       services.AddControllers();
 
+      AmbienceHub.DefineFlowingContract(
+        "tenant-identifiers",
+        (contract) => {
+          contract.IncludeExposedAmbientFieldInstances("currentTenant");
+        }
+      );
+
+      UjmwHostConfiguration.ConfigureRequestSidechannel(
+        (serviceType, sideChannel) => {
+          if (HasDataFlowSideChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
+
+            sideChannel.AcceptHttpHeader("my-ambient-data");
+            sideChannel.AcceptUjmwUnderlineProperty();
+
+            sideChannel.ProcessDataVia(
+              (incommingData) => AmbienceHub.RestoreValuesFrom(incommingData, contractName)
+            );
+          }
+          else {
+            sideChannel.AcceptNoChannelProvided(
+              (ref IDictionary<string, string> defaultData) => {
+                defaultData["currentTenant"] = "(fallback)";
+              }
+            );
+          }
+        }
+      );
+
+      UjmwHostConfiguration.ConfigureResponseSidechannel(
+        (serviceType, sideChannel) => {
+          if (HasDataFlowBackChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
+
+            sideChannel.ProvideHttpHeader("my-ambient-data");
+            sideChannel.ProvideUjmwUnderlineProperty();
+
+            sideChannel.CaptureDataVia(
+              (snapshot) => AmbienceHub.CaptureCurrentValuesTo(snapshot, contractName)
+            );
+          }
+          else {
+            sideChannel.ProvideNoChannel();
+          }
+        }
+      );
+
+      AccessTokenValidator.ConfigureTokenIntrospection(
+        new LocalJwtIntrospector("TheSignKey")
+      );
+
       services.AddSingleton<IDemoService>(new DemoService());
       services.AddDynamicUjmwControllers(r => {
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
-        r.AddControllerFor<IDemoService>("DemoService.svc");
+        r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
+          ControllerRoute = "DemoService.svc",
+          //EnableResponseSidechannel = false,
+          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
+          //AuthAttributeConstructorParams = new object[] { null }
+        });
       });
 
       services.AddSwaggerGen(c => {

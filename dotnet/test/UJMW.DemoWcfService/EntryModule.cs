@@ -34,7 +34,7 @@ namespace UJMW.DemoWcfService {
         AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
       }
 
-      UjmwHostConfiguration.DiableNtlm = false;
+      UjmwHostConfiguration.DiableNtlm = true;
       UjmwHostConfiguration.ForceHttps = false;
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
@@ -54,7 +54,7 @@ namespace UJMW.DemoWcfService {
       AmbienceHub.DefineFlowingContract(
         "tenant-identifiers",
         (contract) => {
-          contract.IncludeExposedAmbientFieldInstances("\"currentTenant\"");
+          contract.IncludeExposedAmbientFieldInstances("currentTenant");
         }
       );
 
@@ -72,7 +72,7 @@ namespace UJMW.DemoWcfService {
           else {
             sideChannel.AcceptNoChannelProvided(
               (ref IDictionary<string, string> defaultData) => {
-                defaultData["ProfileIdentifier"] = "(Independent)";
+                defaultData["currentTenant"] = "(fallback)";
               }
             );
           }

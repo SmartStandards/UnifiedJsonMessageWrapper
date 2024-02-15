@@ -102,7 +102,7 @@ namespace System.Web.UJMW {
         bool requestWrapperContainsUnderline = inboundSideChannelCfg.AcceptedChannels.Contains("_");
         bool responseWrapperContainsUnderline = outboundSideChannelCfg.ChannelsToProvide.Contains("_");
         endpoint.Behaviors.Add(new CustomizedWebHttpBehaviourForJson(
-          requestWrapperContainsUnderline, responseWrapperContainsUnderline
+          requestWrapperContainsUnderline, outboundSideChannelCfg
         ));
 
         ServiceMetadataBehavior metadataBehaviour;
@@ -225,15 +225,12 @@ namespace System.Web.UJMW {
         foreach (var om in outMessages) {
 
           if (addUnderlineToResponse) {
-
-            //TODO: _ property in den contract injecten
-            //x
-            //  om.Body.Parts.
-
+            //within the dispatcher we are to late, because were already getting the serialized body,
+            //so weve just doing that job in the 'CustomizedJsonFormatter' when serializeing, which
+            //allows us to skip an offical registration of that property
           }
 
-          //TODO: add FAULT PROPERTY!!!
-
+          //TODO: fault property?
 
           if (om.Body != null && om.Body.ReturnValue != null) {
             var customizedReturnValueDescription = new MessagePartDescription("return", om.Body.ReturnValue.Namespace);
@@ -345,8 +342,6 @@ namespace System.Web.UJMW {
       #endregion
     }
 
-
-
     internal class CustomFaultBodyWriter : BodyWriter {
       private string _Message;
       public CustomFaultBodyWriter(Exception e) : base(false) {
@@ -377,6 +372,12 @@ namespace System.Web.UJMW {
       private Dictionary<String, MethodInfo> _MethodInfoCache = new Dictionary<String, MethodInfo>();
 
       public Object AfterReceiveRequest(ref Message incomingWcfMessage, IClientChannel channel, InstanceContext instanceContext) {
+       
+        //if (incomingWcfMessage.State == MessageState.Copied) {
+        //  //the copy was implicitely created by us, in order to get the possibility to read the body
+        //  //but it also triggers out own interceptor again - WTF!!!!
+        //  return null;
+        //}
 
         //no hook neccessarry
         if (UjmwHostConfiguration.AuthHeaderEvaluator == null && _InboundSideChannelCfg.AcceptedChannels.Length == 0) {
@@ -410,6 +411,7 @@ namespace System.Web.UJMW {
             _MethodInfoCache[fullCallUrl] = calledContractMethod;
           }
         }
+        HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
 
         int httpReturnCode = 200;
         bool authFailed = false;
@@ -417,7 +419,6 @@ namespace System.Web.UJMW {
         if (UjmwHostConfiguration.AuthHeaderEvaluator != null) {
   
           string rawAuthHeader = null;
-          HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
 
           if (httpRequest.Headers.AllKeys.Contains("Authorization")) {
             rawAuthHeader = httpRequest.Headers["Authorization"];
@@ -441,53 +442,48 @@ namespace System.Web.UJMW {
 
         }
 
+        ///// RESTORE INCOMMING SIDECHANNEL /////
+
         bool sideChannelReceived = false;
         IDictionary<string, string> sideChannelContent = null;
         foreach (string acceptedChannel in _InboundSideChannelCfg.AcceptedChannels) {
-          //TODO: ausimpleemtneiren
 
-
-
-          var x = System.Text.Encoding.UTF8.GetString(incomingWcfMessage.GetBody<byte[]>());
-          var sr = new StringReader(x);
-          var rdr = new JsonTextReader(sr);
-       
-
-          rdr.Read();
-          string found = null;
-          while (rdr.TokenType != JsonToken.None) {
-            if (rdr.TokenType == JsonToken.PropertyName) {
-              if (rdr.Value.ToString() == "_") {
-                rdr.Read();
-                var serializer = new Newtonsoft.Json.JsonSerializer();
-                //xxx = serializer.Deserialize<Dictionary<string, string>>(rdr);
-
-
-                break;
-              }
-              else {
-                rdr.Skip();
-              }
-            }
+          if (acceptedChannel == "_") {
+            //we need to introspect the message...
+            string rawMessage = this.GetBodyFromWcfMessage(ref incomingWcfMessage);
+            var sr = new StringReader(rawMessage);
+            var rdr = new JsonTextReader(sr);
             rdr.Read();
+            while (rdr.TokenType != JsonToken.None) {
+              if (rdr.TokenType == JsonToken.PropertyName) {
+                if (rdr.Value.ToString() == "_") {
+                  rdr.Read();
+                  var serializer = new Newtonsoft.Json.JsonSerializer();
+                  sideChannelContent = serializer.Deserialize<Dictionary<string, string>>(rdr);
+                  sideChannelReceived = true;
+                  break;
+                }
+                else {
+                  rdr.Skip();
+                }
+              }
+              rdr.Read();
+            }
+            if (sideChannelReceived) {
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+              break;
+            }
           }
-
-
-          //while ( rdr.TokenType != JsonToken.PropertyName || rdr.Value.ToString() != "_") {
-
-          //  rdr.Read();
-
-          //}
-
-          //rdr.Read();
-          //var y = rdr.ReadAsString();
-
-
-
-          //x.ToString();
-          //_InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
-
-
+          else { //lets look into the http header
+            if (httpRequest.Headers.AllKeys.Contains(acceptedChannel)) {
+              string rawSideChannelContent = httpRequest.Headers[acceptedChannel];
+              var serializer = new Newtonsoft.Json.JsonSerializer();
+              sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
+              sideChannelReceived= true;
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+              break;
+            }
+          }
         }
 
         if (!sideChannelReceived && _InboundSideChannelCfg.AcceptedChannels.Length > 0) {
@@ -509,76 +505,115 @@ namespace System.Web.UJMW {
          
         }
 
-        return null;
+        ///// (end) RESTORE INCOMMING SIDECHANNEL /////
+        
+        return calledContractMethod;// << this handle will be passed to 'BeforeSendReply' as 'correlationState'
+
       }
 
+
       public void BeforeSendReply(ref Message outgoingWcfMessage, Object correlationState) {
+
+        MethodInfo calledContractMethod = null;
+        if(!(correlationState is MethodInfo)) {
+
+          //TODO: hier könnten wir auch im fehlerfall die fault-message FAKE!!!
+
+          //string msg = this.GetBodyFromWcfMessage(ref outgoingWcfMessage);
+          //outgoingWcfMessage = Message.CreateMessage(outgoingWcfMessage.Version, "FAULT", "invald request");
+          //outgoingWcfMessage = new RawFaultMessage(Message.CreateMessage(outgoingWcfMessage.Version, "ccc", "ffff"),"KAPUTT");
+
+          return;
+        }
+        else {
+          calledContractMethod = (MethodInfo)correlationState;
+        }
+
         if (_OutboundSideChannelCfg.ChannelsToProvide.Length > 0) {
 
-          //string methodName = null;
-          //string fullCallUrl = null;
-          //if (outgoingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
-          //  methodName = httpOperationName?.ToString();
-          //}
-          //if (outgoingWcfMessage.Properties.TryGetValue("Via", out object via)) {
-          //  fullCallUrl = via?.ToString();
-          //}
-          //if (methodName == null || fullCallUrl == null) {
-          //  //TODO: is this allowed???
-          //  return;
-          //}
-   
-
-
-          //TODO: da müssen wir noch rankommen!!!
-          MethodInfo calledContractMethod = null;
-          
-
-
-          //lock (_MethodInfoCache) {
-          //  if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
-
-          //    //HACK: instead of serviceImplementationType we should evaluate the merhodinfo for the contract!
-          //    Type serviceContractType = instanceContext.Host.Description.ServiceType;
-
-          //    calledContractMethod = serviceContractType.GetMethod(methodName);
-          //    _MethodInfoCache[fullCallUrl] = calledContractMethod;
-          //  }
-          //}
+          ///// CAPTURE OUTGOING BACKCHANNEL /////
 
           //prepare some ugly WCF hacking
-          HttpRequestMessageProperty outgoingHttpRequest = null;
-          if (outgoingWcfMessage.Properties.ContainsKey(HttpRequestMessageProperty.Name)) {
-            outgoingHttpRequest = (HttpRequestMessageProperty) outgoingWcfMessage.Properties[HttpRequestMessageProperty.Name];
+          HttpResponseMessageProperty outgoingHttpResponse = null;
+          if (outgoingWcfMessage.Properties.ContainsKey(HttpResponseMessageProperty.Name)) {
+            outgoingHttpResponse = (HttpResponseMessageProperty) outgoingWcfMessage.Properties[HttpResponseMessageProperty.Name];
           }
           else {
-            outgoingHttpRequest = new HttpRequestMessageProperty();
-            outgoingWcfMessage.Properties.Add(HttpRequestMessageProperty.Name, outgoingHttpRequest);
+            outgoingHttpResponse = new HttpResponseMessageProperty();
+            outgoingWcfMessage.Properties.Add(HttpResponseMessageProperty.Name, outgoingHttpResponse);
           }
 
           //COLLECT THE DATA
-          var snapshotContainer = new Dictionary<string,string>(); 
-          _OutboundSideChannelCfg.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
-
-          string serializedSnapshot = JsonConvert.SerializeObject(snapshotContainer);
-          bool injectUnderlineProp = false;
+          string serializedSnapshot = null;
           foreach (string channelName in _OutboundSideChannelCfg.ChannelsToProvide) {
             if(channelName == "_") {
-              injectUnderlineProp = true;
+              //NOTE: for that property we are to late because the body has already been serialized
+              //therfore we háve already captured the data in the 'CustomizedJsonFormatter'
             }
             else {
-              outgoingHttpRequest.Headers.Add(channelName, serializedSnapshot);
+              if(serializedSnapshot == null) { //on-demand, but bufferred...
+                var snapshotContainer = new Dictionary<string, string>();
+               _OutboundSideChannelCfg.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
+                serializedSnapshot = JsonConvert.SerializeObject(snapshotContainer);
+              }
+              outgoingHttpResponse.Headers.Add(channelName, serializedSnapshot);
             }
           }
 
-          if (injectUnderlineProp) {
-
-            //TODO: _ property injecten!!!!
-            //outgoingWcfMessage.Properties.
-
-          }
-
+          ///// (end) CAPTURE OUTGOING BACKCHANNEL /////
+          
         }
+      }
+
+      private string GetBodyFromWcfMessage(ref Message message) {
+        //PFUI!!!
+        Byte[] bodyBytes;
+        MessageBuffer buffer = message.CreateBufferedCopy(Int32.MaxValue);
+        //vvv nötig, weil jede message nur 1x gelsen werden kann
+        message = buffer.CreateMessage();
+        bodyBytes = buffer.CreateMessage().GetBody<byte[]>();
+        return System.Text.Encoding.UTF8.GetString(bodyBytes);
+      }
+
+    }
+
+    //https://stackoverflow.com/questions/62474354/wcf-message-formatter-not-formatting-fault-message
+    internal class RawFaultMessage : Message {
+
+      private Message _RelatedMessage;
+      private string _FaultMessage;
+
+      public RawFaultMessage(Message relatedMessage, string faultMessage) {
+        _RelatedMessage = relatedMessage;
+        _FaultMessage = faultMessage;
+      }
+
+      public override bool IsFault {
+        get {
+          return false;
+        }
+      }
+
+      public override MessageHeaders Headers {
+        get {
+          return _RelatedMessage.Headers;
+        }
+      }
+
+      public override MessageProperties Properties {
+        get {
+          return _RelatedMessage.Properties;
+        }
+      }
+
+      public override MessageVersion Version {
+        get {
+          return _RelatedMessage.Version;
+        }
+      }
+
+      protected override void OnWriteBodyContents(XmlDictionaryWriter writer) {
+        writer.WriteRaw(_FaultMessage);
       }
 
     }
@@ -586,11 +621,11 @@ namespace System.Web.UJMW {
     internal class CustomizedWebHttpBehaviourForJson : WebHttpBehavior {
 
       private bool _RequestWrapperContainsUnderline;
-      private bool _ResponseWrapperContainsUnderline;
+      private OutgoingResponseSideChannelConfiguration _OutgoingResponseSideChannelConfig;
 
-      public CustomizedWebHttpBehaviourForJson(bool requestWrapperContainsUnderline, bool responseWrapperContainsUnderline) {
+      public CustomizedWebHttpBehaviourForJson(bool requestWrapperContainsUnderline, OutgoingResponseSideChannelConfiguration outgoingResponseSideChannelConfig) {
         _RequestWrapperContainsUnderline = requestWrapperContainsUnderline;
-        _ResponseWrapperContainsUnderline = responseWrapperContainsUnderline;
+        _OutgoingResponseSideChannelConfig = outgoingResponseSideChannelConfig;
 
         this.DefaultOutgoingRequestFormat = System.ServiceModel.Web.WebMessageFormat.Json;
         this.DefaultOutgoingResponseFormat = System.ServiceModel.Web.WebMessageFormat.Json;
@@ -601,28 +636,28 @@ namespace System.Web.UJMW {
       protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
         return new CustomizedJsonFormatter(
           operationDescription, true, endpoint.ListenUri,
-          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+          _RequestWrapperContainsUnderline, _OutgoingResponseSideChannelConfig
         );
       }
 
       protected override IDispatchMessageFormatter GetReplyDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
         return new CustomizedJsonFormatter(
           operationDescription, false, endpoint.ListenUri,
-          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+          _RequestWrapperContainsUnderline, _OutgoingResponseSideChannelConfig
         );
       }
 
       protected override IClientMessageFormatter GetRequestClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
         return new CustomizedJsonFormatter(
           operationDescription, true, endpoint.ListenUri,
-          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+          _RequestWrapperContainsUnderline, _OutgoingResponseSideChannelConfig
         );
       }
 
       protected override IClientMessageFormatter GetReplyClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint) {
         return new CustomizedJsonFormatter(
           operationDescription, false, endpoint.ListenUri,
-          _RequestWrapperContainsUnderline, _ResponseWrapperContainsUnderline
+          _RequestWrapperContainsUnderline, _OutgoingResponseSideChannelConfig
         );
       }
 
@@ -642,10 +677,12 @@ namespace System.Web.UJMW {
 
     }
 
+    //PROBLEM: customized IDispatchMessageFormatters are not used for fault-messages - why????
+    //https://stackoverflow.com/questions/62474354/wcf-message-formatter-not-formatting-fault-message
     internal class CustomizedJsonFormatter : IDispatchMessageFormatter, IClientMessageFormatter {
 
       private bool _RequestWrapperContainsUnderline;
-      private bool _ResponseWrapperContainsUnderline;
+      private OutgoingResponseSideChannelConfiguration _OutgoingResponseSideChannelConfig;
       private OperationDescription _OperationSchema;
       private Dictionary<String, int> _ParameterIndicesPerName;
       private Dictionary<String, object> _ParameterDefaults;
@@ -656,11 +693,11 @@ namespace System.Web.UJMW {
       //but is recylced over several requests - so we have no performance problem here
       public CustomizedJsonFormatter(
         OperationDescription operation, bool isRequest, Uri uri,
-        bool requestWrapperContainsUnderline, bool responseWrapperContainsUnderline
+        bool requestWrapperContainsUnderline, OutgoingResponseSideChannelConfiguration outgoingResponseSideChannelConfig
       ) {
 
         _RequestWrapperContainsUnderline = requestWrapperContainsUnderline;
-        _ResponseWrapperContainsUnderline = responseWrapperContainsUnderline;
+        _OutgoingResponseSideChannelConfig = outgoingResponseSideChannelConfig;
 
         _OperationSchema = operation;
         _Uri = new Uri(uri.ToString() + "/" + operation.Name);
@@ -682,10 +719,17 @@ namespace System.Web.UJMW {
             _ParameterDefaults.Add(param.Name, null);
           }
         }
-        
+
+        bool containsUnderline = (isRequest && requestWrapperContainsUnderline) || (!isRequest && _OutgoingResponseSideChannelConfig.UnderlinePropertyIsProvided);
+
         _ParameterIndicesPerName = new Dictionary<String, int>();
+        int indexWithoutUnderline = 0;
         for (int i = 0; i < _RelevantMessageDesc.Body.Parts.Count; i++) {
-          _ParameterIndicesPerName.Add(_RelevantMessageDesc.Body.Parts[i].Name, i);
+          string paramName = _RelevantMessageDesc.Body.Parts[i].Name;
+          if(paramName != "_" || !containsUnderline) {
+            _ParameterIndicesPerName.Add(paramName, indexWithoutUnderline);
+            indexWithoutUnderline++;
+          }
         }
 
       }
@@ -720,6 +764,14 @@ namespace System.Web.UJMW {
               //'writer.Formatting = Newtonsoft.Json.Formatting.Indented;
 
               writer.WriteStartObject();
+
+              if (_OutgoingResponseSideChannelConfig.UnderlinePropertyIsProvided) {
+                MethodInfo calledContractMethod = _OperationSchema.SyncMethod;
+                var snapshotContainer = new Dictionary<string, string>();
+                _OutgoingResponseSideChannelConfig.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
+                writer.WritePropertyName("_");
+                serializer.Serialize(writer, snapshotContainer);
+              }
 
               foreach (var p in _RelevantMessageDesc.Body.Parts.OrderBy((prt) => prt.Index)) {
                 String byRefPropName = p.Name;

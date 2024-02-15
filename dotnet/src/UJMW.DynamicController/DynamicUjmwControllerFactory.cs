@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,7 +48,7 @@ namespace System.Web.UJMW {
       Type baseType = typeof(DynamicControllerBase<>).MakeGenericType(serviceType);
 
       MethodInfo invokeMethod = baseType.GetMethod("InvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic);
-
+     
       //##### ASSEMBLY & MODULE DEFINITION #####
 
       var assemblyName = new AssemblyName(serviceType.Name + ".DyamicControllers");
