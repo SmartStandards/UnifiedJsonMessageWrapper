@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="SmartAmbience" Version="2.0.1" />
+    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="2.3.0" />
     <PackageReference Include="System.ServiceModel.Primitives" Version="4.6.0" />
   </ItemGroup>
 

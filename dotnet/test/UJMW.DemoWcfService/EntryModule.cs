@@ -1,4 +1,5 @@
 ﻿using DistributedDataFlow;
+using Security.AccessTokenHandling;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -38,7 +39,7 @@ namespace UJMW.DemoWcfService {
       UjmwHostConfiguration.ForceHttps = false;
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
+        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
@@ -46,6 +47,7 @@ namespace UJMW.DemoWcfService {
           }
           return true;
         }
+
       );
 
       //in this sample were using the AmbienceHub from our 'SmartAmbience' framework

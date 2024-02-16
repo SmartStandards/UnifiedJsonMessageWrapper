@@ -39,6 +39,16 @@ namespace System.Web.UJMW {
         _ServiceInstance = serviceInstance;
       }
 
+      /// <summary>
+      /// Follows the convention to expose infomration about a related contract...
+      /// (this is also used by AuthTokenhandling to evaluate target methods)
+      /// </summary>
+      public Type ContractType { 
+        get {
+          return typeof(TServiceInterface);
+        }
+      }
+
       protected object InvokeMethod(string methodName, object requestDto) {
 
         Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> redirector =

@@ -19,9 +19,10 @@ namespace System.Web.UJMW {
   internal class WebClientBasedHttpPostExecutor : HttpPostExecutor {
 
     private HttpClient _HttpClient;
-
-    public WebClientBasedHttpPostExecutor(HttpClient httpClient) {
+    private Func<string> _AuthHeaderGetter;
+    public WebClientBasedHttpPostExecutor(HttpClient httpClient, Func<string> authHeaderGetter = null) {
       _HttpClient = httpClient;
+      _AuthHeaderGetter = authHeaderGetter;
     }
 
     public int ExecuteHttpPost(
@@ -34,6 +35,14 @@ namespace System.Web.UJMW {
       if (requestHeaders != null) {
         foreach (var kvp in requestHeaders) {
           content.Headers.Add(kvp.Key, kvp.Value);
+        }
+      }
+      if(_AuthHeaderGetter != null) {
+        //always on demand, because it could be a new one after expiration...
+        string authHeaderValue = _AuthHeaderGetter.Invoke();
+        if (!string.IsNullOrWhiteSpace(authHeaderValue)) {
+          _HttpClient.DefaultRequestHeaders.Remove("Authorization");
+          _HttpClient.DefaultRequestHeaders.Add("Authorization", authHeaderValue);
         }
       }
       var task = _HttpClient.PostAsync(url, content);

@@ -1,32 +1,34 @@
 ﻿using DistributedDataFlow;
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Web.UJMW;
 
   Console.WriteLine("Please enter a number:");
-  if(int.TryParse(Console.ReadLine(),out int number)) {
+  if(int.TryParse(Console.ReadLine(), out int number)) {
 
-  AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
-  var currentTenant = new AmbientField("currentTenant", true);
-  currentTenant.Value = "Rabbit";
+  #region " play arround with ambience & dataflow "
 
-  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>("http://localhost:55202/DemoService.svc");
+    AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
+    var currentTenant = new AmbientField("currentTenant", true);
+    currentTenant.Value = "Rabbit";
 
-  var httpClient = new HttpClient();
+    UjmwClientConfiguration.ConfigureRequestSidechannel((ctct, chnl) => {
+      chnl.ProvideUjmwUnderlineProperty();
+      chnl.CaptureDataVia(AmbienceHub.CaptureCurrentValuesTo);
+    });
 
-  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-  //  httpClient, () => "http://localhost:55202/DemoService.svc"
-  //);
+  //UjmwClientConfiguration.ConfigureResponseBackchannel((ctct, chnl) => {
+  //  chnl.AcceptUjmwUnderlineProperty();
+  //  chnl.ProcessDataVia(AmbienceHub.RestoreValuesFrom);
+  //});
 
-  UjmwClientConfiguration.ConfigureStandardUjmwRequestSidechannel(AmbienceHub.CaptureCurrentValuesTo);
+  #endregion
 
+    UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
 
-  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-    httpClient, () => "http://localhost:55202/DemoService.svc"
-  );
-
-  httpClient.DefaultRequestHeaders.Add("Authorization", "its me");
+    var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+      "http://localhost:55202/DemoService.svc"
+    );
 
     try {
 

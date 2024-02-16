@@ -35,6 +35,7 @@ namespace UJMW.DemoWcfService {
      */
     public string GetData(int value) {
       //return string.Format("You entered: {0}", value);
+      //currentTenant.Value = currentTenant.Value + "_" + value.ToString();
       return string.Format("You entered: {0} (current Tenant is {1})", value, currentTenant.Value);
     }
 

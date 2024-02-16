@@ -17,7 +17,7 @@ namespace System.Web.UJMW {
       OutgoingRequestSideChannelConfiguration sideChannel
     );
 
-    public delegate void IncommingResponseSideChannelConfigurationMethod(
+    public delegate void IncommingResponseBackChannelConfigurationMethod(
       Type serviceContractInterfaceType,
       IncommingResponseSideChannelConfiguration sideChannel
     );
@@ -31,6 +31,11 @@ namespace System.Web.UJMW {
      string fullUrl, MethodInfo method, string faultMessage
     );
 
+    public delegate string AuthHeaderGetterMethod(
+      Type contractType
+    );
+    public static AuthHeaderGetterMethod DefaultAuthHeaderGetter { get; set; } = null;
+
     /// <summary>
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
     /// </summary>
@@ -39,7 +44,7 @@ namespace System.Web.UJMW {
     );
 
     private static OutgoingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
-    private static IncommingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
+    private static IncommingResponseBackChannelConfigurationMethod _ResponseBackChannelConfigurator { get; set; } = null;
 
     /// <summary>
     /// this is just a convenience method for calling 'ConfigureRequestSidechannel' and setting up only the UJMW '_'-property
@@ -56,8 +61,8 @@ namespace System.Web.UJMW {
       _RequestSideChannelConfigurator = requestSideChannelConfigurator;
     }
 
-    public static void ConfigureResponseSidechannel(IncommingResponseSideChannelConfigurationMethod responseSideChannelConfigurator ) {
-      _ResponseSideChannelConfigurator = responseSideChannelConfigurator;
+    public static void ConfigureResponseBackchannel(IncommingResponseBackChannelConfigurationMethod responseBackChannelConfigurator ) {
+      _ResponseBackChannelConfigurator = responseBackChannelConfigurator;
     }
 
     internal static OutgoingRequestSideChannelConfiguration GetRequestSideChannelConfiguration(Type contractType) {
@@ -80,8 +85,8 @@ namespace System.Web.UJMW {
 
     internal static IncommingResponseSideChannelConfiguration GetResponseSideChannelConfiguration(Type contractType) {
       var cfg = new IncommingResponseSideChannelConfiguration();
-      if( _ResponseSideChannelConfigurator != null) {
-        _ResponseSideChannelConfigurator.Invoke(contractType, cfg);
+      if( _ResponseBackChannelConfigurator != null) {
+        _ResponseBackChannelConfigurator.Invoke(contractType, cfg);
         if (cfg.AcceptedChannels == null) {
           throw new Exception("When configuring the SideChannel, you need to call 'AcceptNoChannelProvided()' or another 'Accept...' method explicitely!");
         }

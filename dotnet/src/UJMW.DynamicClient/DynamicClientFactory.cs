@@ -21,27 +21,49 @@ namespace System.Web.UJMW {
 
     #region " CreateInstance - Convenience overloads " 
 
-    public static TApplicable CreateInstance<TApplicable>(string url, string httpAuthHeader = null) {
+    public static TApplicable CreateInstance<TApplicable>(string url){
+      return CreateInstance<TApplicable>(() => url);
+    }
+
+    public static TApplicable CreateInstance<TApplicable>(string url, string httpAuthHeader) {
+      return CreateInstance<TApplicable>(url, ()=> httpAuthHeader);
+    }
+
+    public static TApplicable CreateInstance<TApplicable>(string url, Func<string> httpAuthHeaderGetter) {
       var httpClient = new HttpClient();
-      if (!string.IsNullOrWhiteSpace(httpAuthHeader)) {
-        httpClient.DefaultRequestHeaders.Add("Authorization", httpAuthHeader);
-      }
-      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, () => url, httpClient.Dispose);
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter) {
-      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);
+    public static TApplicable CreateInstance<TApplicable>(Func<string> urlGetter, Func<string> httpAuthHeaderGetter = null) {
+      var httpClient = new HttpClient();
+      if(httpAuthHeaderGetter == null && UjmwClientConfiguration.DefaultAuthHeaderGetter != null) {
+        httpAuthHeaderGetter = ()=>UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(typeof(TApplicable));
+      }
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter, httpClient.Dispose);
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter) {
-      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
-      return CreateInstance(applicableType, invoker);
+    public static object CreateInstance(Type applicableType,Func<string> urlGetter, Func<string> httpAuthHeaderGetter) {
+      var httpClient = new HttpClient();
+      var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter, httpClient.Dispose);
+      return CreateInstance(applicableType,invoker);
     }
+
+    //public static TApplicable CreateInstance<TApplicable>(HttpClient httpClient, Func<string> urlGetter) {
+    //  var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+    //  UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);
+    //  return CreateInstance<TApplicable>(invoker);
+    //}
+
+    //public static object CreateInstance(Type applicableType, HttpClient httpClient, Func<string> urlGetter) {
+    //  var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient);
+    //  UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
+    //  return CreateInstance(applicableType, invoker);
+    //}
 
     public static TApplicable CreateInstance<TApplicable>(HttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);

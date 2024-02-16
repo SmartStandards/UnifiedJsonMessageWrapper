@@ -13,7 +13,7 @@ namespace System.Web.UJMW {
 
   public delegate bool AuthHeaderEvaluatorMethod(
     string rawAuthHeader,
-    MethodInfo calledContractMethod,
+    MethodInfo targetContractMethod,
     string callingMachine,
     ref int httpReturnCode
   );
@@ -153,7 +153,7 @@ namespace System.Web.UJMW {
     );
 
     public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
-      (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
+      (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
         return true;
       }
     );

@@ -144,7 +144,7 @@ namespace Security {
           ControllerRoute = "DemoService.svc",
           //EnableResponseSidechannel = false,
           //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
-          //AuthAttributeConstructorParams = new object[] { null }
+          //AuthAttributeConstructorParams = new object[] { new string[] { } }
         });
       });
 
