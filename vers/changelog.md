@@ -6,7 +6,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* fulfilled compatibility conventions for 'AuthTokenHandling'
+*(none)*
+
+
+
+## v 1.2.1
+released **2024-02-16**, including:
+ - fulfilled compatibility conventions for 'AuthTokenHandling'
 
 
 
