@@ -1,17 +1,27 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
 namespace Security.Controllers {
 
+  [SwaggerSchema("ddddddddddddd")]
+  public class Dto {
+
+
+      [SwaggerSchema("fffffffffffffffff")]
+      public string foo { get; set; }
+      //konvention  return stream out string fileName / out string mimeType
+    }
   [Route("afs")]
   public class DownloadUploadDemo : Controller {
 
-    //konvention  return stream out string fileName / out string mimeType
+  
 
     [HttpGet()]
+
     public IActionResult Download() {
       Stream stream = System.IO.File.OpenRead("C:\\Temp\\AFS-Demo\\FOO.txt");
 
@@ -19,6 +29,14 @@ namespace Security.Controllers {
         return NotFound();
 
       return File(stream, "application/octet-stream", "filetitle.txt"); // returns a FileStreamResult
+    }
+    //Swashbuckle.AspNetCore.Annotations.SwaggerOperationAttribute
+   [HttpPost][SwaggerOperation(nameof(Test)+ 
+      " -> Deis ist eine beschreibung die etwa 120 zeichen lang sein sollte und dann am ende mit drei punkten terminiert wird yes!",
+      "//METHODENKONVENTION DOWNLOAD:     out fileName + out fileContentType + return Stream\r\n    // aktiviert wird regel druch druch return Stream\r\n    //    nicht vorhandensein des filename sorgt für <Snawflake44>.<endung aus contentType>\r\n    //    nicht vorhandensein des contentType sorgt für (application/octet-stream > endung: .dat)\r\n    // weitere out oder ref params verboten\r\n    //   jegliche in params folgen dem ujmw style\r\n    // + implizit wird ein zusätzlicher OVERLOAD, für GET -> alle in argumente werden dadruch zu query-params\r\n    //als protokoll wird das rohe senden von binärdaten (application/octet-stream) verwednet\r\n    // (in asp.net CORE mit dem IActionResult >> return File(stream, \"application/octet-stream\", \"filetitle.txt\");\r\n    //    ControllerBase.File(Stream fileStream, string contentType, string? fileDownloadName)\r\n"
+      ), SwaggerResponse(200, "return-descriptio",null)]
+    public Dto Test([FromBody][SwaggerRequestBody("BODY-DEX")][SwaggerParameter("param-descsdfdsfdfsdfsdfsfsf")] Dictionary<string,string> arghs) {
+      return null;
     }
 
 

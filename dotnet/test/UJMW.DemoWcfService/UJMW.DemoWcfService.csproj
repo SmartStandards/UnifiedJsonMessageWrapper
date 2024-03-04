@@ -46,13 +46,13 @@
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\vendor\nuget\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="SmartAmbience, Version=999.0.0.21576, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\vendor\nuget\SmartAmbience.2.0.1\lib\net46\SmartAmbience.dll</HintPath>
     </Reference>
-    <Reference Include="SmartStandards.AuthTokenHandling, Version=1.0.0.23104, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.2.3.0\lib\net46\SmartStandards.AuthTokenHandling.dll</HintPath>
+    <Reference Include="SmartStandards.AuthTokenHandling, Version=1.0.0.28694, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.2.4.0\lib\net46\SmartStandards.AuthTokenHandling.dll</HintPath>
     </Reference>
     <Reference Include="SwaggerWcf, Version=1.2.16.414, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\vendor\nuget\KornSW.SwaggerWcf.1.2.16.414\lib\net46\SwaggerWcf.dll</HintPath>

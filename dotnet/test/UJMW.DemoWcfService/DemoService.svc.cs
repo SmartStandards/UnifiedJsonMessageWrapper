@@ -49,12 +49,16 @@ namespace UJMW.DemoWcfService {
       return composite;
     }
 
+    public int TestSuport(string otp, out string fileName, ref string fileContentType) {
+      throw new NotImplementedException();
+    }
+
     public void Dispose() {
     }
 
 #if NET5_0_OR_GREATER
 
-    Stream IDemoFileService.Download1(string otp, out string fileName, out string fileContentType) {
+    Stream IDemoFileService.Download1(string otp, out string fileName, ref string fileContentType) {
       fileName = "FOO.txt";
       fileContentType = " text/plain";
       return System.IO.File.OpenRead("C:\\Temp\\AFS-Demo\\FOO.txt");
@@ -120,6 +124,7 @@ namespace UJMW.DemoWcfService {
       fileContentType = " text/plain";
       return System.IO.File.OpenRead("C:\\Temp\\AFS-Demo\\FOO.txt");
     }
+
 
 #endif
   }

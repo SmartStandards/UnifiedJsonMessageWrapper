@@ -6,7 +6,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* new Feature: ASP.net Core controllers are now using attributes for swashbuckle (if present)
 
 
 

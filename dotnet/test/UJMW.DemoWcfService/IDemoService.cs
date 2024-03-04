@@ -26,17 +26,43 @@ namespace UJMW.DemoWcfService {
 #endif
     string GetData(int value);
 
+    /// <summary>
+    /// the
+    /// multiline
+    /// summary!!
+    /// </summary>
+    /// <param name="composite">the description for the composit type</param>
+    /// <returns>this is the return</returns>
 #if NET5_0_OR_GREATER
 #else
     [OperationContract, WebInvoke(Method = "POST")]
 #endif
     CompositeType GetDataUsingDataContract(CompositeType composite);
 
+
+    /// <summary>
+    /// eine methode mit 2x out
+    /// An Unified Json Message Wrapper, which contains the following fields:
+    /// An Unified Json Message Wrapper, which contains the following fields:An Unified Json Message Wrapper, which contains the following fields:An Unified Json Message Wrapper, which contains the following fields:
+    /// </summary>
+    /// <param name="otp">opt geht nur rein</param>
+    /// <param name="fileName"> geht raus</param>
+    /// <param name="fileContentType">geht rein und raus</param>
+    /// <returns>retunernt eine nstream</returns>
+    int TestSuport(string otp, out string fileName, ref string fileContentType);
   }
 
   public interface IDemoFileService {
 
-    Stream Download1(string otp, out string fileName, out string fileContentType);
+    ///// <summary>
+    ///// eine methode mit 2x out
+    ///// </summary>
+    ///// <param name="otp">opt geht nur rein</param>
+    ///// <param name="fileName"> geht raus</param>
+    ///// <param name="fileContentType">geht rein und raus</param>
+    ///// <returns>retunernt eine nstream</returns>
+    Stream Download1(string otp, out string fileName, ref string fileContentType);
+
     Stream Download2(string otp, out string fileContentType);
     Stream Download3(string otp, out string fileName);
     Stream Download4(string otp);
@@ -59,6 +85,9 @@ namespace UJMW.DemoWcfService {
     bool boolValue = true;
     string stringValue = "Hello ";
 
+    /// <summary>
+    /// THE BOOL
+    /// </summary>
     [DataMember]
     public bool BoolValue {
       get { return boolValue; }

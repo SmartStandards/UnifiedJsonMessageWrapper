@@ -32,6 +32,13 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
 
+    //optional
+    private const string swashbuckle = "Swashbuckle.AspNetCore.Annotations";
+    private static ConstructorInfo _SwaggerOperationAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerOperationAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
+    private static ConstructorInfo _SwaggerRequestBodyAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerRequestBodyAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
+    private static ConstructorInfo _SwaggerResponseAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerResponseAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();//Skip(1)?.
+    private static ConstructorInfo _SwaggerSchemaAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerSchemaAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
+
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null) {
       if(options == null) {
         options = new DynamicUjmwControllerOptions();
@@ -137,7 +144,40 @@ namespace System.Web.UJMW {
             );
             methodBuilder.SetCustomAttribute(httpPostAttribBuilder);
 
-            if(authAttributeConstructor != null) {
+            if(_SwaggerOperationAttributeConstructor != null) {
+              try {
+                string sum = serviceMethod.GetDocumentation(true);
+                if(string.IsNullOrWhiteSpace(sum)) { sum = ""; }
+                else if (sum.Length>120) { sum = sum.Substring(0, 117) + "..."; };
+                string doc = serviceMethod.GetDocumentation(false, true).Replace("Returns:", "**Returns:**\n");
+                CustomAttributeBuilder swaggerOperationAttributeBuilder = new CustomAttributeBuilder(
+                  _SwaggerOperationAttributeConstructor, new object[] { sum, doc }
+                );
+                methodBuilder.SetCustomAttribute(swaggerOperationAttributeBuilder);
+
+                string returnInfos = "An Unified Json Message Wrapper, which contains the following fields:";
+                if (options.EnableResponseSidechannel) {
+                  returnInfos = returnInfos + "\n\nParam **'_'**: used to flow additional ambient data (see UJMW standard)";
+                }
+                returnInfos = returnInfos + serviceMethod.GetDocumentationForParams(true, false, true).Replace("Param '", "\n\nParam **").Replace("':", "**:");
+
+                string retInfo = serviceMethod.GetDocumentationForReturn();
+                if(!string.IsNullOrWhiteSpace(retInfo)) {
+                  returnInfos = returnInfos + "\n\nParam **return**: " + retInfo;
+                }
+                
+                CustomAttributeBuilder swaggerResponseAttributeBuilder = new CustomAttributeBuilder(
+                  //_SwaggerResponseAttributeConstructor, new object[] { 200, returnInfos, null , new string[] {"application/json"} }
+                  _SwaggerResponseAttributeConstructor, new object[] { 200, returnInfos, null }
+                );
+                methodBuilder.SetCustomAttribute(swaggerResponseAttributeBuilder);
+              }
+              catch ( Exception ex ) {
+                //no problem - its just for the docu
+              }
+            }
+
+            if (authAttributeConstructor != null) {
               CustomAttributeBuilder authAttribBuilder = new CustomAttributeBuilder(
                 authAttributeConstructor, options.AuthAttributeConstructorParams
               );
@@ -156,6 +196,23 @@ namespace System.Web.UJMW {
               _FromBodyAttributeConstructor, new object[] { }
             );
             paramBuilders[0].SetCustomAttribute(FromBodyAttribBuilder);
+
+            if (_SwaggerRequestBodyAttributeConstructor != null) {
+              try {
+                string paramInfos = "An Unified Json Message Wrapper, which contains the following fields:";
+                if (options.EnableRequestSidechannel) {
+                  paramInfos = paramInfos + "\n\nParam **'_'**: used to flow additional ambient data (see UJMW standard)";
+                }
+                paramInfos = paramInfos + serviceMethod.GetDocumentationForParams().Replace("Param '", "\n\nParam **").Replace("':", "**:");
+                CustomAttributeBuilder swaggerParamAttributeBuilder = new CustomAttributeBuilder(
+                  _SwaggerRequestBodyAttributeConstructor, new object[] { paramInfos }
+                );
+                paramBuilders[0].SetCustomAttribute(swaggerParamAttributeBuilder);
+              }
+              catch (Exception ex) {
+                //no problem - its just for the docu
+              }
+            }
 
             {
               var methodIlGen = methodBuilder.GetILGenerator();
@@ -216,27 +273,35 @@ namespace System.Web.UJMW {
             TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout
           );
 
+          if(_SwaggerSchemaAttributeConstructor != null) {
+            CustomAttributeBuilder swaggerSchemaAttributeBuilder = new CustomAttributeBuilder(
+              _SwaggerSchemaAttributeConstructor, new object[] { "Unified Json Message Wrapper" }
+            );
+            typeBuilder.SetCustomAttribute(swaggerSchemaAttributeBuilder);
+          }
+
           if ((!response && options.EnableRequestSidechannel) || (response && options.EnableResponseSidechannel)) {
-            DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwSideChannelPropertyName, typeof(Dictionary<string, string>));
+            DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwSideChannelPropertyName, typeof(Dictionary<string, string>), "Used to flow additional ambient data (see UJMW standard)");
           }
 
           var parameters = methodInfo.GetParameters();
           foreach (var param in parameters) {
             if ((response && param.IsOut) || (!response && !param.IsOut) || (param.ParameterType.IsByRef && !param.IsOut)) {
+              string doc = param.GetDocumentation();
               if (param.ParameterType.IsByRef) {
-                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType.GetElementType());
+                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType.GetElementType(), doc);
               }
               else {
-                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType);
+                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType,doc);
               }         
             }
           }
 
           if (response) {
             if (methodInfo.ReturnType != null && methodInfo.ReturnType != typeof(void)) {
-              DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwReturnPropertyName, methodInfo.ReturnType);
+              DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwReturnPropertyName, methodInfo.ReturnType, methodInfo.GetDocumentationForReturn(true));
             }
-            DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwFaultPropertyName, typeof(string));
+            DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwFaultPropertyName, typeof(string),"Optional field, which can be used to transport an error-message.");
           }
 
           Type dtoType = typeBuilder.CreateType();
@@ -246,11 +311,18 @@ namespace System.Web.UJMW {
       }
     }
 
-    private static void BuildProp(TypeBuilder typeBuilder, string propName, Type propType) {
+    private static void BuildProp(TypeBuilder typeBuilder, string propName, Type propType, string dscr = null) {
 
       FieldBuilder fieldBdr = typeBuilder.DefineField("_" + propName, propType, FieldAttributes.Private);
 
       var propBdr = typeBuilder.DefineProperty(propName, PropertyAttributes.HasDefault, propType, null);
+
+      if (_SwaggerSchemaAttributeConstructor != null && !string.IsNullOrWhiteSpace(dscr)) {
+        CustomAttributeBuilder swaggerSchemaAttributeBuilder = new CustomAttributeBuilder(
+          _SwaggerSchemaAttributeConstructor, new object[] { dscr }
+        );
+        propBdr.SetCustomAttribute(swaggerSchemaAttributeBuilder);
+      }
 
       MethodAttributes getSetAttr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
 

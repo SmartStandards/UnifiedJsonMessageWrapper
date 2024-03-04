@@ -107,11 +107,12 @@ namespace Security {
             );
           }
           else {
-            sideChannel.AcceptNoChannelProvided(
-              (ref IDictionary<string, string> defaultData) => {
-                defaultData["currentTenant"] = "(fallback)";
-              }
-            );
+            sideChannel.AcceptNoChannelProvided();
+            //sideChannel.AcceptNoChannelProvided(
+            //  (ref IDictionary<string, string> defaultData) => {
+            //    defaultData["currentTenant"] = "(fallback)";
+            //  }
+            //);
           }
         }
       );
@@ -137,7 +138,10 @@ namespace Security {
         new LocalJwtIntrospector("TheSignKey")
       );
 
-      services.AddSingleton<IDemoService>(new DemoService());
+      var svc = new DemoService();
+      services.AddSingleton<IDemoService>(svc);
+      services.AddSingleton<IDemoFileService>(svc);
+
       services.AddDynamicUjmwControllers(r => {
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
@@ -146,6 +150,15 @@ namespace Security {
           //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
           //AuthAttributeConstructorParams = new object[] { new string[] { } }
         });
+
+        r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {
+          ControllerRoute = "FileStore",
+          EnableResponseSidechannel = false,
+          EnableRequestSidechannel = false,
+          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
+          //AuthAttributeConstructorParams = new object[] { new string[] { } }
+        });
+
       });
 
       services.AddSwaggerGen(c => {

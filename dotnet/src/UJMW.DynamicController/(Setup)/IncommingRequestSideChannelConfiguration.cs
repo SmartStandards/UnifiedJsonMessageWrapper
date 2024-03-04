@@ -86,7 +86,9 @@ namespace System.Web.UJMW {
     /// - in the first case the ProcessingMethod WONT GET ANY TRIGGER!!!
     /// For the special case that you want to explicitely pass (null) into the
     /// ProcessingMethod, youll need to provide an valid handle to a method which sets only
-    /// the defaultsToUse=null
+    /// the defaultsToUse=null.
+    /// PLEASE BE AWARE that you will also need to configure 'ProcessDataVia' when
+    /// youre providing detaults to restore!
     /// </param>
     public void AcceptNoChannelProvided(SideChannelDefaultsGetterMethod defaultsGetter = null) {
       this.ImmutableGuard();
