@@ -15,7 +15,7 @@ namespace Security.Controllers {
       public string foo { get; set; }
       //konvention  return stream out string fileName / out string mimeType
     }
-  [Route("afs")]
+  [Route("afs"),Tags("UIUIUI")]
   public class DownloadUploadDemo : Controller {
 
   

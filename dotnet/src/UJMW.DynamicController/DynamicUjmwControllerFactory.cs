@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,6 +32,9 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _ConsumesAttributeConstructor = typeof(ConsumesAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
+ 
+    private static ConstructorInfo _TagsAttributeContructor = Type.GetType("Microsoft.AspNetCore.Http.TagsAttribute, Microsoft.AspNetCore.Http.Extensions", false)?.GetConstructors()?.FirstOrDefault();
+
 
     //optional
     private const string swashbuckle = "Swashbuckle.AspNetCore.Annotations";
@@ -71,20 +75,64 @@ namespace System.Web.UJMW {
       // ##### CLASS DEFINITION #####
 
       string svcName = serviceType.Name;
+      string[] genArgs = new string[] {};
+      if (serviceType.IsGenericType) {
+        svcName = svcName.Substring(0, svcName.IndexOf('`'));
+        genArgs = serviceType.GetGenericArguments().Select((t)=>t.Name).ToArray();
+      }
       if (serviceType.IsInterface && svcName.StartsWith("I") && char.IsUpper(svcName[1])) {
         svcName = svcName.Substring(1);
       }
 
+      string controllerTitle = options.ControllerTitle;  
+      if (string.IsNullOrEmpty(controllerTitle)) {
+        controllerTitle = svcName;
+        if (genArgs.Any()) {
+          controllerTitle = controllerTitle + " (" + string.Join(", ", genArgs) + ")";
+        }
+      }
+
+      string controllerRoute = options.ControllerRoute;
+      if (string.IsNullOrEmpty(controllerRoute)) {
+        controllerRoute = svcName;
+        if (genArgs.Any()) {
+          controllerRoute = controllerRoute + "/" + string.Join("-", genArgs);
+        }
+      }
+
+      string classDiscriminator = options.ClassNameDiscriminator;
+      if (string.IsNullOrEmpty(classDiscriminator)) {
+        classDiscriminator = "";
+        if (genArgs.Any()) {
+          classDiscriminator = classDiscriminator + "_" + string.Join("_", genArgs);
+        }
+      }
+
+      if (genArgs.Any()) {
+        for (int i = 0; i < genArgs.Length; i++) {
+          controllerTitle = controllerTitle.Replace($"{{{i}}}", genArgs[i]);
+          controllerRoute = controllerRoute.Replace($"{{{i}}}", genArgs[i]);
+          classDiscriminator = classDiscriminator.Replace($"{{{i}}}", genArgs[i]);
+        }
+      }
+
       TypeBuilder typeBuilder = moduleBuilder.DefineType(
-          svcName + "Controller",
+          svcName + classDiscriminator + "Controller",
           TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
           baseType
         );
 
       CustomAttributeBuilder RouteAttribBuilder = new CustomAttributeBuilder(
-       _RouteAttributeConstructor, new object[] { options.ControllerRoute }
+       _RouteAttributeConstructor, new object[] { controllerRoute }
       );
       typeBuilder.SetCustomAttribute(RouteAttribBuilder);
+
+      if(_TagsAttributeContructor != null) {
+        CustomAttributeBuilder tagsAttribBuilder = new CustomAttributeBuilder(
+         _TagsAttributeContructor, new object[] { new string[] { controllerTitle } }
+        );
+        typeBuilder.SetCustomAttribute(tagsAttribBuilder);
+      }
 
       // ##### FIELD DEFINITIONs #####
 
@@ -125,11 +173,11 @@ namespace System.Web.UJMW {
           if (serviceMethod.IsPublic) {
 
             Type requestType = DynamicUjmwControllerFactory.GetOrCreateDto(
-              serviceType, serviceMethod, moduleBuilder, false, options
+              serviceType, svcName, classDiscriminator, serviceMethod, moduleBuilder, false, options
             );
 
             Type responseType = DynamicUjmwControllerFactory.GetOrCreateDto(
-              serviceType, serviceMethod, moduleBuilder, true, options
+              serviceType, svcName, classDiscriminator, serviceMethod, moduleBuilder, true, options
             );
 
             var methodBuilder = typeBuilder.DefineMethod(
@@ -254,8 +302,11 @@ namespace System.Web.UJMW {
 
     private static Dictionary<string, Type> _DtoTypeCache = new Dictionary<string, Type>();
 
-    private static Type GetOrCreateDto(Type serviceType, MethodInfo methodInfo, ModuleBuilder moduleBuilder, bool response, DynamicUjmwControllerOptions options) {
-      string dtoTypeName = serviceType.FullName + UjmwResponseDtoNamespaceSuffix + methodInfo.Name ;
+    private static Type GetOrCreateDto(Type serviceType, string serviceName, string classDiscriminator, MethodInfo methodInfo, ModuleBuilder moduleBuilder, bool response, DynamicUjmwControllerOptions options) {
+      string dtoTypeName = serviceType.Namespace + serviceName + UjmwResponseDtoNamespaceSuffix + methodInfo.Name;
+      if (!string.IsNullOrWhiteSpace(classDiscriminator)) {
+        dtoTypeName = dtoTypeName + classDiscriminator;
+      }
       if (response) {
         dtoTypeName = dtoTypeName + UjmwResponseDtoSuffix;
       }

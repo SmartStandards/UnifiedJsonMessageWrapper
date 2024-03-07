@@ -27,6 +27,7 @@ using System.Net.Http;
 using UJMW.DemoWcfService;
 using Microsoft.AspNetCore;
 using DistributedDataFlow;
+using Demo;
 
 namespace Security {
 
@@ -158,6 +159,20 @@ namespace Security {
           //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
           //AuthAttributeConstructorParams = new object[] { new string[] { } }
         });
+
+        var repoControllerOptions = new DynamicUjmwControllerOptions {
+          ControllerRoute = "Repo/{0}",
+          EnableResponseSidechannel = false,
+          EnableRequestSidechannel = false,
+          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
+          //AuthAttributeConstructorParams = new object[] { new string[] { } }
+          ClassNameDiscriminator = "_{0}_",
+          ControllerTitle = "Gen ({0})"
+
+        };
+
+        r.AddControllerFor<IGenericInterface<Foo, int>>(repoControllerOptions);
+        r.AddControllerFor<IGenericInterface<Bar, string>>(repoControllerOptions);
 
       });
 
