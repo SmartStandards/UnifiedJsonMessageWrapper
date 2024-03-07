@@ -6,9 +6,9 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: now supporting generic contract-interfaces
 
-
+  
 
 ## v 1.3.0
 released **2024-03-04**, including:
