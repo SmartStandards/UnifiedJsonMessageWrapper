@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+//using System.Runtime.Remoting.Messaging;
 using System.Text.RegularExpressions;
 
 namespace System.Web.UJMW {
@@ -34,7 +35,45 @@ namespace System.Web.UJMW {
     public delegate string AuthHeaderGetterMethod(
       Type contractType
     );
-    public static AuthHeaderGetterMethod DefaultAuthHeaderGetter { get; set; } = null;
+    public static AuthHeaderGetterMethod DefaultAuthHeaderGetter { get; set; } = (t)=> null;
+
+    public delegate string UrlGetterMethod(
+      Type contractType
+    );
+    public static UrlGetterMethod DefaultUrlGetter { get; set; } = (
+      (t)=> throw new ApplicationException($"To initialize a DynamicUjmwClient whitout specifying an url explicitely, the '{nameof(UjmwClientConfiguration)}.{nameof(UjmwClientConfiguration.DefaultUrlGetter)}' must be initialized instead!")
+    );
+
+    /// <summary>
+    /// Returns true, if another attempt should me made!
+    /// An sleep of 100ms is hardcoded internally, more can be placed inside of that hook.
+    /// IMPORTANT: there is a hard limit of max 20 retries!
+    /// </summary>
+    /// <param name="contractType"></param>
+    /// <param name="ex"></param>
+    /// <param name="tryNumber"></param>
+    /// <param name="url">NOTE: the url can also be modified sothat a fallback-url is used for the next try...</param>
+    /// <returns></returns>
+    public delegate bool RetryDecitionMethod(
+      Type contractType,
+      Exception ex,
+      int tryNumber,
+      ref string url
+    );
+
+    /// <summary>
+    /// Returns true, if another attempt should me made!
+    /// An sleep of 100ms is hardcoded internally, more can be placed inside of that hook.
+    /// IMPORTANT: there is a hard limit of max 20 retries!
+    /// </summary>
+    public static RetryDecitionMethod RetryDecider { get; set; } = (
+      (Type contractType, Exception ex, int tryNumber, ref string url) => { 
+        if (ex is TimeoutException || ex.Message.Contains("Timeout")) {
+          return (tryNumber == 1);//one retry per default...
+        }
+        return false;
+      }
+    );
 
     /// <summary>
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)

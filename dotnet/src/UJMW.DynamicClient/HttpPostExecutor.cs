@@ -6,7 +6,7 @@ using System.Text;
 
 namespace System.Web.UJMW {
 
-  public interface HttpPostExecutor {
+  public interface IHttpPostExecutor {
 
     int ExecuteHttpPost(
       string url,
@@ -16,7 +16,7 @@ namespace System.Web.UJMW {
 
   }
 
-  internal class WebClientBasedHttpPostExecutor : HttpPostExecutor {
+  internal class WebClientBasedHttpPostExecutor : IHttpPostExecutor {
 
     private HttpClient _HttpClient;
     private Func<string> _AuthHeaderGetter;

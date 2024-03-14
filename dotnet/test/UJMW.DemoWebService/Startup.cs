@@ -135,8 +135,10 @@ namespace Security {
         }
       );
 
-      AccessTokenValidator.ConfigureTokenIntrospection(
-        new LocalJwtIntrospector("TheSignKey")
+      AccessTokenValidator.ConfigureTokenValidation(
+        new LocalJwtIntrospector("TheSignKey"),
+        (cfg) => {
+        }
       );
 
       var svc = new DemoService();

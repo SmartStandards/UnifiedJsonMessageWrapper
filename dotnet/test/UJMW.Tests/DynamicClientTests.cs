@@ -11,7 +11,7 @@ namespace System.Web.UJMW {
 
     internal const string dummyRootUrl = "https://dummy/";
 
-    internal class MockHttpPostSimulator : HttpPostExecutor {
+    internal class MockHttpPostSimulator : IHttpPostExecutor {
 
       public MockHttpPostSimulator() {
       }

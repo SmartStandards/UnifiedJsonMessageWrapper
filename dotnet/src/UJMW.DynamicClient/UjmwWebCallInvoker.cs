@@ -13,7 +13,7 @@ namespace System.Web.UJMW {
   internal class UjmwWebCallInvoker: IAbstractWebcallInvoker {
 
     private Type _ContractType;
-    private HttpPostExecutor _HttpPostExecutor;
+    private IHttpPostExecutor _HttpPostExecutor;
     private Func<string> _UrlGetter;
     private OutgoingRequestSideChannelConfiguration _RequestSidechannelCfg;
     private IncommingResponseSideChannelConfiguration _ResponseSidechannelCfg;
@@ -21,7 +21,7 @@ namespace System.Web.UJMW {
 
     public UjmwWebCallInvoker(
       Type applicableType,
-      HttpPostExecutor httpPostExecutor,
+      IHttpPostExecutor httpPostExecutor,
       Func<string> urlGetter,
       Action onDisposeInvoked = null
     ) {
@@ -57,7 +57,7 @@ namespace System.Web.UJMW {
     }
 
     public object InvokeWebCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
-
+         
       if(methodName == nameof(IDisposable.Dispose)) {
         _OnDisposeInvoked.Invoke();
         return null;
@@ -67,6 +67,30 @@ namespace System.Web.UJMW {
       if (!rootUrl.EndsWith("/")) {
         rootUrl += "/";
       }  
+
+      int currentTry = 0;
+      do {
+        currentTry++;
+
+        try {
+
+          return InvokeWebCallInternal(rootUrl, methodName, arguments, argumentNames, methodSignatureString);
+
+        }
+        catch (Exception ex) {
+          if(!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, ref rootUrl)) {
+            throw;
+          }
+        }
+
+        Threading.Thread.Sleep(100); //< security feature 1
+      } while (currentTry < 20); //< security feature 2
+      throw new Exception("UJMW Dynamic Client detected an endless loop caused by the 'UjmwClientConfiguration.RetryDecider'!");
+
+    }
+
+    private object InvokeWebCallInternal(string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+
       string fullUrl = rootUrl + methodName;
 
       MethodInfo method = FindMethod(_ContractType, methodName);
