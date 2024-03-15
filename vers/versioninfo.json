@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.4.0",
-  "currentVersionWithSuffix": "1.4.0",
+  "currentVersion": "1.5.0",
+  "currentVersionWithSuffix": "1.5.0",
   "releaseType": "official",
-  "previousVersion": "1.3.0",
+  "previousVersion": "1.4.0",
   "changeGrade": "minor",
   "currentMajor": 1,
-  "currentMinor": 4,
+  "currentMinor": 5,
   "currentPatch": 0,
-  "versionDateInfo": "2024-03-07",
-  "versionTimeInfo": "18:14:28",
-  "versionNotes": "- new Feature: now supporting generic contract-interfaces\n"
+  "versionDateInfo": "2024-03-15",
+  "versionTimeInfo": "08:29:48",
+  "versionNotes": "- new Feature: added a global url-discovery hook and support for retry-policies\n"
 }

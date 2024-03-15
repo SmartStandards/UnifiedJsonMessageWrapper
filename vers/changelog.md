@@ -6,7 +6,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: added a global url-discovery hook and support for retry-policies
+*(none)*
+
+
+
+## v 1.5.0
+released **2024-03-15**, including:
+ - **new Feature**: added a global url-discovery hook and support for retry-policies
 
 
 
