@@ -6,7 +6,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: added MySetting "*GracetimeForSetupPhase*" for WCF to fix MultiThreading problems and ensure that there is enough time for configurative IHttpModules to adjust the UjmwHostConfiguration
+*(none)*
+
+
+
+## v 1.6.0
+released **2024-04-03**, including:
+ - **new Feature**: added MySetting "*GracetimeForSetupPhase*" for WCF to fix MultiThreading problems and ensure that there is enough time for configurative IHttpModules to adjust the UjmwHostConfiguration
 
 
 

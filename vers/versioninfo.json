@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.5.0",
-  "currentVersionWithSuffix": "1.5.0",
+  "currentVersion": "1.6.0",
+  "currentVersionWithSuffix": "1.6.0",
   "releaseType": "official",
-  "previousVersion": "1.4.0",
+  "previousVersion": "1.5.0",
   "changeGrade": "minor",
   "currentMajor": 1,
-  "currentMinor": 5,
+  "currentMinor": 6,
   "currentPatch": 0,
-  "versionDateInfo": "2024-03-15",
-  "versionTimeInfo": "08:29:48",
-  "versionNotes": "- new Feature: added a global url-discovery hook and support for retry-policies\n"
+  "versionDateInfo": "2024-04-03",
+  "versionTimeInfo": "14:29:16",
+  "versionNotes": "- new Feature: added MySetting \"*GracetimeForSetupPhase*\" for WCF to fix MultiThreading problems and ensure that there is enough time for configurative IHttpModules to adjust the UjmwHostConfiguration\n"
 }
