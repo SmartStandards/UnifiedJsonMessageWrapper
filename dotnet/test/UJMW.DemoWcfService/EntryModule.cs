@@ -96,22 +96,24 @@ namespace UJMW.DemoWcfService {
             sideChannel.ProvideNoChannel();
           }
         }
-      ); 
-      
-    //UjmwServiceBehaviour.ContractSelector = (
-    //  (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => { 
-    //    ... here you could choose, which implmentend service-contract interface to be used (my be related to the related url)
-    //  }
-    //);
+      );
 
-    //UjmwServiceBehaviour.ForceHttps = true;
+      //UjmwServiceBehaviour.ContractSelector = (
+      //  (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => { 
+      //    ... here you could choose, which implmentend service-contract interface to be used (my be related to the related url)
+      //  }
+      //);
 
-    //UNDER DEVEOPMENT
-    //UjmwServiceBehaviour.BlExceptionHandler = (method, ex) => {
-    //  string msg = $"EXCEPTION (from {method.DeclaringType.FullName}.{method.Name}): {ex.Message}";
-    //  Debug.WriteLine(msg);
-    //  throw new FaultException(msg); //WARNING: exposing error details is only a good idea for non-prod env's!
-    //};
+      //UjmwServiceBehaviour.ForceHttps = true;
+
+      //UNDER DEVEOPMENT
+      //UjmwServiceBehaviour.BlExceptionHandler = (method, ex) => {
+      //  string msg = $"EXCEPTION (from {method.DeclaringType.FullName}.{method.Name}): {ex.Message}";
+      //  Debug.WriteLine(msg);
+      //  throw new FaultException(msg); //WARNING: exposing error details is only a good idea for non-prod env's!
+      //};
+
+      UjmwHostConfiguration.SetupCompleted();
 
   }
 

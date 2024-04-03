@@ -42,7 +42,7 @@ namespace System.Web.UJMW {
     /// <summary>
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
     /// </summary>
-    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex)=> Trace.TraceError(ex.Message);
+    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
 
     private static IncommingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
     private static OutgoingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
@@ -52,7 +52,7 @@ namespace System.Web.UJMW {
     /// </summary>
     /// <param name="processingMethod"></param>
     public static void ConfigureStandardUjmwRequestSidechannel(RequestSidechannelProcessingMethod processingMethod) {
-      ConfigureRequestSidechannel((t,sc) => {
+      ConfigureRequestSidechannel((t, sc) => {
         sc.AcceptUjmwUnderlineProperty();
         sc.ProcessDataVia(processingMethod);
       });
@@ -62,13 +62,13 @@ namespace System.Web.UJMW {
       _RequestSideChannelConfigurator = requestSideChannelConfigurator;
     }
 
-    public static void ConfigureResponseSidechannel(OutgoingResponseSideChannelConfigurationMethod responseSideChannelConfigurator ) {
+    public static void ConfigureResponseSidechannel(OutgoingResponseSideChannelConfigurationMethod responseSideChannelConfigurator) {
       _ResponseSideChannelConfigurator = responseSideChannelConfigurator;
     }
 
     internal static IncommingRequestSideChannelConfiguration GetRequestSideChannelConfiguration(Type contractType) {
       var cfg = new IncommingRequestSideChannelConfiguration();
-      if(_RequestSideChannelConfigurator != null) {
+      if (_RequestSideChannelConfigurator != null) {
         _RequestSideChannelConfigurator.Invoke(contractType, cfg);
         if (cfg.AcceptedChannels == null) {
           throw new Exception("When configuring the SideChannel, you need to call 'AcceptNoChannelProvided()' or another 'Accept...' method explicitely!");
@@ -88,7 +88,7 @@ namespace System.Web.UJMW {
       var cfg = new OutgoingResponseSideChannelConfiguration();
       if (_ResponseSideChannelConfigurator != null) {
         _ResponseSideChannelConfigurator.Invoke(contractType, cfg);
-        if(cfg.ChannelsToProvide == null) {
+        if (cfg.ChannelsToProvide == null) {
           throw new Exception("When configuring the SideChannel, you need to call 'ProvideNoChannel()' or another 'Provide...' method explicitely!");
         }
         if (cfg.CaptureMethod == null && (cfg.ChannelsToProvide.Count() > 0)) {
@@ -168,6 +168,38 @@ namespace System.Web.UJMW {
     /// could require to enable 'Anonymous' authentication for the Web-Application... 
     /// </summary>
     public static bool DiableNtlm { get; set; } = false;
+
+    // SEMAPHORES against WCF multithreading problems: sometimes the
+    // custom IHttpModules (as configured within the web.config)
+    // will be invoked to late caused by multi-threading. Therefore
+    // we will need to wait a little bit, to give time to any
+    // potential exisiting external code to do the configuration...
+    internal static DateTime _SetupCompletedTime;
+
+    static UjmwHostConfiguration(){
+      if(FileBasedSettings.GracetimeForSetupPhase < 0) {
+        _SetupCompletedTime = DateTime.MaxValue; //wait forever until 'SetupCompleted' has been called
+      }
+      else {
+        _SetupCompletedTime = DateTime.Now.AddSeconds(FileBasedSettings.GracetimeForSetupPhase);
+      }
+    }
+
+    internal static void WaitForSetupCompleted() {
+      while (DateTime.Now < _SetupCompletedTime) {
+        Threading.Thread.Sleep(100);
+      }
+    }
+
+    /// <summary>
+    /// Call this, if youre finished your adjustments to the UjmwHostConfiguration.
+    /// Otherwise the ServiceHosts will not be created until a wait-time names 'SetupDelaySeconds'
+    /// (can be modified via web.config)
+    /// seconds are expired!
+    /// </summary>
+    public static void SetupCompleted() {
+      _SetupCompletedTime = DateTime.Now;
+    }
 
   }
 

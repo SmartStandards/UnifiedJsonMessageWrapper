@@ -53,6 +53,8 @@ namespace System.Web.UJMW {
     protected override ServiceHost CreateServiceHost(Type serviceImplementationType, Uri[] baseAddresses) {
       try {
 
+        UjmwHostConfiguration.WaitForSetupCompleted();
+
         Uri primaryUri = baseAddresses[0];
 
         if (UjmwHostConfiguration.ForceHttps) {
