@@ -46,6 +46,8 @@ namespace System.Web.UJMW {
 
     private static IncommingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
     private static OutgoingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
+  
+    public static Action<ServiceModel.WebHttpBinding> HttpBindingCustomizingHook { get; set; } = null;
 
     /// <summary>
     /// this is just a convenience method for calling 'ConfigureRequestSidechannel' and setting up only the UJMW '_'-property

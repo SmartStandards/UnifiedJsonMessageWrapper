@@ -163,10 +163,11 @@ namespace System.Web.UJMW {
     private static WebHttpBinding _CustomizedWebHttpBindingSecured = null;
     private static WebHttpBinding _CustomizedWebHttpBinding = null;
 
-    private WebHttpBinding GetCustomizedWebHttpBinding() {
+    public static WebHttpBinding GetCustomizedWebHttpBinding() {
       if (UjmwHostConfiguration.ForceHttps) {
 
         if (_CustomizedWebHttpBindingSecured == null) {
+
           if (UjmwHostConfiguration.DiableNtlm) {
             _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
             _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
@@ -175,13 +176,19 @@ namespace System.Web.UJMW {
             _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
             _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.Ntlm;
           }
-        }
-        return _CustomizedWebHttpBindingSecured;
 
+          if(UjmwHostConfiguration.HttpBindingCustomizingHook != null) {
+            UjmwHostConfiguration.HttpBindingCustomizingHook.Invoke(_CustomizedWebHttpBindingSecured);
+          }
+
+        }
+
+        return _CustomizedWebHttpBindingSecured;
       }
       else {
 
         if (_CustomizedWebHttpBinding == null) {
+
           if (UjmwHostConfiguration.DiableNtlm) {
             _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.None);
             _CustomizedWebHttpBinding.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
@@ -190,9 +197,14 @@ namespace System.Web.UJMW {
             _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.TransportCredentialOnly);
             _CustomizedWebHttpBinding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Ntlm;
           }
-        }
-        return _CustomizedWebHttpBinding;
 
+          if (UjmwHostConfiguration.HttpBindingCustomizingHook != null) {
+            UjmwHostConfiguration.HttpBindingCustomizingHook.Invoke(_CustomizedWebHttpBinding);
+          }
+
+        }
+
+        return _CustomizedWebHttpBinding;
       }
     }
 
