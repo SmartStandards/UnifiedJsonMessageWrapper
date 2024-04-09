@@ -34,18 +34,16 @@ namespace System.Web.UJMW {
       OutgoingResponseSideChannelConfiguration sideChannel
     );
 
-    //UNDER DEVELOPMENT...
-    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
-    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
-    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
-
-    /// <summary>
-    /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
-    /// </summary>
-    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex)=> Trace.TraceError(ex.Message);
-
     private static IncommingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
     private static OutgoingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
+
+    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
+      (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
+        return true;
+      }
+    );
+
+    public static bool ForceHttps { get; set; } = false;
 
     /// <summary>
     /// this is just a convenience method for calling 'ConfigureRequestSidechannel' and setting up only the UJMW '_'-property
@@ -102,63 +100,30 @@ namespace System.Web.UJMW {
       return cfg;
     }
 
-    //public static ServiceContractInterfaceSelectorMethod ContractSelector { get; set; } = (
-    //  (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => {
+    /// <summary>
+    /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
+    /// </summary>
+    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
 
-    //    Type[] allInterfaces = serviceImplementationType.GetInterfaces().Where(
-    //     (i) => (i != typeof(IDisposable))
-    //    ).ToArray();
+    //UNDER DEVELOPMENT...
+    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
+    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
+    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
 
-    //    if (allInterfaces.Length == 0) {
-    //      //use the concrete impl. type only if there is relly no interface implemented
-    //      serviceContractInterfaceType = serviceImplementationType;
-    //      return false;
-    //    }
-
-    //    Type[] contractInterfaces = allInterfaces.Where(
-    //      (i) => i.GetCustomAttributes(true).Where((a) => a.GetType() == typeof(System.ServiceModel.ServiceContractAttribute)).Any()
-    //    ).ToArray();
-
-    //    if (contractInterfaces.Length > 1) {
-    //      string[] urlTokens = url.Split('/');
-    //      string versionFromUrl = null;
-    //      for (int i = urlTokens.Length - 1; i > 0; i--) {
-    //        if (Regex.IsMatch(urlTokens[i], "^([vV][0-9]{1,})$")) {
-    //          versionFromUrl = urlTokens[i].ToLower();
-    //          break;
-    //        }
-    //      }
-    //      if (versionFromUrl != null) {
-    //        var versionMatchingInterface = contractInterfaces.Where((i) => ("." + i.FullName.ToLower() + ".").Contains(versionFromUrl)).FirstOrDefault();
-    //        if (versionMatchingInterface != null) {
-    //          serviceContractInterfaceType = versionMatchingInterface;
-    //          //prefer a interface (with a 'ServiceContractAttribute') wich is matching the version
-    //          return true;
-    //        }
-    //      }
-    //    }
-
-    //    if (contractInterfaces.Length > 0) {
-    //      //prefer the first interface (with a 'ServiceContractAttribute')
-    //      serviceContractInterfaceType = contractInterfaces.First();
-    //      return true;
-    //    }
-    //    else {
-    //      //otherwise use the first interface (without a 'ServiceContractAttribute')
-    //      serviceContractInterfaceType = allInterfaces.First();
-    //      return false;
-    //    }
-
-    //  }
-    //);
-
-    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
-      (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
-        return true;
-      }
-    );
-
-    public static bool ForceHttps { get; set; } = false;
+    /// <summary></summary>
+    /// <param name="logLevel">0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal</param>
+    /// <param name="message"></param>
+    public delegate void LoggingMethod(int logLevel, string message);
+    /// <summary>
+    /// A method to process logging output (LogLevel: 0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal)
+    /// </summary>
+    public static LoggingMethod LoggingHook { get; set; } = (logLevel, message) => {
+      if (logLevel < 1) Trace.WriteLine(message);
+      else if (logLevel == 1) Debug.WriteLine(message);
+      else if (logLevel == 2) Trace.TraceInformation(message);
+      else if (logLevel == 3) Trace.TraceWarning(message);
+      else if (logLevel > 3) Trace.TraceError(message);
+    };
 
   }
 

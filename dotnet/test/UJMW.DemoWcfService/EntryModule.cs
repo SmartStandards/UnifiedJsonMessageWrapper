@@ -35,7 +35,7 @@ namespace UJMW.DemoWcfService {
         AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
       }
 
-      UjmwHostConfiguration.DiableNtlm = true;
+      UjmwHostConfiguration.RequireNtlm = false;
       UjmwHostConfiguration.ForceHttps = false;
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
@@ -70,6 +70,13 @@ namespace UJMW.DemoWcfService {
             sideChannel.ProcessDataVia(
               (incommingData) => AmbienceHub.RestoreValuesFrom(incommingData, contractName)
             );
+
+            //sideChannel.AcceptNoChannelProvided(
+            //  (ref IDictionary<string, string> defaultData) => {
+            //    defaultData["currentTenant"] = "(fallback)";
+            //  }
+            //);
+
           }
           else {
             sideChannel.AcceptNoChannelProvided(

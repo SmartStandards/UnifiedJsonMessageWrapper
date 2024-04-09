@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 
 namespace System.Web.UJMW {
@@ -159,6 +160,18 @@ namespace System.Web.UJMW {
         rawJsonRequest, requestHeaders,
         out string rawJsonResponse, out var responseHeaders
       );
+
+      // Informational responses (100 – 199)
+      // Successful responses(200 – 299)
+      // Redirection messages(300 – 399)
+      // Client error responses(400 – 499)
+      // Server error responses(500 – 599)
+      if (httpReturnCode == 401) {
+        throw new UnauthorizedAccessException($"Authorization required! Received HTTP code 401.");
+      }
+      else if (httpReturnCode < 200 || httpReturnCode > 299) {
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode}.");
+      }
 
       //some old technologies can only return XML-encapulated replies
       //this is an hack to support this

@@ -39,7 +39,6 @@ namespace UJMW.DemoWcfService {
 #endif
     CompositeType GetDataUsingDataContract(CompositeType composite);
 
-
     /// <summary>
     /// eine methode mit 2x out
     /// An Unified Json Message Wrapper, which contains the following fields:
@@ -49,6 +48,10 @@ namespace UJMW.DemoWcfService {
     /// <param name="fileName"> geht raus</param>
     /// <param name="fileContentType">geht rein und raus</param>
     /// <returns>retunernt eine nstream</returns>
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
     int TestSuport(string otp, out string fileName, ref string fileContentType);
   }
 

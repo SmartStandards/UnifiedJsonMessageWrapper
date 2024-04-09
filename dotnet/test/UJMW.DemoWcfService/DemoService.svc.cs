@@ -50,7 +50,9 @@ namespace UJMW.DemoWcfService {
     }
 
     public int TestSuport(string otp, out string fileName, ref string fileContentType) {
-      throw new NotImplementedException();
+      fileName = otp;
+      fileContentType = otp;
+      return 1;
     }
 
     public void Dispose() {

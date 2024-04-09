@@ -34,16 +34,6 @@ namespace System.Web.UJMW {
       OutgoingResponseSideChannelConfiguration sideChannel
     );
 
-    //UNDER DEVELOPMENT...
-    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
-    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
-    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
-
-    /// <summary>
-    /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
-    /// </summary>
-    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
-
     private static IncommingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
     private static OutgoingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
   
@@ -169,7 +159,7 @@ namespace System.Web.UJMW {
     /// Please be aware, that working without the build-in wcf security features
     /// could require to enable 'Anonymous' authentication for the Web-Application... 
     /// </summary>
-    public static bool DiableNtlm { get; set; } = false;
+    public static bool RequireNtlm { get; set; } = true;
 
     // SEMAPHORES against WCF multithreading problems: sometimes the
     // custom IHttpModules (as configured within the web.config)
@@ -203,6 +193,31 @@ namespace System.Web.UJMW {
       _SetupCompletedTime = DateTime.Now;
     }
 
+    //UNDER DEVELOPMENT...
+    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
+    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
+    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
+
+    /// <summary>
+    /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
+    /// </summary>
+    public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
+
+    /// <summary></summary>
+    /// <param name="logLevel">0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal</param>
+    /// <param name="message"></param>
+    public delegate void LoggingMethod(int logLevel, string message);
+    /// <summary>
+    /// A method to process logging output (LogLevel: 0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal)
+    /// </summary>
+    public static LoggingMethod LoggingHook { get; set; } = (logLevel, message) => {
+      if (logLevel < 1)       Trace.WriteLine(message);
+      else if (logLevel == 1) Debug.WriteLine(message);      
+      else if (logLevel == 2) Trace.TraceInformation(message);  
+      else if (logLevel == 3) Trace.TraceWarning(message);    
+      else if (logLevel > 3)  Trace.TraceError(message);   
+    };
+    
   }
 
 }

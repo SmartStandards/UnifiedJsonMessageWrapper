@@ -1,10 +1,6 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -16,14 +12,15 @@ using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
 using System.ServiceModel.Web;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml;
+
+using static System.Web.UJMW.UjmwServiceHostFactory.CustomizedJsonFormatter;
+
 using Message = System.ServiceModel.Channels.Message;
 using ServiceDescription = System.ServiceModel.Description.ServiceDescription;
 
 namespace System.Web.UJMW {
-
 
   //-------------------------------------------------------------------------------------------------------------------
   //  <system.serviceModel>
@@ -32,16 +29,6 @@ namespace System.Web.UJMW {
   //        <add relativeAddress="v1/the-url.svc" service="TpeTpeTpe, AssAssAss"
   //             factory="System.Web.UJMW.UjmwServiceHostFactory, UJMW.DynamicWcfHost" />
   //-------------------------------------------------------------------------------------------------------------------
-
-  //-------------------------------------------------------------------------------------------------------------------
-  // could also be neccessary
-  //-------------------------------------------------------------------------------------------------------------------
-  //  <runtime>
-  //    <assemblyBinding xmlns = "urn:schemas-microsoft-com:asm.v1" >
-  //      <dependentAssembly>
-  //        <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
-  //        <bindingRedirect oldVersion = "0.0.0.0-14.0.0.0" newVersion="8.0.0.0" />
-  //      </dependentAssembly>
 
   public class UjmwServiceHostFactory : ServiceHostFactory {
 
@@ -61,7 +48,11 @@ namespace System.Web.UJMW {
           primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
         }
 
-        UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+        bool contractFound = UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
+
+        if (UjmwHostConfiguration.LoggingHook != null) {
+          UjmwHostConfiguration.LoggingHook.Invoke(2, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
+        }
 
         ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
 
@@ -86,14 +77,19 @@ namespace System.Web.UJMW {
         );
         host.AddServiceEndpoint(endpoint);
 
-
         //https://weblogs.asp.net/scottgu/437027
-
-        if(UjmwHostConfiguration.DiableNtlm) {
-          host.Authentication.AuthenticationSchemes = AuthenticationSchemes.Anonymous;
+        AuthenticationSchemes hostAuthenticationSchemes;
+        if (UjmwHostConfiguration.RequireNtlm) {
+          hostAuthenticationSchemes =  AuthenticationSchemes.Ntlm;
         }
-        else {
-          host.Authentication.AuthenticationSchemes = AuthenticationSchemes.Ntlm;
+        else{
+          hostAuthenticationSchemes = AuthenticationSchemes.Anonymous | AuthenticationSchemes.Ntlm;
+        }
+        //it seems not to work properly when changing the host afterwards:
+        //host.Authentication.AuthenticationSchemes = hostAuthenticationSchemes;
+
+        if (UjmwHostConfiguration.LoggingHook != null) {
+          UjmwHostConfiguration.LoggingHook.Invoke(2, $"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
         }
 
         CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
@@ -133,8 +129,7 @@ namespace System.Web.UJMW {
           host.Description.Behaviors.Add(debugBehaviour);
         }
         debugBehaviour.IncludeExceptionDetailInFaults = (!UjmwHostConfiguration.ForceHttps);
-
-   
+ 
         ServiceBehaviorToApplyDispatchHooks customizedServiceBehaviour;
         if (host.Description.Behaviors.Contains(typeof(ServiceBehaviorToApplyDispatchHooks))) {
           customizedServiceBehaviour = host.Description.Behaviors.Find<ServiceBehaviorToApplyDispatchHooks>();
@@ -143,7 +138,18 @@ namespace System.Web.UJMW {
           customizedServiceBehaviour = new ServiceBehaviorToApplyDispatchHooks(inboundSideChannelCfg, outboundSideChannelCfg);
           host.Description.Behaviors.Add(customizedServiceBehaviour);
         }
-        
+
+        ServiceAuthenticationBehavior authBehavoir = null;
+        authBehavoir = host.Description.Behaviors.Find<ServiceAuthenticationBehavior>();
+        if (authBehavoir == null) {
+          authBehavoir = new ServiceAuthenticationBehavior();
+          authBehavoir.AuthenticationSchemes = hostAuthenticationSchemes;
+          host.Description.Behaviors.Add(authBehavoir);
+        }
+        else {
+          authBehavoir.AuthenticationSchemes = hostAuthenticationSchemes;
+        }
+
         return host;
       }
       catch (Exception ex) {
@@ -168,7 +174,7 @@ namespace System.Web.UJMW {
 
         if (_CustomizedWebHttpBindingSecured == null) {
 
-          if (UjmwHostConfiguration.DiableNtlm) {
+          if (!UjmwHostConfiguration.RequireNtlm) {
             _CustomizedWebHttpBindingSecured = new WebHttpBinding(WebHttpSecurityMode.Transport);
             _CustomizedWebHttpBindingSecured.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
           }
@@ -189,7 +195,7 @@ namespace System.Web.UJMW {
 
         if (_CustomizedWebHttpBinding == null) {
 
-          if (UjmwHostConfiguration.DiableNtlm) {
+          if (!UjmwHostConfiguration.RequireNtlm) {
             _CustomizedWebHttpBinding = new WebHttpBinding(WebHttpSecurityMode.None);
             _CustomizedWebHttpBinding.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
           }
@@ -292,13 +298,25 @@ namespace System.Web.UJMW {
         if (contractType == null) {
           throw new Exception($"ContractType for Service '{serviceDescription.Name}' was not found!");
         }
-        else {
-          foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
-            foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
-              endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector(_InboundSideChannelCfg, _OutboundSideChannelCfg));
+
+        foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
+          foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
+            endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector(_InboundSideChannelCfg, _OutboundSideChannelCfg));
+          }
+        }
+
+
+
+        IOperationBehavior loggingBehavior = new OperationBehaviorWhenDispatching();
+        foreach (ServiceEndpoint endpoint in serviceDescription.Endpoints) {
+          foreach (OperationDescription operation in endpoint.Contract.Operations) {
+            if (!operation.Behaviors.Any(d => d is OperationBehaviorWhenDispatching)) {
+              operation.Behaviors.Add(loggingBehavior);
             }
           }
         }
+
+
 
         //foreach (ChannelDispatcherBase channelDispatcherBase in serviceHostBase.ChannelDispatchers) {
         //  ChannelDispatcher channelDispatcher = channelDispatcherBase as ChannelDispatcher;
@@ -444,8 +462,9 @@ namespace System.Web.UJMW {
 
           if (!authSuccess) {
 
-            //TODO: logging hook!!!
-            Trace.TraceWarning("Rejected incomming request because AuthHeaderEvaluator returned false!");
+            if (UjmwHostConfiguration.LoggingHook != null) {
+              UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because AuthHeaderEvaluator returned false!");
+            }
 
             if (httpReturnCode == 200) {
               //default, if no specific code has been provided!
@@ -512,8 +531,9 @@ namespace System.Web.UJMW {
             }
           }
           else {
-            //TODO: logging hook!!! 
-            Trace.TraceWarning("Rejected incomming request because of missing side channel");
+            if (UjmwHostConfiguration.LoggingHook != null) {
+              UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because of missing side channel");
+            }
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
          
@@ -726,11 +746,13 @@ namespace System.Web.UJMW {
         //we need to prefetch the default-values for OPTIONAL parameters
         _ParameterDefaults = new Dictionary<String, object>();
         foreach (var param in operation.SyncMethod.GetParameters()) {
-          if(param.IsOptional && param.HasDefaultValue) {
-            _ParameterDefaults.Add(param.Name, param.DefaultValue);
-          }
-          else {
-            _ParameterDefaults.Add(param.Name, null);
+          if (!param.IsOut) {
+            if(param.IsOptional && param.HasDefaultValue) {
+              _ParameterDefaults.Add(param.Name, param.DefaultValue);
+            }
+            else {
+              _ParameterDefaults.Add(param.Name, null);
+            }
           }
         }
 
@@ -787,22 +809,30 @@ namespace System.Web.UJMW {
                 serializer.Serialize(writer, snapshotContainer);
               }
 
-              foreach (var p in _RelevantMessageDesc.Body.Parts.OrderBy((prt) => prt.Index)) {
-                String byRefPropName = p.Name;
-                Object byRefValue = parameters[p.Index];
-                if (Char.IsUpper(byRefPropName[0])) {
-                  byRefPropName = Char.ToLower(byRefPropName[0]) + byRefPropName.Substring(1);
-                }
-                writer.WritePropertyName(byRefPropName);
-                serializer.Serialize(writer, byRefValue);
+              if (!string.IsNullOrWhiteSpace(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value)) {
+                writer.WritePropertyName("fault");
+                serializer.Serialize(writer, HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value);
               }
+              else {
 
-              if (_RelevantMessageDesc.Body.ReturnValue != null &&
-                _RelevantMessageDesc.Body.ReturnValue.Type != typeof(void) &&
-                !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
-                //should be "result" as customized on another place
-                writer.WritePropertyName(_RelevantMessageDesc.Body.ReturnValue.Name);
-                serializer.Serialize(writer, result);
+                foreach (var p in _RelevantMessageDesc.Body.Parts.OrderBy((prt) => prt.Index)) {
+                  String byRefPropName = p.Name;
+                  Object byRefValue = parameters[p.Index];
+                  if (Char.IsUpper(byRefPropName[0])) {
+                    byRefPropName = Char.ToLower(byRefPropName[0]) + byRefPropName.Substring(1);
+                  }
+                  writer.WritePropertyName(byRefPropName);
+                  serializer.Serialize(writer, byRefValue);
+                }
+
+                if (_RelevantMessageDesc.Body.ReturnValue != null &&
+                  _RelevantMessageDesc.Body.ReturnValue.Type != typeof(void) &&
+                  !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
+                  //should be "result" as customized on another place
+                  writer.WritePropertyName(_RelevantMessageDesc.Body.ReturnValue.Name);
+                  serializer.Serialize(writer, result);
+                }
+
               }
 
               writer.WriteEndObject();
@@ -910,6 +940,71 @@ namespace System.Web.UJMW {
           writer.WriteStartElement("Binary");
           writer.WriteBase64(_Content, 0, _Content.Length);
           writer.WriteEndElement();
+        }
+
+      }
+
+      public class OperationBehaviorWhenDispatching : IOperationBehavior {
+
+        public OperationBehaviorWhenDispatching() {
+        }
+
+        public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters) {
+        }
+
+        public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation) {
+        }
+
+        public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation) {
+          dispatchOperation.Invoker = new HookedOperationInvoker( dispatchOperation.Invoker, dispatchOperation);
+        }
+
+        public void Validate(OperationDescription operationDescription) {
+        }
+
+      }
+
+      public class HookedOperationInvoker : IOperationInvoker {
+
+        public static AsyncLocal<string> CatchedExeptionFromCurrentOperation = new AsyncLocal<string>();
+
+        private readonly IOperationInvoker _BaseInvoker;
+        private readonly string _OperationName;
+        private readonly string _ControllerName;
+
+        public HookedOperationInvoker( IOperationInvoker baseInvoker, DispatchOperation operation) {
+          _BaseInvoker = baseInvoker;
+          _OperationName = operation.Name;
+          _ControllerName = operation.Parent.Type == null ? "[None]" : operation.Parent.Type.FullName;
+        }
+
+        public bool IsSynchronous => _BaseInvoker.IsSynchronous;
+    
+        public object[] AllocateInputs() {
+          return _BaseInvoker.AllocateInputs();
+        }
+
+        public object Invoke(object instance, object[] inputs, out object[] outputs) {
+          if (UjmwHostConfiguration.LoggingHook != null) {
+            UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
+          }
+          try {
+            return _BaseInvoker.Invoke(instance, inputs, out outputs);
+          }
+          catch (Exception ex) {
+            UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
+            CatchedExeptionFromCurrentOperation.Value = ex.Message;
+            outputs = new object[0];
+            return null;
+          }
+        }
+
+        public IAsyncResult InvokeBegin(object instance, object[] inputs, AsyncCallback callback, object state) {
+          return _BaseInvoker.InvokeBegin(instance, inputs, callback, state);
+        }
+
+        public object InvokeEnd(object instance, out object[] outputs, IAsyncResult result) {
+          return _BaseInvoker.InvokeEnd(instance, out outputs, result);
         }
 
       }

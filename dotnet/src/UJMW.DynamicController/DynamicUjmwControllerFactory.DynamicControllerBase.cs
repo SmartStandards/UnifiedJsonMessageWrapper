@@ -160,8 +160,9 @@ namespace System.Web.UJMW {
                     }
                   }
                   else {
-                    //TODO: logging hook!!! 
-                    Trace.TraceWarning("Rejected incomming request because of missing side channel");
+                    if (UjmwHostConfiguration.LoggingHook != null) {
+                      UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because of missing side channel");
+                    }
                     throw new Exception("Rejected incomming request because of missing side channel");
                   }
                 }

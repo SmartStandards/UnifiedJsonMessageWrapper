@@ -79,7 +79,7 @@ namespace System.Web.UJMW {
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
     /// </summary>
     public static FaultRepsonseHandlerMethod FaultRepsonseHandler { get; set; } = (
-      (string fullUrl, MethodInfo method, string faultMessage) => throw new UjmwFaultException(fullUrl, method,faultMessage)
+      (string fullUrl, MethodInfo method, string faultMessage) => throw new UjmwFaultException(fullUrl, method, faultMessage)
     );
 
     private static OutgoingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
