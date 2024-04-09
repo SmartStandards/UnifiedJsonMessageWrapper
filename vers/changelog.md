@@ -6,10 +6,16 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **breaking Change**: DisableNtlm=false was replaced by RequireNtlm=true and is applied via separate dispatch-behaviour
-* **new Feature**: added hook to customize the 'WebHttpBinding' for WCF
-* **new Feature**: added hook for Logging
-* Fix: WCF can now provides the 'fault'-Property on exceptions properly (instead of html-error-page)
+*(none)*
+
+
+
+## v 2.0.0
+released **2024-04-09**, including:
+ - **breaking Change**: DisableNtlm=false was replaced by RequireNtlm=true and is applied via separate dispatch-behaviour
+ - **new Feature**: added hook for Logging
+ - **new Feature**: added hook to customize the 'WebHttpBinding' for WCF
+ - Fix: WCF can now provides the 'fault'-Property on exceptions properly (instead of html-error-page)
 
 
 

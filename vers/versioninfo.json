@@ -1,13 +1,13 @@
 {
-  "currentVersion": "1.6.0",
-  "currentVersionWithSuffix": "1.6.0",
+  "currentVersion": "2.0.0",
+  "currentVersionWithSuffix": "2.0.0",
   "releaseType": "official",
-  "previousVersion": "1.5.0",
-  "changeGrade": "minor",
-  "currentMajor": 1,
-  "currentMinor": 6,
+  "previousVersion": "1.6.0",
+  "changeGrade": "major",
+  "currentMajor": 2,
+  "currentMinor": 0,
   "currentPatch": 0,
-  "versionDateInfo": "2024-04-03",
-  "versionTimeInfo": "14:29:16",
-  "versionNotes": "- new Feature: added MySetting \"*GracetimeForSetupPhase*\" for WCF to fix MultiThreading problems and ensure that there is enough time for configurative IHttpModules to adjust the UjmwHostConfiguration\n"
+  "versionDateInfo": "2024-04-09",
+  "versionTimeInfo": "14:45:41",
+  "versionNotes": "- breaking Change: DisableNtlm=false was replaced by RequireNtlm=true and is applied via separate dispatch-behaviour\n- new Feature: added hook for Logging\n- new Feature: added hook to customize the 'WebHttpBinding' for WCF\n- Fix: WCF can now provides the 'fault'-Property on exceptions properly (instead of html-error-page)\n"
 }
