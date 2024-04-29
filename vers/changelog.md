@@ -6,9 +6,15 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: A new hook 'UjmwClientConfiguration.HttpClientFactory' allows to customize HttpClient creation. This can be used to adjust proxy-settings, while the default is to use NO PROXY!
-* Fix: AssemblyInfo for .NET-Fx 4 Projects are now without wildcard, to ensure propper versions instead of 999.x
-* Fix: 'AuthHeaderEvaluator'-Hook is now working for ASP.net Core
+*(none)*
+
+
+
+## v 2.1.0
+released **2024-04-29**, including:
+ - **new Feature**: A new hook 'UjmwClientConfiguration.HttpClientFactory' allows to customize HttpClient creation. This can be used to adjust proxy-settings, while the default is to use NO PROXY!
+ - Fix: 'AuthHeaderEvaluator'-Hook is now working for ASP.net Core
+ - Fix: AssemblyInfo for .NET-Fx 4 Projects are now without wildcard, to ensure propper versions instead of 999.x
 
 
 
