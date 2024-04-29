@@ -37,11 +37,7 @@ namespace System.Web.UJMW {
     private static IncommingRequestSideChannelConfigurationMethod _RequestSideChannelConfigurator { get; set; } = null;
     private static OutgoingResponseSideChannelConfigurationMethod _ResponseSideChannelConfigurator { get; set; } = null;
 
-    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
-      (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
-        return true;
-      }
-    );
+    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = null;
 
     public static bool ForceHttps { get; set; } = false;
 

@@ -32,7 +32,9 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _ConsumesAttributeConstructor = typeof(ConsumesAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
- 
+    
+    private static ConstructorInfo _AuthHeaderInterceptorAttributeConstructor = typeof(AuthHeaderInterceptorAttribute).GetConstructors().Single();
+
     private static ConstructorInfo _TagsAttributeContructor = Type.GetType("Microsoft.AspNetCore.Http.TagsAttribute, Microsoft.AspNetCore.Http.Extensions", false)?.GetConstructors()?.FirstOrDefault();
 
 
@@ -132,6 +134,13 @@ namespace System.Web.UJMW {
          _TagsAttributeContructor, new object[] { new string[] { controllerTitle } }
         );
         typeBuilder.SetCustomAttribute(tagsAttribBuilder);
+      }
+
+      if (options.EnableAuthHeaderEvaluatorHook) {
+        CustomAttributeBuilder authHeaderInterceptorAttributeBuilder = new CustomAttributeBuilder(
+          _AuthHeaderInterceptorAttributeConstructor, new object[] { }
+        );
+        typeBuilder.SetCustomAttribute(authHeaderInterceptorAttributeBuilder);
       }
 
       // ##### FIELD DEFINITIONs #####

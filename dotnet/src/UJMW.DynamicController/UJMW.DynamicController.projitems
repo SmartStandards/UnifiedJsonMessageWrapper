@@ -18,6 +18,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AuthHeaderInterceptorAttribute.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)XmlCommentAccessExtensions.cs" />
   </ItemGroup>
 </Project>

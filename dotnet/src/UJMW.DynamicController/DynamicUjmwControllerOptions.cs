@@ -28,6 +28,13 @@ namespace System.Web.UJMW {
     /// <summary> build the '_' property within the json message wrapper of responses to transport ambient information </summary>
     public bool EnableResponseSidechannel { get; set; } = true;
 
+    /// <summary>
+    /// When true, an 'IAsyncActionFilter' will be applied to the dynamic controller internally,
+    /// to redirect the Http-Authorization headers to the 'UjmwHostConfiguration.AuthHeaderEvaluator'-Method.
+    /// You can set this to false to increase performance, if no authorization is needed or is applied in another way.
+    /// </summary>
+    public bool EnableAuthHeaderEvaluatorHook { get; set; } = true;
+
     public Type AuthAttribute { get; set; } = null;
     public object[] AuthAttributeConstructorParams { get; set; } = new object[] { };
 

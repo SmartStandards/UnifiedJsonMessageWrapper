@@ -6,7 +6,9 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: A new hook 'UjmwClientConfiguration.HttpClientFactory' allows to customize HttpClient creation. This can be used to adjust proxy-settings, while the default is to use NO PROXY!
+* Fix: AssemblyInfo for .NET-Fx 4 Projects are now without wildcard, to ensure propper versions instead of 999.x
+* Fix: 'AuthHeaderEvaluator'-Hook is now working for ASP.net Core
 
 
 
@@ -15,7 +17,7 @@ released **2024-04-09**, including:
  - **breaking Change**: DisableNtlm=false was replaced by RequireNtlm=true and is applied via separate dispatch-behaviour
  - **new Feature**: added hook for Logging
  - **new Feature**: added hook to customize the 'WebHttpBinding' for WCF
- - Fix: WCF can now provides the 'fault'-Property on exceptions properly (instead of html-error-page)
+ - Fix: WCF now provides the 'fault'-Property on exceptions properly (instead of html-error-page)
 
 
 

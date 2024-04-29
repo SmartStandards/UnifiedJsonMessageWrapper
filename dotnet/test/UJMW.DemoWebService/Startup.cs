@@ -141,6 +141,17 @@ namespace Security {
         }
       );
 
+      UjmwHostConfiguration.AuthHeaderEvaluator = (
+        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
+          //in this demo - any auth header is ok - but there must be one ;-)
+          if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
+            httpReturnCode = 403;
+            return false;
+          }
+          return true;
+        }
+      );
+
       var svc = new DemoService();
       services.AddSingleton<IDemoService>(svc);
       services.AddSingleton<IDemoFileService>(svc);

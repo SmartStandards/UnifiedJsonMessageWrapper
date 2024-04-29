@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 //using System.Runtime.Remoting.Messaging;
 using System.Text.RegularExpressions;
@@ -140,11 +142,22 @@ namespace System.Web.UJMW {
       return cfg;
     }
 
-    //public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
-    //  (string rawAuthHeader, MethodInfo calledContractMethod, string callingMachine, ref int httpReturnCode) => {
-    //    return true;
-    //  }
-    //);
+    public static Func<HttpClient> HttpClientFactory { get; set; } = (
+      () => {
+        HttpClientHandler httpClientHandler = new HttpClientHandler();
+        httpClientHandler.UseProxy = false;
+
+        //if (httpClientHandler.Proxy is WebProxy) {
+        //  ((WebProxy)httpClientHandler.Proxy).BypassProxyOnLocal = true;
+        //}
+        //else {
+        //  httpClientHandler.UseProxy = false;
+        //}
+
+        HttpClient httpClient = new HttpClient(httpClientHandler);
+        return httpClient;
+      }
+    );
 
   }
 

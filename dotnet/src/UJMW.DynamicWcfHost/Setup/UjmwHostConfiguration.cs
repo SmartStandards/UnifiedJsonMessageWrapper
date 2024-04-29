@@ -144,11 +144,7 @@ namespace System.Web.UJMW {
       }
     );
 
-    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = (
-      (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
-        return true;
-      }
-    );
+    public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = null;
 
     public static bool ForceHttps { get; set; } = false;
 
@@ -192,11 +188,6 @@ namespace System.Web.UJMW {
     public static void SetupCompleted() {
       _SetupCompletedTime = DateTime.Now;
     }
-
-    //UNDER DEVELOPMENT...
-    //https://stackoverflow.com/questions/17961564/wcf-exception-handling-using-ierrorhandler
-    //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
-    //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
 
     /// <summary>
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)

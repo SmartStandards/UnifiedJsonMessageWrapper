@@ -4,7 +4,7 @@ namespace System.Web.UJMW {
 
   public class UjmwFaultException : Exception {
 
-    public UjmwFaultException(string fullUrl, MethodInfo method, string faultMessage) : base(faultMessage) {
+    public UjmwFaultException(string fullUrl, MethodInfo method, string faultMessage) : base("ERROR on SERVER-SIDE: " + faultMessage) {
       _FullUrl = fullUrl;
       _Method = method;
     }

@@ -47,7 +47,6 @@ namespace UJMW.DemoWcfService {
           }
           return true;
         }
-
       );
 
       //in this sample were using the AmbienceHub from our 'SmartAmbience' framework

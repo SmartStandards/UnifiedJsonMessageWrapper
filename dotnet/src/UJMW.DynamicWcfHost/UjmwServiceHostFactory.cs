@@ -279,7 +279,7 @@ namespace System.Web.UJMW {
 
 
 
-    internal class ServiceBehaviorToApplyDispatchHooks : IServiceBehavior, IErrorHandler {
+    internal class ServiceBehaviorToApplyDispatchHooks : IServiceBehavior {
 
       private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
       private OutgoingResponseSideChannelConfiguration _OutboundSideChannelCfg;
@@ -305,8 +305,6 @@ namespace System.Web.UJMW {
           }
         }
 
-
-
         IOperationBehavior loggingBehavior = new OperationBehaviorWhenDispatching();
         foreach (ServiceEndpoint endpoint in serviceDescription.Endpoints) {
           foreach (OperationDescription operation in endpoint.Contract.Operations) {
@@ -316,62 +314,11 @@ namespace System.Web.UJMW {
           }
         }
 
-
-
-        //foreach (ChannelDispatcherBase channelDispatcherBase in serviceHostBase.ChannelDispatchers) {
-        //  ChannelDispatcher channelDispatcher = channelDispatcherBase as ChannelDispatcher;
-        //  if (channelDispatcher != null) {
-        //    channelDispatcher.ErrorHandlers.Add(this);
-        //  }
-        //}
-
       }
 
-      #region " IErrorHandler "
-
-      public bool HandleError(Exception error) {
-        //return (error is FaultException);
-        return false;
-       // return true;
-      }
-
-      public void ProvideFault(Exception error, MessageVersion version, ref Message fault) {
-        fault = null;
-        return;
-
-        //MessageFault MF = FE.CreateMessageFault();
-        //fault = Message.CreateMessage(version, MF, null);
-
-        //BUG: this will return a body content of: 
-        // <string xmlns="http://schemas.microsoft.com/2003/10/Serialization/">{ "fault":"error message" }</string>
-        //string body = $"{{ \"fault\":\"{error.Message}\" }}";
-        //fault = Message.CreateMessage(version, action: null, body: body);
-
-        //BodyWriter bodyWriter = new CustomFaultBodyWriter(error);
-        //fault = Message.CreateMessage(version, action: null, bodyWriter);
-
-      }
       public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) {
       }
 
-      //internal sealed class WebHttpErrorHandler : IErrorHandler {
-      //  //private static readonly ILog logger = LogManager.GetLogger(typeof(WebHttpErrorHandler));
-
-      //  public void ProvideFault(Exception error, MessageVersion version, ref Message fault) {
-      //    var exception = new FaultException("Web Server error encountered. All details have been logged.");
-      //    var messageFault = exception.CreateMessageFault();
-
-      //    fault = Message.CreateMessage(version, messageFault, exception.Action);
-      //  }
-
-      //  public bool HandleError(Exception error) {
-      //    logger.Error(string.Format("An error has occurred in the Web service {0}", error));
-
-      //    return !(error is FaultException);
-      //  }
-      //}
-
-      #endregion
     }
 
     internal class CustomFaultBodyWriter : BodyWriter {
