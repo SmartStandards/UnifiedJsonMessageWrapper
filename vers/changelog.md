@@ -6,7 +6,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* Fix: WCF AuthHeaderEvaluator Hook now passes a correct MethodInfo for the 'calledContractMethod' instead of a MethodInfo pointing to the concrete implementation.
 
 
 

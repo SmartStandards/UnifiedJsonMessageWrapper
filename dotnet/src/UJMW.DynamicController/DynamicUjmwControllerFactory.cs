@@ -44,8 +44,12 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _SwaggerRequestBodyAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerRequestBodyAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
     private static ConstructorInfo _SwaggerResponseAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerResponseAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();//Skip(1)?.
     private static ConstructorInfo _SwaggerSchemaAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerSchemaAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
-
+    
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null) {
+      return BuildDynamicControllerType(serviceType, options, out string dummy);
+    }
+
+    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute) {
       if(options == null) {
         options = new DynamicUjmwControllerOptions();
       }
@@ -94,7 +98,7 @@ namespace System.Web.UJMW {
         }
       }
 
-      string controllerRoute = options.ControllerRoute;
+      controllerRoute = options.ControllerRoute;
       if (string.IsNullOrEmpty(controllerRoute)) {
         controllerRoute = svcName;
         if (genArgs.Any()) {
@@ -119,10 +123,10 @@ namespace System.Web.UJMW {
       }
 
       TypeBuilder typeBuilder = moduleBuilder.DefineType(
-          svcName + classDiscriminator + "Controller",
-          TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
-          baseType
-        );
+        svcName + classDiscriminator + "Controller",
+        TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
+        baseType
+      );
 
       CustomAttributeBuilder RouteAttribBuilder = new CustomAttributeBuilder(
        _RouteAttributeConstructor, new object[] { controllerRoute }

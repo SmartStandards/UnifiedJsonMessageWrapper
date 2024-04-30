@@ -47,8 +47,6 @@ namespace Security {
 
       services.AddLogging();
 
-      
-
       _ApiVersion = typeof(IDemoService).Assembly.GetName().Version;
 
       string outDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -318,7 +316,9 @@ namespace Security {
 
       app.UseEndpoints(endpoints => {
         endpoints.MapControllers();
-       });
+      });
+
+      var allRoutesToAnnounce = DynamicUjmwControllerRegistrar.GetAllRegisteredServiceTypesByRoute();
 
     }
 

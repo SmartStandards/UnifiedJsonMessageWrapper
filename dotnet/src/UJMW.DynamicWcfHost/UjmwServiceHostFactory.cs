@@ -381,12 +381,10 @@ namespace System.Web.UJMW {
         MethodInfo calledContractMethod;
         lock (_MethodInfoCache) {
           if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
-
-            //HACK: instead of serviceImplementationType we would like to get the CONTRACT!
-            Type serviceContractType = instanceContext.Host.Description.ServiceType;
-
+            //TODO: a little bt more error-handling (as we know in wcf can anything be null in some reasons)
+            Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
+            //Type serviceType = instanceContext.Host.Description.ServiceType;
             calledContractMethod = serviceContractType.GetMethod(methodName);
-
             _MethodInfoCache[fullCallUrl] = calledContractMethod;
           }
         }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace System.Web.UJMW {
@@ -42,8 +43,19 @@ namespace System.Web.UJMW {
     }
 
     private static void CreateAndRegisterController(ControllerFeature feature, Type serviceType, DynamicUjmwControllerOptions options) {
-      Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(serviceType, options);
+      Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(serviceType, options, out string controllerRoute);
       feature.Controllers.Add(dynamicController.GetTypeInfo());
+      lock (_AllRegisteredServiceTypesByRoute) {
+        _AllRegisteredServiceTypesByRoute[controllerRoute] = serviceType;
+      }
+    }
+
+    private static Dictionary<string, Type> _AllRegisteredServiceTypesByRoute = new Dictionary<string, Type>();
+
+    public static KeyValuePair<string, Type>[] GetAllRegisteredServiceTypesByRoute() {
+      lock (_AllRegisteredServiceTypesByRoute) {
+        return _AllRegisteredServiceTypesByRoute.ToArray();
+      }
     }
 
   }
