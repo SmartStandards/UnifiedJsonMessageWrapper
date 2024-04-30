@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.1.0",
-  "currentVersionWithSuffix": "2.1.0",
+  "currentVersion": "2.1.1",
+  "currentVersionWithSuffix": "2.1.1",
   "releaseType": "official",
-  "previousVersion": "2.0.0",
-  "changeGrade": "minor",
+  "previousVersion": "2.1.0",
+  "changeGrade": "patch",
   "currentMajor": 2,
   "currentMinor": 1,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-04-29",
-  "versionTimeInfo": "20:21:43",
-  "versionNotes": "- new Feature: A new hook 'UjmwClientConfiguration.HttpClientFactory' allows to customize HttpClient creation. This can be used to adjust proxy-settings, while the default is to use NO PROXY!\n- Fix: 'AuthHeaderEvaluator'-Hook is now working for ASP.net Core\n- Fix: AssemblyInfo for .NET-Fx 4 Projects are now without wildcard, to ensure propper versions instead of 999.x\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-04-30",
+  "versionTimeInfo": "11:15:51",
+  "versionNotes": "- Fix: WCF AuthHeaderEvaluator Hook now passes a correct MethodInfo for the 'calledContractMethod' instead of a MethodInfo pointing to the concrete implementation.\n"
 }
