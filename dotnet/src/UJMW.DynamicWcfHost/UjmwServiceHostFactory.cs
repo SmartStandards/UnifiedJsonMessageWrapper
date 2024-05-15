@@ -351,7 +351,7 @@ namespace System.Web.UJMW {
       private Dictionary<String, MethodInfo> _MethodInfoCache = new Dictionary<String, MethodInfo>();
 
       public Object AfterReceiveRequest(ref Message incomingWcfMessage, IClientChannel channel, InstanceContext instanceContext) {
-       
+
         //if (incomingWcfMessage.State == MessageState.Copied) {
         //  //the copy was implicitely created by us, in order to get the possibility to read the body
         //  //but it also triggers out own interceptor again - WTF!!!!
@@ -389,6 +389,13 @@ namespace System.Web.UJMW {
           }
         }
         HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
+
+        if(httpRequest.Method.Equals("OPTIONS", StringComparison.CurrentCultureIgnoreCase)) {
+          //passes the string "OPTIONS" as magic-value to the "correlationState"
+          //(which is evaluated during "BeforeSendReply" - see below)
+          return "OPTIONS";
+          //skip any further processing here
+        }
 
         int httpReturnCode = 200;
         bool authFailed = false;
@@ -479,6 +486,7 @@ namespace System.Web.UJMW {
             if (UjmwHostConfiguration.LoggingHook != null) {
               UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because of missing side channel");
             }
+            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No sidechannel provided.";
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
          
@@ -490,17 +498,50 @@ namespace System.Web.UJMW {
 
       }
 
-
       public void BeforeSendReply(ref Message outgoingWcfMessage, Object correlationState) {
+
+        //prepare some ugly WCF hacking (get access to the HttpResponse)   
+        HttpResponseMessageProperty outgoingHttpResponse = null;
+        if (outgoingWcfMessage.Properties.ContainsKey(HttpResponseMessageProperty.Name)) {
+          outgoingHttpResponse = (HttpResponseMessageProperty)outgoingWcfMessage.Properties[HttpResponseMessageProperty.Name];
+        }
+        else {
+          outgoingHttpResponse = new HttpResponseMessageProperty();
+          outgoingWcfMessage.Properties.Add(HttpResponseMessageProperty.Name, outgoingHttpResponse);
+        }
+
+        //apply additional headers globally (especially for CORS)
+        outgoingHttpResponse.Headers["Allow"]= "POST,OPTIONS";
+        if (!string.IsNullOrEmpty(UjmwHostConfiguration.CorsAllowOrigin)) {
+          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Origin", UjmwHostConfiguration.CorsAllowOrigin);
+          outgoingHttpResponse.Headers.Add("Access-Control-Request-Method", "POST,OPTIONS");
+          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Headers", "X-Requested-With,Content-Type");
+        }
 
         MethodInfo calledContractMethod = null;
         if(!(correlationState is MethodInfo)) {
 
-          //TODO: hier könnten wir auch im fehlerfall die fault-message FAKE!!!
+          //disable that html response body with WCF-ramblings
+          outgoingHttpResponse.SuppressEntityBody = true;
 
-          //string msg = this.GetBodyFromWcfMessage(ref outgoingWcfMessage);
-          //outgoingWcfMessage = Message.CreateMessage(outgoingWcfMessage.Version, "FAULT", "invald request");
-          //outgoingWcfMessage = new RawFaultMessage(Message.CreateMessage(outgoingWcfMessage.Version, "ccc", "ffff"),"KAPUTT");
+          if (correlationState is string) {
+            string specialReplyName = (string)correlationState;
+            //in default, all our magic-values sould be treaded as signal to responde BadRequest
+            outgoingHttpResponse.StatusCode = HttpStatusCode.BadRequest;
+
+            //in case of options-verb (which should be available always) respond success
+            if (specialReplyName == "OPTIONS") {
+              outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
+              return;
+            }
+
+          } //NOTE: we get an correlationState==null when we've previously thrown an exception
+
+          //in all cases, we habve a body-less response, so it makes sence to apply error-messages
+          //to the Http-StatusDescription (because there is no fault property)!
+          if (!string.IsNullOrWhiteSpace(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value)) {
+            outgoingHttpResponse.StatusDescription = HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value;
+          }
 
           return;
         }
@@ -509,18 +550,7 @@ namespace System.Web.UJMW {
         }
 
         if (_OutboundSideChannelCfg.ChannelsToProvide.Length > 0) {
-
           ///// CAPTURE OUTGOING BACKCHANNEL /////
-
-          //prepare some ugly WCF hacking
-          HttpResponseMessageProperty outgoingHttpResponse = null;
-          if (outgoingWcfMessage.Properties.ContainsKey(HttpResponseMessageProperty.Name)) {
-            outgoingHttpResponse = (HttpResponseMessageProperty) outgoingWcfMessage.Properties[HttpResponseMessageProperty.Name];
-          }
-          else {
-            outgoingHttpResponse = new HttpResponseMessageProperty();
-            outgoingWcfMessage.Properties.Add(HttpResponseMessageProperty.Name, outgoingHttpResponse);
-          }
 
           //COLLECT THE DATA
           string serializedSnapshot = null;
@@ -539,8 +569,7 @@ namespace System.Web.UJMW {
             }
           }
 
-          ///// (end) CAPTURE OUTGOING BACKCHANNEL /////
-          
+          ///// (end) CAPTURE OUTGOING BACKCHANNEL /////      
         }
       }
 
@@ -857,7 +886,13 @@ namespace System.Web.UJMW {
             }
             else if (_ParameterIndicesPerName.ContainsKey(parameterName)) {
               int parameterIndex = _ParameterIndicesPerName[parameterName];
-              parameters[parameterIndex] = serializer.Deserialize(reader, _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type);
+              Type targetTypeToDeserialize = _OperationSchema.Messages[0].Body.Parts[parameterIndex].Type;
+              try {
+                parameters[parameterIndex] = serializer.Deserialize(reader, targetTypeToDeserialize);
+              }
+              catch {
+                parameters[parameterIndex] = null;
+              }
             }
             else {
               reader.Skip();
@@ -938,7 +973,12 @@ namespace System.Web.UJMW {
           }
           catch (Exception ex) {
             UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
-            CatchedExeptionFromCurrentOperation.Value = ex.Message;
+            if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
+              CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
+            }
+            else {
+              CatchedExeptionFromCurrentOperation.Value = ex.Message;
+            }
             outputs = new object[0];
             return null;
           }

@@ -119,6 +119,8 @@ namespace UJMW.DemoWcfService {
       //  throw new FaultException(msg); //WARNING: exposing error details is only a good idea for non-prod env's!
       //};
 
+      UjmwHostConfiguration.CorsAllowOrigin = "*";
+
       UjmwHostConfiguration.SetupCompleted();
 
   }

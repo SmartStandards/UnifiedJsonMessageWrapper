@@ -106,6 +106,8 @@ namespace System.Web.UJMW {
     //https://www.c-sharpcorner.com/UploadFile/b182bf/centralize-exception-handling-in-wcf-part-10/
     //public static Action<MethodInfo,Exception> BlExceptionHandler { get; set; } = null;
 
+    public static bool HideExeptionMessageInFaultProperty { get; set; } = false;
+
     /// <summary></summary>
     /// <param name="logLevel">0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal</param>
     /// <param name="message"></param>

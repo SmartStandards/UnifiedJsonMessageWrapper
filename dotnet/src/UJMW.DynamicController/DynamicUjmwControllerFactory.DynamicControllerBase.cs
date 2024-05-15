@@ -185,12 +185,22 @@ namespace System.Web.UJMW {
               }
               catch (TargetInvocationException ex) {
                 if (faultProp != null) {
-                  faultProp.SetValue(responseDto, ex.InnerException.Message);
+                  if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
+                    faultProp.SetValue(responseDto, "BL-Exception");
+                  }
+                  else {
+                    faultProp.SetValue(responseDto, ex.InnerException.Message);
+                  }
                 }
               }
               catch (Exception ex) {
                 if (faultProp != null) {
-                  faultProp.SetValue(responseDto, ex.Message);
+                  if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
+                    faultProp.SetValue(responseDto, "BL-Exception");
+                  }
+                  else {
+                    faultProp.SetValue(responseDto, ex.Message);
+                  }
                 }
               }
 

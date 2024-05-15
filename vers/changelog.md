@@ -6,9 +6,11 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: Added Support to configure CORS-Headers in WCF.
 
+* **new Feature**: option 'HideExeptionMessageInFaultProperty' in MCV & .NET core WebApi
 
+  
 
 ## v 2.1.1
 released **2024-04-30**, including:
@@ -65,7 +67,7 @@ released **2024-02-16**, including:
 
 ## v 1.2.0
 released **2024-02-15**, including:
- - completet impl. the **new Feature** of full sidechannel support for WCF and ASP.net core WebAPI
+ - completed impl. the **new Feature** of full sidechannel support for WCF and ASP.net core WebAPI
 
 
 

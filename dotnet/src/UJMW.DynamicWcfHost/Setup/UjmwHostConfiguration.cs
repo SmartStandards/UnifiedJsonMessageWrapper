@@ -149,6 +149,12 @@ namespace System.Web.UJMW {
     public static bool ForceHttps { get; set; } = false;
 
     /// <summary>
+    /// If set to null (which is the default), then NO cors headers will be written.
+    /// To enable cors headers, you can set it to "*".
+    /// </summary>
+    public static string CorsAllowOrigin { get; set; } = null;
+
+    /// <summary>
     /// Usually WCF requires at least any authentication schema.
     /// Disableing this is only recommended when you're using any
     /// other secirity framework instead (may-be access-token based).
@@ -193,6 +199,8 @@ namespace System.Web.UJMW {
     /// will be invoked for exceptions that have been thrown during host creation (when WCF is using our factory)
     /// </summary>
     public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
+    
+    public static bool HideExeptionMessageInFaultProperty { get; set; } = false;
 
     /// <summary></summary>
     /// <param name="logLevel">0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal</param>
