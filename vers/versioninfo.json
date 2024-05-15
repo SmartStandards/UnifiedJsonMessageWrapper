@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.1.1",
-  "currentVersionWithSuffix": "2.1.1",
+  "currentVersion": "2.2.0",
+  "currentVersionWithSuffix": "2.2.0",
   "releaseType": "official",
-  "previousVersion": "2.1.0",
-  "changeGrade": "patch",
+  "previousVersion": "2.1.1",
+  "changeGrade": "minor",
   "currentMajor": 2,
-  "currentMinor": 1,
-  "currentPatch": 1,
-  "versionDateInfo": "2024-04-30",
-  "versionTimeInfo": "11:15:51",
-  "versionNotes": "- Fix: WCF AuthHeaderEvaluator Hook now passes a correct MethodInfo for the 'calledContractMethod' instead of a MethodInfo pointing to the concrete implementation.\n"
+  "currentMinor": 2,
+  "currentPatch": 0,
+  "versionDateInfo": "2024-05-15",
+  "versionTimeInfo": "11:19:03",
+  "versionNotes": "- new Feature: Added Support to configure CORS-Headers in WCF.\n- new Feature: option 'HideExeptionMessageInFaultProperty' in MCV & .NET core WebApi\n"
 }
