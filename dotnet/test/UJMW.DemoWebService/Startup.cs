@@ -140,10 +140,11 @@ namespace Security {
       );
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
+        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
+            failedReason = "This demo requires at least ANY string as authheader!";
             return false;
           }
           return true;

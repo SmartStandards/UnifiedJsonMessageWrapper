@@ -15,7 +15,8 @@ namespace System.Web.UJMW {
     string rawAuthHeader,
     MethodInfo calledContractMethod,
     string callingMachine,
-    ref int httpReturnCode
+    ref int httpReturnCode,
+    ref string failedReason
   );
 
   /// <summary> (specific to ASP.net core WebAPI) </summary>

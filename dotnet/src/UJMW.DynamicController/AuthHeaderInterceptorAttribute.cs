@@ -36,15 +36,22 @@ namespace System.Web.UJMW {
         MethodInfo calledContractMethod = GetMethodInfoFromContext(context);
 
         int httpReturnCode = 200;
-        if (!UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(rawHeader, calledContractMethod, apiCaller.Host, ref httpReturnCode)) {
+        string failedReason = string.Empty;
+        if (!UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
+          rawHeader, calledContractMethod, apiCaller.Host, ref httpReturnCode, ref failedReason
+        )) {
          
           if (httpReturnCode == 200) {
-            httpReturnCode = 401;
+            httpReturnCode = 403;
+          }
+
+          if (string.IsNullOrWhiteSpace(failedReason)) {
+            failedReason = "Forbidden";
           }
 
           context.Result = new ContentResult() {
             StatusCode = 401,
-            Content = "Forbidden!"
+            Content = failedReason
           };
 
           return;

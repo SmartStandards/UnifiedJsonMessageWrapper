@@ -277,8 +277,6 @@ namespace System.Web.UJMW {
       }
     }
 
-
-
     internal class ServiceBehaviorToApplyDispatchHooks : IServiceBehavior {
 
       private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
@@ -348,57 +346,73 @@ namespace System.Web.UJMW {
         _OutboundSideChannelCfg = outboundSideChannelCfg;
       }
 
+      private class CorellationStateContainer {
+        public string HttpVerb = null;
+        public string HttpOrigin = null;
+        public MethodInfo ContractMethod = null;
+        public bool SkipBody = false;
+      }
+
       private Dictionary<String, MethodInfo> _MethodInfoCache = new Dictionary<String, MethodInfo>();
 
       public Object AfterReceiveRequest(ref Message incomingWcfMessage, IClientChannel channel, InstanceContext instanceContext) {
-
-        //if (incomingWcfMessage.State == MessageState.Copied) {
-        //  //the copy was implicitely created by us, in order to get the possibility to read the body
-        //  //but it also triggers out own interceptor again - WTF!!!!
-        //  return null;
-        //}
+        
+        HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
+        
+        CorellationStateContainer corellationState = new CorellationStateContainer();
+        corellationState.HttpVerb = httpRequest.Method;
+        corellationState.HttpOrigin = httpRequest.Headers["origin"]?.ToString();
+        if (string.IsNullOrWhiteSpace(corellationState.HttpOrigin)) {
+          corellationState.HttpOrigin = "*";
+        }
 
         //no hook neccessarry
         if (UjmwHostConfiguration.AuthHeaderEvaluator == null && _InboundSideChannelCfg.AcceptedChannels.Length == 0) {
-          return null;
+          corellationState.SkipBody = true;
+          return corellationState;
         }
 
         RemoteEndpointMessageProperty clientEndpoint = OperationContext.Current.IncomingMessageProperties[RemoteEndpointMessageProperty.Name] as RemoteEndpointMessageProperty;
         string callingMachine = clientEndpoint.Address.ToString();
 
+        if(httpRequest.Method.Equals("OPTIONS", StringComparison.CurrentCultureIgnoreCase)) {
+          corellationState.SkipBody = true;
+          return corellationState;
+        }
+
         string methodName = null;
         string fullCallUrl = null;
-        if (incomingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
-          methodName = httpOperationName?.ToString();
-        }
         if (incomingWcfMessage.Properties.TryGetValue("Via", out object via)) {
           fullCallUrl = via?.ToString();
         }
+        if (incomingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
+          methodName = httpOperationName?.ToString();
+          if(methodName == string.Empty) {
+            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "Unknown method or wrong http verb!";
+            return corellationState;
+          }
+        }
         if (methodName == null || fullCallUrl == null) {
+          //happens, when .svc-Endpoint is called directly via Http-GET from browser!
+          //so we want the outbound hook to skip immediately
           return null;
         }
 
-        MethodInfo calledContractMethod;
         lock (_MethodInfoCache) {
-          if (!_MethodInfoCache.TryGetValue(fullCallUrl, out calledContractMethod)) {
-            //TODO: a little bt more error-handling (as we know in wcf can anything be null in some reasons)
+          if (!_MethodInfoCache.TryGetValue(fullCallUrl, out corellationState.ContractMethod)) {
             Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
-            //Type serviceType = instanceContext.Host.Description.ServiceType;
-            calledContractMethod = serviceContractType.GetMethod(methodName);
-            _MethodInfoCache[fullCallUrl] = calledContractMethod;
+            if(!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
+              if (UjmwHostConfiguration.LoggingHook != null) {
+                UjmwHostConfiguration.LoggingHook.Invoke(4, $"Method '{methodName}' not found on contract type!");
+              }
+              throw new WebFaultException(HttpStatusCode.InternalServerError);
+            }
+            _MethodInfoCache[fullCallUrl] = corellationState.ContractMethod;
           }
-        }
-        HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
-
-        if(httpRequest.Method.Equals("OPTIONS", StringComparison.CurrentCultureIgnoreCase)) {
-          //passes the string "OPTIONS" as magic-value to the "correlationState"
-          //(which is evaluated during "BeforeSendReply" - see below)
-          return "OPTIONS";
-          //skip any further processing here
         }
 
         int httpReturnCode = 200;
-        bool authFailed = false;
+        string failedReason = string.Empty;
 
         if (UjmwHostConfiguration.AuthHeaderEvaluator != null) {
   
@@ -409,7 +423,7 @@ namespace System.Web.UJMW {
           }
 
           bool authSuccess = UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-            rawAuthHeader, calledContractMethod, callingMachine, ref httpReturnCode
+            rawAuthHeader, corellationState.ContractMethod, callingMachine, ref httpReturnCode, ref failedReason
           );
 
           if (!authSuccess) {
@@ -417,6 +431,11 @@ namespace System.Web.UJMW {
             if (UjmwHostConfiguration.LoggingHook != null) {
               UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because AuthHeaderEvaluator returned false!");
             }
+
+            if (string.IsNullOrWhiteSpace(failedReason)) {
+              failedReason = "Forbidden";
+            }
+            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = failedReason;
 
             if (httpReturnCode == 200) {
               //default, if no specific code has been provided!
@@ -455,7 +474,7 @@ namespace System.Web.UJMW {
               rdr.Read();
             }
             if (sideChannelReceived) {
-              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
               break;
             }
           }
@@ -465,7 +484,7 @@ namespace System.Web.UJMW {
               var serializer = new Newtonsoft.Json.JsonSerializer();
               sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
               sideChannelReceived= true;
-              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
               break;
             }
           }
@@ -479,7 +498,7 @@ namespace System.Web.UJMW {
               _InboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
               //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
               //passed to the processing method...
-              _InboundSideChannelCfg.ProcessingMethod.Invoke(calledContractMethod, sideChannelContent);
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
             }
           }
           else {
@@ -494,11 +513,15 @@ namespace System.Web.UJMW {
 
         ///// (end) RESTORE INCOMMING SIDECHANNEL /////
         
-        return calledContractMethod;// << this handle will be passed to 'BeforeSendReply' as 'correlationState'
+        return corellationState; // << this handle will be passed to 'BeforeSendReply' as 'correlationState'
 
       }
 
       public void BeforeSendReply(ref Message outgoingWcfMessage, Object correlationState) {
+        CorellationStateContainer state = null;
+        if ((correlationState is CorellationStateContainer) ) {
+          state = (CorellationStateContainer)correlationState;
+        }
 
         //prepare some ugly WCF hacking (get access to the HttpResponse)   
         HttpResponseMessageProperty outgoingHttpResponse = null;
@@ -513,29 +536,32 @@ namespace System.Web.UJMW {
         //apply additional headers globally (especially for CORS)
         outgoingHttpResponse.Headers["Allow"]= "POST,OPTIONS";
         if (!string.IsNullOrEmpty(UjmwHostConfiguration.CorsAllowOrigin)) {
-          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Origin", UjmwHostConfiguration.CorsAllowOrigin);
+          string corsOrigin = UjmwHostConfiguration.CorsAllowOrigin;
+          if(state != null) {
+            corsOrigin = corsOrigin.Replace("{origin}", state.HttpOrigin);
+          }
+          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Origin", corsOrigin);
           outgoingHttpResponse.Headers.Add("Access-Control-Request-Method", "POST,OPTIONS");
           outgoingHttpResponse.Headers.Add("Access-Control-Allow-Headers", "X-Requested-With,Content-Type");
         }
 
-        MethodInfo calledContractMethod = null;
-        if(!(correlationState is MethodInfo)) {
+
+        if (state == null && outgoingHttpResponse.StatusCode == HttpStatusCode.OK) {
+          outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
+          //dont skip body - because this resonse contains the .svc-overview page
+          return;
+        }
+        if (state != null && state.SkipBody) {
+          outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
+          //disable that html response body with WCF-ramblings
+          outgoingHttpResponse.SuppressEntityBody = true;
+          return;
+        }
+        if(state?.ContractMethod == null) { //<< indicates a BadRequest
+          outgoingHttpResponse.StatusCode = HttpStatusCode.BadRequest;
 
           //disable that html response body with WCF-ramblings
           outgoingHttpResponse.SuppressEntityBody = true;
-
-          if (correlationState is string) {
-            string specialReplyName = (string)correlationState;
-            //in default, all our magic-values sould be treaded as signal to responde BadRequest
-            outgoingHttpResponse.StatusCode = HttpStatusCode.BadRequest;
-
-            //in case of options-verb (which should be available always) respond success
-            if (specialReplyName == "OPTIONS") {
-              outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
-              return;
-            }
-
-          } //NOTE: we get an correlationState==null when we've previously thrown an exception
 
           //in all cases, we habve a body-less response, so it makes sence to apply error-messages
           //to the Http-StatusDescription (because there is no fault property)!
@@ -544,9 +570,6 @@ namespace System.Web.UJMW {
           }
 
           return;
-        }
-        else {
-          calledContractMethod = (MethodInfo)correlationState;
         }
 
         if (_OutboundSideChannelCfg.ChannelsToProvide.Length > 0) {
@@ -562,7 +585,7 @@ namespace System.Web.UJMW {
             else {
               if(serializedSnapshot == null) { //on-demand, but bufferred...
                 var snapshotContainer = new Dictionary<string, string>();
-               _OutboundSideChannelCfg.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
+               _OutboundSideChannelCfg.CaptureMethod.Invoke(state.ContractMethod, snapshotContainer);
                 serializedSnapshot = JsonConvert.SerializeObject(snapshotContainer);
               }
               outgoingHttpResponse.Headers.Add(channelName, serializedSnapshot);
@@ -581,6 +604,24 @@ namespace System.Web.UJMW {
         message = buffer.CreateMessage();
         bodyBytes = buffer.CreateMessage().GetBody<byte[]>();
         return System.Text.Encoding.UTF8.GetString(bodyBytes);
+      }
+
+      private static bool TryGetContractMethod(Type serviceContractType, string methodName, out MethodInfo method) {
+        method = serviceContractType.GetMethod(methodName);
+        if (method != null) {
+          return true;
+        }
+        foreach (Type aggregatedContract in serviceContractType.GetInterfaces()) {      
+          if(TryGetContractMethod(aggregatedContract, methodName, out method)) {
+            return true;
+          }  
+        }
+        if (serviceContractType.BaseType != null) {
+          return TryGetContractMethod(serviceContractType.BaseType, methodName, out method);
+        }
+        else {
+          return false;
+        }
       }
 
     }

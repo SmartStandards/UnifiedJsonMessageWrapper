@@ -39,10 +39,11 @@ namespace UJMW.DemoWcfService {
       UjmwHostConfiguration.ForceHttps = false;
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode) => {
+        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
+            failedReason = "This demo requires at least ANY string as authheader!";
             return false;
           }
           return true;
@@ -119,7 +120,7 @@ namespace UJMW.DemoWcfService {
       //  throw new FaultException(msg); //WARNING: exposing error details is only a good idea for non-prod env's!
       //};
 
-      UjmwHostConfiguration.CorsAllowOrigin = "*";
+      UjmwHostConfiguration.CorsAllowOrigin = "{origin}";
 
       UjmwHostConfiguration.SetupCompleted();
 
