@@ -6,8 +6,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: authHeaderEvaluator for WCF now passed methodInfo also for Methods from inherited contracts (was null before)
-* AuthHeaderEvaluator can now return a failedReason byref
+*(none)*
+
+
+
+## v 2.2.1
+released **2024-05-16**, including:
+ - AuthHeaderEvaluator can now return a failedReason byref
+ - Fix: authHeaderEvaluator for WCF now passed methodInfo also for Methods from inherited contracts (was null before)
 
 
 

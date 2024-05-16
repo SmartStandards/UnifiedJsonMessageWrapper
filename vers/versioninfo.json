@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.2.0",
-  "currentVersionWithSuffix": "2.2.0",
+  "currentVersion": "2.2.1",
+  "currentVersionWithSuffix": "2.2.1",
   "releaseType": "official",
-  "previousVersion": "2.1.1",
-  "changeGrade": "minor",
+  "previousVersion": "2.2.0",
+  "changeGrade": "patch",
   "currentMajor": 2,
   "currentMinor": 2,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-05-15",
-  "versionTimeInfo": "11:19:03",
-  "versionNotes": "- new Feature: Added Support to configure CORS-Headers in WCF.\n- new Feature: option 'HideExeptionMessageInFaultProperty' in MCV & .NET core WebApi\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-05-16",
+  "versionTimeInfo": "11:53:10",
+  "versionNotes": "- AuthHeaderEvaluator can now return a failedReason byref\n- Fix: authHeaderEvaluator for WCF now passed methodInfo also for Methods from inherited contracts (was null before)\n"
 }
