@@ -6,9 +6,15 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: added some errorhandling for WCF
+*(none)*
 
-  
+
+
+## v 2.3.0
+released **2024-05-22**, including:
+ - **new Feature**: added some errorhandling for WCF
+
+
 
 ## v 2.2.1
 released **2024-05-16**, including:

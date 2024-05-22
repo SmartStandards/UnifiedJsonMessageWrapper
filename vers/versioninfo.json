@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.2.1",
-  "currentVersionWithSuffix": "2.2.1",
+  "currentVersion": "2.3.0",
+  "currentVersionWithSuffix": "2.3.0",
   "releaseType": "official",
-  "previousVersion": "2.2.0",
-  "changeGrade": "patch",
+  "previousVersion": "2.2.1",
+  "changeGrade": "minor",
   "currentMajor": 2,
-  "currentMinor": 2,
-  "currentPatch": 1,
-  "versionDateInfo": "2024-05-16",
-  "versionTimeInfo": "11:53:10",
-  "versionNotes": "- AuthHeaderEvaluator can now return a failedReason byref\n- Fix: authHeaderEvaluator for WCF now passed methodInfo also for Methods from inherited contracts (was null before)\n"
+  "currentMinor": 3,
+  "currentPatch": 0,
+  "versionDateInfo": "2024-05-22",
+  "versionTimeInfo": "12:00:36",
+  "versionNotes": "- new Feature: added some errorhandling for WCF\n"
 }
