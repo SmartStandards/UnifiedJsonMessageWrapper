@@ -453,29 +453,35 @@ namespace System.Web.UJMW {
         foreach (string acceptedChannel in _InboundSideChannelCfg.AcceptedChannels) {
 
           if (acceptedChannel == "_") {
-            //we need to introspect the message...
-            string rawMessage = this.GetBodyFromWcfMessage(ref incomingWcfMessage);
-            var sr = new StringReader(rawMessage);
-            var rdr = new JsonTextReader(sr);
-            rdr.Read();
-            while (rdr.TokenType != JsonToken.None) {
-              if (rdr.TokenType == JsonToken.PropertyName) {
-                if (rdr.Value.ToString() == "_") {
-                  rdr.Read();
-                  var serializer = new Newtonsoft.Json.JsonSerializer();
-                  sideChannelContent = serializer.Deserialize<Dictionary<string, string>>(rdr);
-                  sideChannelReceived = true;
-                  break;
-                }
-                else {
-                  rdr.Skip();
-                }
-              }
+            try {
+              //we need to introspect the message...
+              string rawMessage = this.GetBodyFromWcfMessage(ref incomingWcfMessage);
+              var sr = new StringReader(rawMessage);
+              var rdr = new JsonTextReader(sr);
               rdr.Read();
+              while (rdr.TokenType != JsonToken.None) {
+                if (rdr.TokenType == JsonToken.PropertyName) {
+                  if (rdr.Value.ToString() == "_") {
+                    rdr.Read();
+                    var serializer = new Newtonsoft.Json.JsonSerializer();
+                    sideChannelContent = serializer.Deserialize<Dictionary<string, string>>(rdr);
+                    sideChannelReceived = true;
+                    break;
+                  }
+                  else {
+                    rdr.Skip();
+                  }
+                }
+                rdr.Read();
+              }
+              if (sideChannelReceived) {
+                _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+                break;
+              }
             }
-            if (sideChannelReceived) {
-              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
-              break;
+            catch (Exception ex) {
+              HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No valid JSON";
+              throw new WebFaultException(HttpStatusCode.BadRequest);
             }
           }
           else { //lets look into the http header
@@ -600,6 +606,9 @@ namespace System.Web.UJMW {
         //PFUI!!!
         Byte[] bodyBytes;
         MessageBuffer buffer = message.CreateBufferedCopy(Int32.MaxValue);
+        if (message.IsEmpty) {
+          return string.Empty;
+        }
         //vvv nötig, weil jede message nur 1x gelsen werden kann
         message = buffer.CreateMessage();
         bodyBytes = buffer.CreateMessage().GetBody<byte[]>();

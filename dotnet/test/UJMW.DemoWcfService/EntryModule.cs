@@ -63,13 +63,10 @@ namespace UJMW.DemoWcfService {
       UjmwHostConfiguration.ConfigureRequestSidechannel(
         (serviceType, sideChannel) => {
           if (HasDataFlowSideChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
-
-            sideChannel.AcceptHttpHeader("my-ambient-data");
             sideChannel.AcceptUjmwUnderlineProperty();
+            sideChannel.AcceptHttpHeader("my-ambient-data");
+      
 
-            sideChannel.ProcessDataVia(
-              (incommingData) => AmbienceHub.RestoreValuesFrom(incommingData, contractName)
-            );
 
             //sideChannel.AcceptNoChannelProvided(
             //  (ref IDictionary<string, string> defaultData) => {
@@ -85,6 +82,11 @@ namespace UJMW.DemoWcfService {
               }
             );
           }
+
+          sideChannel.ProcessDataVia(
+            (incommingData) => AmbienceHub.RestoreValuesFrom(incommingData, contractName)
+          );
+
         }
       );
 

@@ -18,9 +18,13 @@ namespace System.Web.UJMW {
 
       public int ExecuteHttpPost(
         string url,
-        string requestContent, IDictionary<string, string> requestHeaders,
-        out string responseContent, out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders
+        string requestContent,
+        IDictionary<string, string> requestHeaders,
+        out string responseContent,
+        out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
+        out string reasonPhrase
       ) {
+
         string methodName = url.Substring(dummyRootUrl.Length);
         responseHeaders = null;
         if (methodName == nameof(IMyService.ThisIsAVoid)) {
@@ -41,6 +45,8 @@ namespace System.Web.UJMW {
         else {
           responseContent = "{ \"fault\":\"UNKNOWN-METHOD\"}";
         }
+
+        reasonPhrase = "OK";
         return 200;
       }
     }

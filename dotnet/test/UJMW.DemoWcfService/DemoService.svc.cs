@@ -55,6 +55,10 @@ namespace UJMW.DemoWcfService {
       return 1;
     }
 
+    public int ParamlessCall() {
+      return 123;
+    }
+
     public void Dispose() {
     }
 

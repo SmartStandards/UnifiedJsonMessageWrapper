@@ -158,7 +158,8 @@ namespace System.Web.UJMW {
       int httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
         fullUrl,
         rawJsonRequest, requestHeaders,
-        out string rawJsonResponse, out var responseHeaders
+        out string rawJsonResponse, out var responseHeaders,
+        out string reasonPhrase
       );
 
       // Informational responses (100 – 199)
@@ -170,7 +171,7 @@ namespace System.Web.UJMW {
         throw new UnauthorizedAccessException($"Authorization required! Received HTTP code 401.");
       }
       else if (httpReturnCode < 200 || httpReturnCode > 299) {
-        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode}.");
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'");
       }
 
       //some old technologies can only return XML-encapulated replies

@@ -10,8 +10,11 @@ namespace System.Web.UJMW {
 
     int ExecuteHttpPost(
       string url,
-      string requestContent, IDictionary<string, string> requestHeaders,
-      out string responseContent, out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders
+      string requestContent,
+      IDictionary<string, string> requestHeaders,
+      out string responseContent,
+      out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
+      out string reasonPhrase
     );
 
   }
@@ -27,8 +30,11 @@ namespace System.Web.UJMW {
 
     public int ExecuteHttpPost(
       string url,
-      string requestContent, IDictionary<string, string> requestHeaders,
-      out string responseContent, out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders
+      string requestContent,
+      IDictionary<string, string> requestHeaders,
+      out string responseContent,
+      out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
+      out string reasonPhrase
     ) {
 
       HttpContent content = new StringContent(requestContent, Encoding.UTF8, "application/json");
@@ -51,6 +57,7 @@ namespace System.Web.UJMW {
       task2.Wait();
       responseContent = task2.Result;
       responseHeaders = task.Result.Headers;
+      reasonPhrase = task.Result.ReasonPhrase;
       return (int)task.Result.StatusCode;
     }
 

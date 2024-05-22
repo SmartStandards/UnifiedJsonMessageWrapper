@@ -53,6 +53,14 @@ namespace UJMW.DemoWcfService {
     [OperationContract, WebInvoke(Method = "POST")]
 #endif
     int TestSuport(string otp, out string fileName, ref string fileContentType);
+
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
+
+    int ParamlessCall();
+
   }
 
   public interface IDemoFileService {

@@ -12,10 +12,11 @@ using System.Web.UJMW;
     var currentTenant = new AmbientField("currentTenant", true);
     currentTenant.Value = "Rabbit";
 
-    UjmwClientConfiguration.ConfigureRequestSidechannel((ctct, chnl) => {
-      chnl.ProvideUjmwUnderlineProperty();
-      chnl.CaptureDataVia(AmbienceHub.CaptureCurrentValuesTo);
-    });
+  UjmwClientConfiguration.ConfigureRequestSidechannel((ctct, chnl) => {
+    //chnl.ProvideUjmwUnderlineProperty();
+    chnl.ProvideHttpHeader("my-ambient-data");
+    chnl.CaptureDataVia(AmbienceHub.CaptureCurrentValuesTo);
+  });
 
   //UjmwClientConfiguration.ConfigureResponseBackchannel((ctct, chnl) => {
   //  chnl.AcceptUjmwUnderlineProperty();
@@ -24,15 +25,15 @@ using System.Web.UJMW;
 
   #endregion
 
-    UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
+  UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
 
     var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-      "http://localhost:55202/DemoService.svc"
+      "http://localhost:55205/DemoService.svc"
     );
 
     try {
-
-      var result = svc.GetData(number);
+    var resultw = svc.ParamlessCall();
+    var result = svc.GetData(number);
       Console.WriteLine("RESPONSE from Service:");
       Console.WriteLine("\"" + result + "\"");
     }
