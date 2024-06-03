@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.3.0",
-  "currentVersionWithSuffix": "2.3.0",
+  "currentVersion": "2.4.0",
+  "currentVersionWithSuffix": "2.4.0",
   "releaseType": "official",
-  "previousVersion": "2.2.1",
+  "previousVersion": "2.3.0",
   "changeGrade": "minor",
   "currentMajor": 2,
-  "currentMinor": 3,
+  "currentMinor": 4,
   "currentPatch": 0,
-  "versionDateInfo": "2024-05-22",
-  "versionTimeInfo": "12:00:36",
-  "versionNotes": "- new Feature: added some errorhandling for WCF\n"
+  "versionDateInfo": "2024-06-03",
+  "versionTimeInfo": "15:06:16",
+  "versionNotes": "- new Feature: added a new Hook named 'ArgumentPreEvaluator' (for WCF & WebAPI), which can be used to inspect method-arguments before invocation. This is helpful to build a centralized parameter-guard\n- Fix: HTTP Header names for side channel are now evaluated case-insensitive instead of only working when headers are configured completely lower\n"
 }
