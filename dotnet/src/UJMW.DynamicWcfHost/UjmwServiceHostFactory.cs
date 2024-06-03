@@ -13,6 +13,7 @@ using System.ServiceModel.Dispatcher;
 using System.ServiceModel.Web;
 using System.Text;
 using System.Threading;
+using System.Web.Services.Description;
 using System.Xml;
 
 using static System.Web.UJMW.UjmwServiceHostFactory.CustomizedJsonFormatter;
@@ -485,8 +486,7 @@ namespace System.Web.UJMW {
             }
           }
           else { //lets look into the http header
-            if (httpRequest.Headers.AllKeys.Contains(acceptedChannel)) {
-              string rawSideChannelContent = httpRequest.Headers[acceptedChannel];
+            if (httpRequest.Headers.TryGetValue(acceptedChannel, out string rawSideChannelContent)) {
               var serializer = new Newtonsoft.Json.JsonSerializer();
               sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
               sideChannelReceived= true;
@@ -615,7 +615,7 @@ namespace System.Web.UJMW {
         return System.Text.Encoding.UTF8.GetString(bodyBytes);
       }
 
-      private static bool TryGetContractMethod(Type serviceContractType, string methodName, out MethodInfo method) {
+      internal static bool TryGetContractMethod(Type serviceContractType, string methodName, out MethodInfo method) {
         method = serviceContractType.GetMethod(methodName);
         if (method != null) {
           return true;
@@ -986,7 +986,7 @@ namespace System.Web.UJMW {
         }
 
         public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation) {
-          dispatchOperation.Invoker = new HookedOperationInvoker( dispatchOperation.Invoker, dispatchOperation);
+          dispatchOperation.Invoker = new HookedOperationInvoker(dispatchOperation.Invoker, dispatchOperation, operationDescription.DeclaringContract);
         }
 
         public void Validate(OperationDescription operationDescription) {
@@ -1001,11 +1001,15 @@ namespace System.Web.UJMW {
         private readonly IOperationInvoker _BaseInvoker;
         private readonly string _OperationName;
         private readonly string _ControllerName;
+        private readonly MethodInfo _ContractMethod;
 
-        public HookedOperationInvoker( IOperationInvoker baseInvoker, DispatchOperation operation) {
+        public HookedOperationInvoker(IOperationInvoker baseInvoker, DispatchOperation operation, ContractDescription contractDesc) {
           _BaseInvoker = baseInvoker;
+          Type serviceContractType = contractDesc.ContractType; 
           _OperationName = operation.Name;
           _ControllerName = operation.Parent.Type == null ? "[None]" : operation.Parent.Type.FullName;
+          DispatchMessageInspector.TryGetContractMethod(contractDesc.ContractType, operation.Name, out _ContractMethod);
+          //TODO: prüfen:  operation.CallContextInitializers << sehr interessant!
         }
 
         public bool IsSynchronous => _BaseInvoker.IsSynchronous;
@@ -1019,7 +1023,22 @@ namespace System.Web.UJMW {
             UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
           }
           try {
+
+            if(UjmwHostConfiguration.ArgumentPreEvaluator != null) {
+              UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractMethod, inputs);
+            }
             return _BaseInvoker.Invoke(instance, inputs, out outputs);
+          }
+          catch (TargetInvocationException ex) {
+            UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.InnerException.Message}");
+            if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
+              CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
+            }
+            else {
+              CatchedExeptionFromCurrentOperation.Value = ex.InnerException.Message;
+            }
+            outputs = new object[0];
+            return null;
           }
           catch (Exception ex) {
             UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
@@ -1048,4 +1067,18 @@ namespace System.Web.UJMW {
 
   }
 
+  internal static class InternalExtensions {
+
+    internal static bool TryGetValue(this WebHeaderCollection headers, string headerName, out string headerValue) {
+      foreach (var entryKey in headers.AllKeys) {
+        if (entryKey.Equals(headerName, StringComparison.InvariantCultureIgnoreCase)) { 
+          headerValue = headers[entryKey];
+          return true;
+        }
+      }
+      headerValue = null;
+      return false;
+    }
+        
+  }
 }

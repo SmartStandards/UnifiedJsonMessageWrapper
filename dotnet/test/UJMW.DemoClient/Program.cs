@@ -28,10 +28,13 @@ using System.Web.UJMW;
   UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
 
     var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-      "http://localhost:55205/DemoService.svc"
+      "http://localhost:55202/DemoService.svc" //MVC
     );
+//  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+//  "http://localhost:55205/DemoService.svc" //WCF
+//);
 
-    try {
+  try {
     var resultw = svc.ParamlessCall();
     var result = svc.GetData(number);
       Console.WriteLine("RESPONSE from Service:");

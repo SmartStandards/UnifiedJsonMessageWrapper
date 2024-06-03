@@ -19,6 +19,11 @@ namespace System.Web.UJMW {
     ref string failedReason
   );
 
+  public delegate void ArgumentPreEvaluatorMethod(
+    MethodInfo targetContractMethod,
+    object[] arguments
+  );
+
   /// <summary> (specific to WCF) </summary>
   public class UjmwHostConfiguration {
 
@@ -146,6 +151,8 @@ namespace System.Web.UJMW {
     );
 
     public static AuthHeaderEvaluatorMethod AuthHeaderEvaluator { get; set; } = null;
+
+    public static ArgumentPreEvaluatorMethod ArgumentPreEvaluator { get; set; } = null;
 
     public static bool ForceHttps { get; set; } = false;
 

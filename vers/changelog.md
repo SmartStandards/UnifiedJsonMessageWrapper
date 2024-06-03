@@ -6,7 +6,8 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: added a new Hook named 'ArgumentPreEvaluator' (for WCF & WebAPI), which can be used to inspect method-arguments before invocation. This is helpful to build a centralized parameter-guard
+* Fix: HTTP Header names for side channel are now evaluated case-insensitive instead of only working when headers are configured completely lower
 
 
 
@@ -14,7 +15,7 @@ This files contains a version history including all changes relevant for semanti
 released **2024-05-22**, including:
  - **new Feature**: added some errorhandling for WCF
 
-
+   
 
 ## v 2.2.1
 released **2024-05-16**, including:

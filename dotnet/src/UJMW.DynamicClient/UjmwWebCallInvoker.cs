@@ -168,10 +168,10 @@ namespace System.Web.UJMW {
       // Client error responses(400 – 499)
       // Server error responses(500 – 599)
       if (httpReturnCode == 401) {
-        throw new UnauthorizedAccessException($"Authorization required! Received HTTP code 401.");
+        throw new UnauthorizedAccessException($"Authorization required! Received HTTP code 401 (URL: '{fullUrl}').");
       }
       else if (httpReturnCode < 200 || httpReturnCode > 299) {
-        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'");
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'  (URL: '{fullUrl}').");
       }
 
       //some old technologies can only return XML-encapulated replies

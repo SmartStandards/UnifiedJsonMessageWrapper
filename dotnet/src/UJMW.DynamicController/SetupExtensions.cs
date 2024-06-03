@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace System.Web.UJMW {
 
@@ -17,6 +18,17 @@ namespace System.Web.UJMW {
         (apm) => apm.FeatureProviders.Add(registrar)
       );
 
+    }
+
+    internal static bool TryGetValue(this IHeaderDictionary headers, string headerName, out string headerValue) {
+      foreach (var entry in headers) {
+        if (entry.Key.Equals(headerName, StringComparison.InvariantCultureIgnoreCase)) {
+          headerValue = entry.Value.ToString();
+          return true;
+        }
+      }
+      headerValue = null;
+      return false;
     }
 
   }

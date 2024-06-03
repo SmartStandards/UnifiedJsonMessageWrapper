@@ -74,7 +74,7 @@ namespace System.Web.UJMW {
             return _RedirectorMethods[methodName];
           } //doing the expensive creaction of mapping code only once (on demand) and give the handles into a lambda:
 
-          MethodInfo serviceMethod = typeof(TServiceInterface).GetMethod(methodName);
+          MethodInfo contractMethod = typeof(TServiceInterface).GetMethod(methodName);
           MethodInfo controllerMethod = controller.GetType().GetMethod(methodName);
 
           Type requestDtoType = controllerMethod.GetParameters().Single().ParameterType;
@@ -83,7 +83,7 @@ namespace System.Web.UJMW {
           var requestDtoValueMappers = new List<DtoValueMapper>();
           var responseDtoValueMappers = new List<DtoValueMapper>();
 
-          ParameterInfo[] serviceMethodParams = serviceMethod.GetParameters();
+          ParameterInfo[] serviceMethodParams = contractMethod.GetParameters();
           int paramCount = serviceMethodParams.Length;
           for (int idx = 0; idx < paramCount; idx++) {
             ParameterInfo param = serviceMethodParams[idx];
@@ -96,7 +96,7 @@ namespace System.Web.UJMW {
           }
 
           PropertyInfo returnProp = null;
-          if (serviceMethod.ReturnType != null && serviceMethod.ReturnType != typeof(void)) {
+          if (contractMethod.ReturnType != null && contractMethod.ReturnType != typeof(void)) {
             returnProp = responseDtoType.GetProperty(UjmwReturnPropertyName);
           }
 
@@ -131,18 +131,17 @@ namespace System.Web.UJMW {
                       var container = (Dictionary<string, string>)requestSidechannelProp.GetValue(requestDto);
                       if (container != null) {
                         sideChannelReceived = true;
-                        inboundSideChannelCfg.ProcessingMethod.Invoke(serviceMethod, container);
+                        inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, container);
                         break;
                       }
                     }
                   }
                   else { //lets look into the http header
-                    if (requestHeaders.ContainsKey(acceptedChannel)) {
-                      var rawSideChannelContent = requestHeaders[acceptedChannel].ToString();
+                    if(requestHeaders.TryGetValue(acceptedChannel,out string rawSideChannelContent)) {
                       var serializer = new Newtonsoft.Json.JsonSerializer();
                       sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
                       sideChannelReceived = true;
-                      inboundSideChannelCfg.ProcessingMethod.Invoke(serviceMethod, sideChannelContent);
+                      inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                       break;
                     }
                   }
@@ -156,7 +155,7 @@ namespace System.Web.UJMW {
                       inboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
                       //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
                       //passed to the processing method...
-                      inboundSideChannelCfg.ProcessingMethod.Invoke(serviceMethod, sideChannelContent);
+                      inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                     }
                   }
                   else {
@@ -169,8 +168,12 @@ namespace System.Web.UJMW {
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 
+                if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
+                  UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(contractMethod, serviceMethodParams);
+                }
+
                 //invoke the service method
-                object returnVal = serviceMethod.Invoke(svc, serviceMethodParams);
+                object returnVal = contractMethod.Invoke(svc, serviceMethodParams);
 
                 //map the return value
                 foreach (DtoValueMapper responseDtoValueMapper in responseDtoValueMappers) {
@@ -184,6 +187,7 @@ namespace System.Web.UJMW {
 
               }
               catch (TargetInvocationException ex) {
+                UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.InnerException.Message}");
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
                     faultProp.SetValue(responseDto, "BL-Exception");
@@ -194,6 +198,7 @@ namespace System.Web.UJMW {
                 }
               }
               catch (Exception ex) {
+                UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
                     faultProp.SetValue(responseDto, "BL-Exception");
@@ -208,7 +213,7 @@ namespace System.Web.UJMW {
               
               if (outboundSideChannelCfg.ChannelsToProvide.Any()) {
                 var backChannelContainer = new Dictionary<string, string>();
-                outboundSideChannelCfg.CaptureMethod.Invoke(serviceMethod, backChannelContainer);
+                outboundSideChannelCfg.CaptureMethod.Invoke(contractMethod, backChannelContainer);
 
                 //COLLECT THE DATA
                 string serializedSnapshot = null;
