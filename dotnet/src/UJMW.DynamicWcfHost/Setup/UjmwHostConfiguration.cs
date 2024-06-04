@@ -117,36 +117,68 @@ namespace System.Web.UJMW {
           (i) => i.GetCustomAttributes(true).Where((a) => a.GetType() == typeof(System.ServiceModel.ServiceContractAttribute)).Any()
         ).ToArray();
 
-        if (contractInterfaces.Length > 1) {
-          string[] urlTokens = url.Split('/');
-          string versionFromUrl = null;
-          for (int i = urlTokens.Length - 1; i > 0; i--) {
-            if (Regex.IsMatch(urlTokens[i], "^([vV][0-9]{1,})$")) {
-              versionFromUrl = urlTokens[i].ToLower();
-              break;
-            }
-          }
-          if (versionFromUrl != null) {
-            var versionMatchingInterface = contractInterfaces.Where((i) => ("." + i.FullName.ToLower() + ".").Contains(versionFromUrl)).FirstOrDefault();
-            if (versionMatchingInterface != null) {
-              serviceContractInterfaceType = versionMatchingInterface;
-              //prefer a interface (with a 'ServiceContractAttribute') wich is matching the version
-              return true;
-            }
-          }
-        }
-
-        if (contractInterfaces.Length > 0) {
-          //prefer the first interface (with a 'ServiceContractAttribute')
-          serviceContractInterfaceType = contractInterfaces.First();
+        if(contractInterfaces.Length == 1) {
+          serviceContractInterfaceType = contractInterfaces[0];
           return true;
         }
-        else {
+        if(contractInterfaces.Length == 0) {
           //otherwise use the first interface (without a 'ServiceContractAttribute')
           serviceContractInterfaceType = allInterfaces.First();
           return false;
         }
 
+        string[] urlTokens = url.Split('/');
+        string endpointNameInUrl = urlTokens[urlTokens.Length - 1];
+        if (endpointNameInUrl.EndsWith(".svc")) {
+          endpointNameInUrl = endpointNameInUrl.Substring(0, endpointNameInUrl.Length - 4);
+        }
+
+        Type[] contractInterfacesWithNameMatch = contractInterfaces.Where(
+          (i) => i.Name.Equals(endpointNameInUrl, StringComparison.CurrentCultureIgnoreCase) ||
+                 i.Name.Equals("I" + endpointNameInUrl, StringComparison.CurrentCultureIgnoreCase)
+        ).ToArray();
+
+        if(contractInterfacesWithNameMatch.Length == 1) {
+          serviceContractInterfaceType = contractInterfacesWithNameMatch[0];
+          return true;
+        }
+
+        string versionFromUrl = null;
+        for (int i = urlTokens.Length - 1; i > 0; i--) {
+          if (Regex.IsMatch(urlTokens[i], "^([vV][0-9]{1,})$")) {
+            versionFromUrl = urlTokens[i].ToLower();
+            break;
+          }
+        }
+
+        //if versioned services are used
+        if (versionFromUrl != null) {
+          if (contractInterfacesWithNameMatch.Length > 0) {
+            //prefer that interfaces with name-match
+            var versionMatchingInterface = contractInterfacesWithNameMatch.Where((i) => (i.Namespace.ToLower() + ".").Contains(versionFromUrl + ".")).FirstOrDefault();
+            if (versionMatchingInterface != null) {
+              serviceContractInterfaceType = versionMatchingInterface;
+              return true;
+            }
+          }
+          else {
+            //fallback to interfaces without name-match
+            var versionMatchingInterface = contractInterfaces.Where((i) => (i.Namespace.ToLower() + ".").Contains(versionFromUrl + ".")).FirstOrDefault();
+            if (versionMatchingInterface != null) {
+              serviceContractInterfaceType = versionMatchingInterface;
+              return true;
+            }
+          }
+        }
+
+        //noversioning needed
+        if (contractInterfacesWithNameMatch.Length > 0) {
+          serviceContractInterfaceType = contractInterfacesWithNameMatch[0];
+        }
+        else {
+          serviceContractInterfaceType = contractInterfaces[0];
+        }
+        return true;
       }
     );
 
@@ -157,10 +189,36 @@ namespace System.Web.UJMW {
     public static bool ForceHttps { get; set; } = false;
 
     /// <summary>
-    /// If set to null (which is the default), then NO cors headers will be written.
-    /// To enable cors headers, you can set it to "*".
+    /// A convenience method to quickly setup cors in this way:
+    ///   CorsAllowOrigin="{origin}" /
+    ///   CorsAllowMethod="POST,OPTIONS" /
+    ///   CorsAllowHeaders="*"
+    /// </summary>
+    public static void EnableCorsGeneric() {
+      CorsAllowOrigin = "{origin}";
+      CorsAllowMethod = "POST,OPTIONS";
+      CorsAllowHeaders = "*";
+    }
+
+    /// <summary>
+    /// If set to null (which is the default), then NO header will be written.
+    /// To enable the "Access-Control-Allow-Origin" header, you can set it to "*"
+    /// (or to "{origin}" to use the origin from the request!)
     /// </summary>
     public static string CorsAllowOrigin { get; set; } = null;
+
+    /// <summary>
+    /// If set to null (which is the default), then NO header will be written.
+    /// To enable the "Access-Control-Allow-Method" header, you can set it to "POST,OPTIONS".
+    /// </summary>
+    public static string CorsAllowMethod { get; set; } = null;
+
+    /// <summary>
+    /// If set to null (which is the default), then NO header will be written.
+    /// To enable the "Access-Control-Allow-Headers" header, you can set it to "*".
+    /// (or for example 'X-Requested-With,Content-Type')
+    /// </summary>
+    public static string CorsAllowHeaders { get; set; } = null;
 
     /// <summary>
     /// Usually WCF requires at least any authentication schema.

@@ -547,10 +547,13 @@ namespace System.Web.UJMW {
             corsOrigin = corsOrigin.Replace("{origin}", state.HttpOrigin);
           }
           outgoingHttpResponse.Headers.Add("Access-Control-Allow-Origin", corsOrigin);
-          outgoingHttpResponse.Headers.Add("Access-Control-Request-Method", "POST,OPTIONS");
-          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Headers", "X-Requested-With,Content-Type");
         }
-
+        if (!string.IsNullOrEmpty(UjmwHostConfiguration.CorsAllowMethod)) {
+          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Method", UjmwHostConfiguration.CorsAllowMethod);
+        }
+        if (!string.IsNullOrEmpty(UjmwHostConfiguration.CorsAllowHeaders)) {
+          outgoingHttpResponse.Headers.Add("Access-Control-Allow-Headers", UjmwHostConfiguration.CorsAllowHeaders);
+        }
 
         if (state == null && outgoingHttpResponse.StatusCode == HttpStatusCode.OK) {
           outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
