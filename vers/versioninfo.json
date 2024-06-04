@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.4.0",
-  "currentVersionWithSuffix": "2.4.0",
+  "currentVersion": "2.5.0",
+  "currentVersionWithSuffix": "2.5.0",
   "releaseType": "official",
-  "previousVersion": "2.3.0",
+  "previousVersion": "2.4.0",
   "changeGrade": "minor",
   "currentMajor": 2,
-  "currentMinor": 4,
+  "currentMinor": 5,
   "currentPatch": 0,
-  "versionDateInfo": "2024-06-03",
-  "versionTimeInfo": "15:06:16",
-  "versionNotes": "- new Feature: added a new Hook named 'ArgumentPreEvaluator' (for WCF & WebAPI), which can be used to inspect method-arguments before invocation. This is helpful to build a centralized parameter-guard\n- Fix: HTTP Header names for side channel are now evaluated case-insensitive instead of only working when headers are configured completely lower\n"
+  "versionDateInfo": "2024-06-04",
+  "versionTimeInfo": "11:51:16",
+  "versionNotes": "- new Feature: CORS-Headers (for WCF Endpoints) can now be configured separately\n- new Feature: WCF-Contract selector will now prefer Contract-Interfaces where the name matches to the endpoint-url instead of only checking the version-string from url\n"
 }

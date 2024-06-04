@@ -6,8 +6,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: CORS-Headers (for WCF Endpoints) can now be configured separately
-* **new Feature**: WCF-Contract selector will now prefer Contract-Interfaces where the name matches to the endpoint-url instead of only checking the version-string from url
+*(none)*
+
+
+
+## v 2.5.0
+released **2024-06-04**, including:
+ - **new Feature**: CORS-Headers (for WCF Endpoints) can now be configured separately
+ - **new Feature**: WCF-Contract selector will now prefer Contract-Interfaces where the name matches to the endpoint-url instead of only checking the version-string from url
 
 
 
