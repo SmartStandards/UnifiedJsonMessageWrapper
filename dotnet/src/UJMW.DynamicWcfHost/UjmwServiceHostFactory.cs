@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -389,7 +390,8 @@ namespace System.Web.UJMW {
         if (incomingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
           methodName = httpOperationName?.ToString();
           if(methodName == string.Empty) {
-            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "Unknown method or wrong http verb!";
+            Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
+            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = $"Unknown method (see Contract: '{serviceContractType.Name}') OR wrong HTTP verb!";
             return corellationState;
           }
         }
@@ -404,7 +406,7 @@ namespace System.Web.UJMW {
             Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
             if(!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
               if (UjmwHostConfiguration.LoggingHook != null) {
-                UjmwHostConfiguration.LoggingHook.Invoke(4, $"Method '{methodName}' not found on contract type!");
+                UjmwHostConfiguration.LoggingHook.Invoke(4, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
               }
               throw new WebFaultException(HttpStatusCode.InternalServerError);
             }
@@ -545,6 +547,9 @@ namespace System.Web.UJMW {
           string corsOrigin = UjmwHostConfiguration.CorsAllowOrigin;
           if(state != null) {
             corsOrigin = corsOrigin.Replace("{origin}", state.HttpOrigin);
+          }
+          else {
+            corsOrigin = corsOrigin.Replace("{origin}", "*");
           }
           outgoingHttpResponse.Headers.Add("Access-Control-Allow-Origin", corsOrigin);
         }
@@ -817,15 +822,18 @@ namespace System.Web.UJMW {
         return this.DeserializeIncommingMessage(message, parameters, true);
       }
 
+      private static Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer() {
+        ContractResolver = new CamelCasePropertyNamesContractResolver()
+      };
+
       public Message SerializeOutgoingMessage(MessageVersion messageVersion, Object[] parameters, Object result, bool isReply) {
         Byte[] body;
-        var serializer = new Newtonsoft.Json.JsonSerializer();
 
         using (var ms = new MemoryStream()) {
           using (var sw = new StreamWriter(ms, Encoding.UTF8)) {
             using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw)) {
               //'writer.Formatting = Newtonsoft.Json.Formatting.Indented;
-
+             
               writer.WriteStartObject();
 
               if (_OutgoingResponseSideChannelConfig.UnderlinePropertyIsProvided) {
