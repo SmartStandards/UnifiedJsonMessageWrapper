@@ -6,8 +6,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: {origin} placeholder will now replaced also in case of a BadRequest
-* Fix: Property names of Composite-Types in WCF-Responses will now be CamelCase
+*(none)*
+
+
+
+## v 2.5.1
+released **2024-06-06**, including:
+ - Fix: Property names of Composite-Types in WCF-Responses will now be CamelCase
+ - Fix: {origin} placeholder will now replaced also in case of a BadRequest
 
 
 

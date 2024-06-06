@@ -1,13 +1,13 @@
 {
-  "currentVersion": "2.5.0",
-  "currentVersionWithSuffix": "2.5.0",
+  "currentVersion": "2.5.1",
+  "currentVersionWithSuffix": "2.5.1",
   "releaseType": "official",
-  "previousVersion": "2.4.0",
-  "changeGrade": "minor",
+  "previousVersion": "2.5.0",
+  "changeGrade": "patch",
   "currentMajor": 2,
   "currentMinor": 5,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-06-04",
-  "versionTimeInfo": "11:51:16",
-  "versionNotes": "- new Feature: CORS-Headers (for WCF Endpoints) can now be configured separately\n- new Feature: WCF-Contract selector will now prefer Contract-Interfaces where the name matches to the endpoint-url instead of only checking the version-string from url\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-06-06",
+  "versionTimeInfo": "11:07:56",
+  "versionNotes": "- Fix: Property names of Composite-Types in WCF-Responses will now be CamelCase\n- Fix: {origin} placeholder will now replaced also in case of a BadRequest\n"
 }
