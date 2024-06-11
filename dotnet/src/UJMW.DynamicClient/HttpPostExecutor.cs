@@ -43,22 +43,29 @@ namespace System.Web.UJMW {
           content.Headers.Add(kvp.Key, kvp.Value);
         }
       }
-      if(_AuthHeaderGetter != null) {
-        //always on demand, because it could be a new one after expiration...
-        string authHeaderValue = _AuthHeaderGetter.Invoke();
-        if (!string.IsNullOrWhiteSpace(authHeaderValue)) {
-          _HttpClient.DefaultRequestHeaders.Remove("Authorization");
-          _HttpClient.DefaultRequestHeaders.Add("Authorization", authHeaderValue);
+
+      lock (_HttpClient) {
+
+        if(_AuthHeaderGetter != null) {
+          //always on demand, because it could be a new one after expiration...
+          string authHeaderValue = _AuthHeaderGetter.Invoke();
+          if (!string.IsNullOrWhiteSpace(authHeaderValue)) {
+            _HttpClient.DefaultRequestHeaders.Remove("Authorization");
+            _HttpClient.DefaultRequestHeaders.Add("Authorization", authHeaderValue);
+          }
         }
+        var task = _HttpClient.PostAsync(url, content);
+        task.Wait();
+        var task2 = task.Result.Content.ReadAsStringAsync();
+        task2.Wait();
+        responseContent = task2.Result;
+        responseHeaders = task.Result.Headers;
+        reasonPhrase = task.Result.ReasonPhrase;
+
+        return (int)task.Result.StatusCode;
+
       }
-      var task = _HttpClient.PostAsync(url, content);
-      task.Wait();
-      var task2 = task.Result.Content.ReadAsStringAsync();
-      task2.Wait();
-      responseContent = task2.Result;
-      responseHeaders = task.Result.Headers;
-      reasonPhrase = task.Result.ReasonPhrase;
-      return (int)task.Result.StatusCode;
+
     }
 
   }
