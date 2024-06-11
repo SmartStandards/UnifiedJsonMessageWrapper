@@ -6,7 +6,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: Synclock for _HttpClient
+*(none)*
+
+
+
+## v 2.5.2
+released **2024-06-11**, including:
+ - Fix: Synclock for _HttpClient
 
 
 
