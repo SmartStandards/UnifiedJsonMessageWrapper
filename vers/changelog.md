@@ -7,11 +7,16 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **breaking Change**: Signature of AuthHeaderEvaluator contains now the additional Argument '*contractType*', because using *targetContractMethod.DeclaringType* (which was the old best practice) will point to the wrong interface when your contract interfaces are inheriting each other!
+*(none)*
 
-* Fix: optimized a lot of border case issues when calling methods from inherited contracts
 
-  
+
+## v 3.0.0
+released **2024-06-12**, including:
+ - **breaking Change**: Signature of AuthHeaderEvaluator contains now the additional Argument '*contractType*', because using *targetContractMethod.DeclaringType* (which was the old best practice) will point to the wrong interface when your contract interfaces are inheriting each other!
+ - Fix: optimized a lot of border case issues when calling methods from inherited contracts
+
+
 
 ## v 2.5.2
 released **2024-06-11**, including:
