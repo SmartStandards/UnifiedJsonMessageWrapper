@@ -13,14 +13,16 @@ namespace System.Web.UJMW {
 
   public delegate bool AuthHeaderEvaluatorMethod(
     string rawAuthHeader,
-    MethodInfo targetContractMethod,
+    Type contractType,
+    MethodInfo calledContractMethod,
     string callingMachine,
     ref int httpReturnCode,
     ref string failedReason
   );
 
   public delegate void ArgumentPreEvaluatorMethod(
-    MethodInfo targetContractMethod,
+    Type contractType,
+    MethodInfo calledContractMethod,
     object[] arguments
   );
 

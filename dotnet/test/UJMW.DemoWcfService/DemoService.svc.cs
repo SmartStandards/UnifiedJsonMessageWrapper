@@ -59,6 +59,10 @@ namespace UJMW.DemoWcfService {
       return 123;
     }
 
+    public string BaseMethod() {
+      return "Foo";
+    }
+
     public void Dispose() {
     }
 

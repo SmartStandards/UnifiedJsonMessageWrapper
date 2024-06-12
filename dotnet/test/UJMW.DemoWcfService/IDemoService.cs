@@ -12,12 +12,29 @@ using System.Threading;
 
 namespace UJMW.DemoWcfService {
 
+
+
 #if NET5_0_OR_GREATER
 #else
-  [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("DemoService", "v1")]
+  [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("BaseContract", "v1")]
 #endif
   [HasDataFlowSideChannel("tenant-identifiers"), HasDataFlowBackChannel("tenant-identifiers")]
-  public interface IDemoService : IDisposable {
+  public interface IBaseContract {
+
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
+    string BaseMethod();
+
+  }
+
+#if NET5_0_OR_GREATER
+#else
+    [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("DemoService", "v1")]
+#endif
+  [HasDataFlowSideChannel("tenant-identifiers"), HasDataFlowBackChannel("tenant-identifiers")]
+  public interface IDemoService : IDisposable, IBaseContract {
     
 
 #if NET5_0_OR_GREATER

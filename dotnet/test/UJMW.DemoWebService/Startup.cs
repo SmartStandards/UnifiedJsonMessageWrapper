@@ -140,7 +140,7 @@ namespace Security {
       );
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
+        (string rawAuthHeader, Type contractType, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
@@ -150,6 +150,14 @@ namespace Security {
           return true;
         }
       );
+      UjmwHostConfiguration.ArgumentPreEvaluator = (
+        Type contractType,
+        MethodInfo calledContractMethod,
+        object[] arguments
+      ) => {
+
+        contractType.ToString();
+      };
 
       var svc = new DemoService();
       services.AddSingleton<IDemoService>(svc);

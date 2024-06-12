@@ -27,22 +27,25 @@ using System.Web.UJMW;
 
   UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
 
-    var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-      ()=> "http://localhost:55202/DemoService.svc" , () => {
-        return DateTime.Now.ToLongTimeString().Replace(":","-");
-      }
-    );
+  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+  //  ()=> "http://localhost:55202/DemoService.svc" , () => {
+  //    return DateTime.Now.ToLongTimeString().Replace(":","-");
+  //  }
+  //);
 
+  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+    "http://localhost:55202/DemoService.svc" //MVC
+  );
 
   //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-  //  "http://localhost:55202/DemoService.svc" //MVC
-  //);
-  //  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
   //  "http://localhost:55205/DemoService.svc" //WCF
   //);
 
   try {
-    var resultw = svc.ParamlessCall();
+
+
+
+    var resultw = svc.BaseMethod();
     var result = svc.GetData(number);
       Console.WriteLine("RESPONSE from Service:");
       Console.WriteLine("\"" + result + "\"");

@@ -74,8 +74,14 @@ namespace System.Web.UJMW {
             return _RedirectorMethods[methodName];
           } //doing the expensive creaction of mapping code only once (on demand) and give the handles into a lambda:
 
-          MethodInfo contractMethod = typeof(TServiceInterface).GetMethod(methodName);
+          Type contractType = typeof(TServiceInterface);
           MethodInfo controllerMethod = controller.GetType().GetMethod(methodName);
+          MethodInfo contractMethod = contractType.GetMethod(methodName);
+          if (!DynamicUjmwControllerFactory.TryGetContractMethod(
+            contractType, methodName, out contractMethod
+          )) {
+            throw new Exception($"Cannot find a Method named '{methodName}' on Contract Interface '{contractType.FullName}'!");
+          }
 
           Type requestDtoType = controllerMethod.GetParameters().Single().ParameterType;
           Type responseDtoType = controllerMethod.ReturnType;
@@ -169,7 +175,9 @@ namespace System.Web.UJMW {
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 
                 if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
-                  UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(contractMethod, serviceMethodParams);
+                  UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
+                    contractType, contractMethod, serviceMethodParams
+                  );
                 }
 
                 //invoke the service method

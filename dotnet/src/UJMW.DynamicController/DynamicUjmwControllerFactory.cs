@@ -179,7 +179,10 @@ namespace System.Web.UJMW {
 
       // ##### METHOD DEFINITIONs #####
 
-      foreach (var serviceMethod in serviceType.GetMethods()) {
+      var allMethods = new List<MethodInfo>();
+      CollectAllMethodsForType(serviceType, allMethods);
+
+      foreach (var serviceMethod in allMethods) {
         var methodSignatureString = serviceMethod.ToString();
         var methodNameBlacklist = new[] { "ToString", "GetHashCode", "GetType", "Equals"};
         if (!serviceMethod.IsSpecialName && !methodNameBlacklist.Contains(serviceMethod.Name) && !serviceMethod.Name.EndsWith("Async")) {
@@ -406,6 +409,36 @@ namespace System.Web.UJMW {
       propBdr.SetGetMethod(getterPropMthdBldr);
       propBdr.SetSetMethod(setterPropMthdBldr);
 
+    }
+
+    internal static bool TryGetContractMethod(Type serviceContractType, string methodName, out MethodInfo method) {
+      method = serviceContractType.GetMethod(methodName);
+      if (method != null) {
+        return true;
+      }
+      foreach (Type aggregatedContract in serviceContractType.GetInterfaces()) {
+        if (TryGetContractMethod(aggregatedContract, methodName, out method)) {
+          return true;
+        }
+      }
+      if (serviceContractType.BaseType != null) {
+        return TryGetContractMethod(serviceContractType.BaseType, methodName, out method);
+      }
+      else {
+        return false;
+      }
+    }
+
+    internal static void CollectAllMethodsForType(Type t, List<MethodInfo> target) {
+      foreach (MethodInfo mi in t.GetMethods()) {
+        target.Add(mi);
+      }
+      if (t.BaseType != null) {
+        CollectAllMethodsForType(t.BaseType, target);
+      }
+      foreach (Type intf in t.GetInterfaces()) {
+        CollectAllMethodsForType(intf, target);
+      }
     }
 
   }

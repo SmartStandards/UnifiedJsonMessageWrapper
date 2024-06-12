@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
@@ -305,7 +306,7 @@ namespace System.Web.UJMW {
           }
         }
 
-        IOperationBehavior loggingBehavior = new OperationBehaviorWhenDispatching();
+        IOperationBehavior loggingBehavior = new OperationBehaviorWhenDispatching(contractType);
         foreach (ServiceEndpoint endpoint in serviceDescription.Endpoints) {
           foreach (OperationDescription operation in endpoint.Contract.Operations) {
             if (!operation.Behaviors.Any(d => d is OperationBehaviorWhenDispatching)) {
@@ -382,6 +383,8 @@ namespace System.Web.UJMW {
           return corellationState;
         }
 
+        Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
+
         string methodName = null;
         string fullCallUrl = null;
         if (incomingWcfMessage.Properties.TryGetValue("Via", out object via)) {
@@ -390,7 +393,6 @@ namespace System.Web.UJMW {
         if (incomingWcfMessage.Properties.TryGetValue("HttpOperationName", out object httpOperationName)) {
           methodName = httpOperationName?.ToString();
           if(methodName == string.Empty) {
-            Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
             HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = $"Unknown method (see Contract: '{serviceContractType.Name}') OR wrong HTTP verb!";
             return corellationState;
           }
@@ -403,7 +405,7 @@ namespace System.Web.UJMW {
 
         lock (_MethodInfoCache) {
           if (!_MethodInfoCache.TryGetValue(fullCallUrl, out corellationState.ContractMethod)) {
-            Type serviceContractType = instanceContext.Host.Description.Endpoints[0].Contract.ContractType;
+
             if(!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
               if (UjmwHostConfiguration.LoggingHook != null) {
                 UjmwHostConfiguration.LoggingHook.Invoke(4, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
@@ -426,7 +428,8 @@ namespace System.Web.UJMW {
           }
 
           bool authSuccess = UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-            rawAuthHeader, corellationState.ContractMethod, callingMachine, ref httpReturnCode, ref failedReason
+            rawAuthHeader, serviceContractType, corellationState.ContractMethod,
+            callingMachine, ref httpReturnCode, ref failedReason
           );
 
           if (!authSuccess) {
@@ -987,7 +990,10 @@ namespace System.Web.UJMW {
 
       public class OperationBehaviorWhenDispatching : IOperationBehavior {
 
-        public OperationBehaviorWhenDispatching() {
+        private Type _ContractType;
+
+        public OperationBehaviorWhenDispatching(Type contractType) {
+          _ContractType = contractType;
         }
 
         public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters) {
@@ -997,7 +1003,8 @@ namespace System.Web.UJMW {
         }
 
         public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation) {
-          dispatchOperation.Invoker = new HookedOperationInvoker(dispatchOperation.Invoker, dispatchOperation, operationDescription.DeclaringContract);
+          //ACHTUNG: operationDescription.DeclaringContract.ContractType IST FALSCH!!! das ist bei abgeleiteten contract die baisklasse!
+          dispatchOperation.Invoker = new HookedOperationInvoker(dispatchOperation.Invoker, dispatchOperation, _ContractType);
         }
 
         public void Validate(OperationDescription operationDescription) {
@@ -1012,14 +1019,15 @@ namespace System.Web.UJMW {
         private readonly IOperationInvoker _BaseInvoker;
         private readonly string _OperationName;
         private readonly string _ControllerName;
+        private readonly Type _ContractType;
         private readonly MethodInfo _ContractMethod;
 
-        public HookedOperationInvoker(IOperationInvoker baseInvoker, DispatchOperation operation, ContractDescription contractDesc) {
+        public HookedOperationInvoker(IOperationInvoker baseInvoker, DispatchOperation operation, Type contractType) {
           _BaseInvoker = baseInvoker;
-          Type serviceContractType = contractDesc.ContractType; 
+          _ContractType = contractType; 
           _OperationName = operation.Name;
           _ControllerName = operation.Parent.Type == null ? "[None]" : operation.Parent.Type.FullName;
-          DispatchMessageInspector.TryGetContractMethod(contractDesc.ContractType, operation.Name, out _ContractMethod);
+          DispatchMessageInspector.TryGetContractMethod(_ContractType, operation.Name, out _ContractMethod);
           //TODO: prüfen:  operation.CallContextInitializers << sehr interessant!
         }
 
@@ -1036,7 +1044,7 @@ namespace System.Web.UJMW {
           try {
 
             if(UjmwHostConfiguration.ArgumentPreEvaluator != null) {
-              UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractMethod, inputs);
+              UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractType, _ContractMethod, inputs);
             }
             return _BaseInvoker.Invoke(instance, inputs, out outputs);
           }

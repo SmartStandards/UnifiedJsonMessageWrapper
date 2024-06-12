@@ -33,12 +33,20 @@ namespace System.Web.UJMW {
         }
 
         HostString apiCaller = context.HttpContext.Request.Host;
-        MethodInfo calledContractMethod = GetMethodInfoFromContext(context);
+        //MethodInfo calledContractMethod = GetMethodInfoFromContext(context);
+
+        Type contractType = GetContractTypeFromContext(context);
+        MethodInfo calledContractMethod = null;
+        if (context.RouteData.Values.TryGetValue("action", out object actionUntyped)) {
+          DynamicUjmwControllerFactory.TryGetContractMethod(
+            contractType, (string)actionUntyped, out calledContractMethod
+          );
+        }
 
         int httpReturnCode = 200;
         string failedReason = string.Empty;
         if (!UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-          rawHeader, calledContractMethod, apiCaller.Host, ref httpReturnCode, ref failedReason
+          rawHeader, contractType, calledContractMethod, apiCaller.Host, ref httpReturnCode, ref failedReason
         )) {
          
           if (httpReturnCode == 200) {
@@ -68,24 +76,49 @@ namespace System.Web.UJMW {
 
     }//OnActionExecutionAsync()
 
-    private static Dictionary<string, MethodInfo> _MethodBuffer = new Dictionary<string, MethodInfo>();
+    //private static Dictionary<string, MethodInfo> _MethodBuffer = new Dictionary<string, MethodInfo>();
 
-    private static MethodInfo GetMethodInfoFromContext(ActionExecutingContext context) {
-      string actionName = null;
+    //private static MethodInfo GetMethodInfoFromContext(ActionExecutingContext context) {
+    //  string actionName = null;
+    //  string controllerName = null;
+    //  if (context.RouteData.Values.TryGetValue("action", out object actionUntyped)) {
+    //    actionName = (string)actionUntyped;
+    //  }
+    //  if (context.RouteData.Values.TryGetValue("controller", out object controllerUntyped)) {
+    //    controllerName = (string)controllerUntyped;
+    //  }
+    //  if (actionName == null) {
+    //    return null;
+    //  }
+    //  string key = controllerName + "." + actionName;
+    //  lock (_MethodBuffer) {
+    //    if (_MethodBuffer.TryGetValue(key, out MethodInfo mth)) {
+    //      return mth;
+    //    }
+    //    Type coType = context.Controller.GetType();
+
+    //    //special convention, to allow referring to an explicit contractType
+    //    PropertyInfo contractProp = coType.GetProperty("ContractType");
+    //    if (contractProp != null) {
+    //      coType = (Type)contractProp.GetValue(context.Controller);
+    //    }
+
+    //    mth = coType.GetMethod(actionName);
+    //    _MethodBuffer.Add(key, mth);
+    //    return mth;
+    //  }
+    //}
+
+    private static Dictionary<string, Type> _ContractTypesPerController = new Dictionary<string, Type>();
+    private static Type GetContractTypeFromContext(ActionExecutingContext context) {
       string controllerName = null;
-      if (context.RouteData.Values.TryGetValue("action", out object actionUntyped)) {
-        actionName = (string)actionUntyped;
-      }
       if (context.RouteData.Values.TryGetValue("controller", out object controllerUntyped)) {
         controllerName = (string)controllerUntyped;
       }
-      if (actionName == null) {
-        return null;
-      }
-      string key = controllerName + "." + actionName;
-      lock (_MethodBuffer) {
-        if (_MethodBuffer.TryGetValue(key, out MethodInfo mth)) {
-          return mth;
+      string key = controllerName;
+      lock (_ContractTypesPerController) {
+        if (_ContractTypesPerController.TryGetValue(key, out Type t)) {
+          return t;
         }
         Type coType = context.Controller.GetType();
 
@@ -94,12 +127,9 @@ namespace System.Web.UJMW {
         if (contractProp != null) {
           coType = (Type)contractProp.GetValue(context.Controller);
         }
-
-        mth = coType.GetMethod(actionName);
-        _MethodBuffer.Add(key, mth);
-        return mth;
+        _ContractTypesPerController.Add(key, coType);
+        return coType;
       }
-
     }
 
   }//AuthHeaderInterceptorAttribute

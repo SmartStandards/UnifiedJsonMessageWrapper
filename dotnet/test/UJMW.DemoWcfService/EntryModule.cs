@@ -39,7 +39,7 @@ namespace UJMW.DemoWcfService {
       UjmwHostConfiguration.ForceHttps = false;
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
+        (string rawAuthHeader, Type contractType, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
@@ -49,7 +49,15 @@ namespace UJMW.DemoWcfService {
           return true;
         }
       );
+      //UjmwHostConfiguration.ArgumentPreEvaluator = (
+      //  Type contractType,
+      //  MethodInfo calledContractMethod,
+      //  object[] arguments
+      //) => {
 
+      //  contractType.ToString();
+      //};
+        
       //in this sample were using the AmbienceHub from our 'SmartAmbience' framework
       //which allows us to handle contextual discriminated values very easy:
 
