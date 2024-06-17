@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Removed Loggin-Hooks and switched over to SmartStandards Tracing convention.
+*(none)*
+
+
+
+## v 3.0.1
+released **2024-06-17**, including:
+ - Removed Loggin-Hooks and switched over to SmartStandards Tracing convention.
 
 
 

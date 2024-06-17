@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.0.0",
-  "currentVersionWithSuffix": "3.0.0",
+  "currentVersion": "3.0.1",
+  "currentVersionWithSuffix": "3.0.1",
   "releaseType": "official",
-  "previousVersion": "2.5.2",
-  "changeGrade": "major",
+  "previousVersion": "3.0.0",
+  "changeGrade": "patch",
   "currentMajor": 3,
   "currentMinor": 0,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-06-12",
-  "versionTimeInfo": "14:45:24",
-  "versionNotes": "- breaking Change: Signature of AuthHeaderEvaluator contains now the additional Argument '*contractType*', because using *targetContractMethod.DeclaringType* (which was the old best practice) will point to the wrong interface when your contract interfaces are inheriting each other!\n- Fix: optimized a lot of border case issues when calling methods from inherited contracts\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-06-17",
+  "versionTimeInfo": "11:16:11",
+  "versionNotes": "- Removed Loggin-Hooks and switched over to SmartStandards Tracing convention.\n"
 }
