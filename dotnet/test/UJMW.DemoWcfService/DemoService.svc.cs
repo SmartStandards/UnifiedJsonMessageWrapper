@@ -60,6 +60,7 @@ namespace UJMW.DemoWcfService {
     }
 
     public string BaseMethod() {
+      throw new Exception("bbom");
       return "Foo";
     }
 

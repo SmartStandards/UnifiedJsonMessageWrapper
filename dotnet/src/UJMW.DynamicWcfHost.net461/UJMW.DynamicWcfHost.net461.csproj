@@ -146,6 +146,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\UJMW.DynamicClient.net461\LogToTraceAdapter.cs">
+      <Link>LogToTraceAdapter.cs</Link>
+    </Compile>
     <Compile Include="FileBasedSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Settings.Designer.cs">

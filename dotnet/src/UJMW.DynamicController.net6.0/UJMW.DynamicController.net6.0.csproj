@@ -39,10 +39,24 @@
   <Import Project="..\UJMW.DynamicController\UJMW.DynamicController.projitems" Label="Shared" />
 
   <ItemGroup>
+    <Compile Include="..\UJMW.DynamicClient.net461\LogToTraceAdapter.cs" Link="LogToTraceAdapter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.5" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicController\%28Setup%29\LogToTraceAdapter.tt">
+      <LastGenOutput>LogToTraceAdapter.cs</LastGenOutput>
+    </None>
   </ItemGroup>
 
 </Project>

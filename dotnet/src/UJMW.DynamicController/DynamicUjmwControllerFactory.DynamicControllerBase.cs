@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Logging.SmartStandards;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -165,23 +166,41 @@ namespace System.Web.UJMW {
                     }
                   }
                   else {
-                    if (UjmwHostConfiguration.LoggingHook != null) {
-                      UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because of missing side channel");
-                    }
-                    throw new Exception("Rejected incomming request because of missing side channel");
+                    string msg = "Rejected incomming request because of missing side channel";
+                    LogToTraceAdapter.LogWarning(msg);
+                    throw new Exception(msg);
                   }
                 }
+
+                LogToTraceAdapter.LogTrace($"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 
                 if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
-                  UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
-                    contractType, contractMethod, serviceMethodParams
-                  );
+                  try {
+                    UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
+                      contractType, contractMethod, serviceMethodParams
+                    );
+                  }
+                  catch (TargetInvocationException ex) {
+                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+                  }
+                  catch (Exception ex) {
+                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+                  }
                 }
 
                 //invoke the service method
-                object returnVal = contractMethod.Invoke(svc, serviceMethodParams);
+                object returnVal;
+                try {
+                  returnVal = contractMethod.Invoke(svc, serviceMethodParams);
+                }
+                catch (TargetInvocationException ex) {
+                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+                }
+                catch (Exception ex) {
+                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+                }
 
                 //map the return value
                 foreach (DtoValueMapper responseDtoValueMapper in responseDtoValueMappers) {
@@ -194,19 +213,9 @@ namespace System.Web.UJMW {
                 }
 
               }
-              catch (TargetInvocationException ex) {
-                UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.InnerException.Message}");
-                if (faultProp != null) {
-                  if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
-                    faultProp.SetValue(responseDto, "BL-Exception");
-                  }
-                  else {
-                    faultProp.SetValue(responseDto, ex.InnerException.Message);
-                  }
-                }
-              }
               catch (Exception ex) {
-                UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
+                LogToTraceAdapter.LogError(ex);
+                //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
                     faultProp.SetValue(responseDto, "BL-Exception");

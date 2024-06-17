@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Logging.SmartStandards;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -53,9 +54,7 @@ namespace System.Web.UJMW {
 
         bool contractFound = UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
 
-        if (UjmwHostConfiguration.LoggingHook != null) {
-          UjmwHostConfiguration.LoggingHook.Invoke(2, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
-        }
+        LogToTraceAdapter.LogTrace($"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
 
         ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
 
@@ -91,9 +90,7 @@ namespace System.Web.UJMW {
         //it seems not to work properly when changing the host afterwards:
         //host.Authentication.AuthenticationSchemes = hostAuthenticationSchemes;
 
-        if (UjmwHostConfiguration.LoggingHook != null) {
-          UjmwHostConfiguration.LoggingHook.Invoke(2, $"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
-        }
+        LogToTraceAdapter.LogTrace($"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
 
         CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
         WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();
@@ -407,9 +404,7 @@ namespace System.Web.UJMW {
           if (!_MethodInfoCache.TryGetValue(fullCallUrl, out corellationState.ContractMethod)) {
 
             if(!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
-              if (UjmwHostConfiguration.LoggingHook != null) {
-                UjmwHostConfiguration.LoggingHook.Invoke(4, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
-              }
+              LogToTraceAdapter.LogError($"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
               throw new WebFaultException(HttpStatusCode.InternalServerError);
             }
             _MethodInfoCache[fullCallUrl] = corellationState.ContractMethod;
@@ -434,9 +429,7 @@ namespace System.Web.UJMW {
 
           if (!authSuccess) {
 
-            if (UjmwHostConfiguration.LoggingHook != null) {
-              UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because AuthHeaderEvaluator returned false!");
-            }
+            LogToTraceAdapter.LogWarning("Rejected incomming request because AuthHeaderEvaluator returned false!");
 
             if (string.IsNullOrWhiteSpace(failedReason)) {
               failedReason = "Forbidden";
@@ -513,9 +506,7 @@ namespace System.Web.UJMW {
             }
           }
           else {
-            if (UjmwHostConfiguration.LoggingHook != null) {
-              UjmwHostConfiguration.LoggingHook.Invoke(3, "Rejected incomming request because of missing side channel");
-            }
+            LogToTraceAdapter.LogWarning("Rejected incomming request because of missing side channel");
             HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No sidechannel provided.";
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
@@ -1038,29 +1029,36 @@ namespace System.Web.UJMW {
         }
 
         public object Invoke(object instance, object[] inputs, out object[] outputs) {
-          if (UjmwHostConfiguration.LoggingHook != null) {
-            UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
-          }
-          try {
+          //if (UjmwHostConfiguration.LoggingHook != null) {
+          //  UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
+          //}
+          LogToTraceAdapter.LogTrace($"Invoking UJMW call to UJMW Operation '{_ContractMethod.Name}'");
 
+          try {
             if(UjmwHostConfiguration.ArgumentPreEvaluator != null) {
-              UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractType, _ContractMethod, inputs);
+              try {
+                UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractType, _ContractMethod, inputs);
+              }
+              catch (TargetInvocationException ex) {
+                throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+              }
+              catch (Exception ex) {
+                throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+              }
             }
-            return _BaseInvoker.Invoke(instance, inputs, out outputs);
-          }
-          catch (TargetInvocationException ex) {
-            UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.InnerException.Message}");
-            if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
-              CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
+            try {
+              return _BaseInvoker.Invoke(instance, inputs, out outputs);
             }
-            else {
-              CatchedExeptionFromCurrentOperation.Value = ex.InnerException.Message;
+            catch (TargetInvocationException ex) {
+              throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
             }
-            outputs = new object[0];
-            return null;
+            catch (Exception ex) {
+              throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+            }
           }
           catch (Exception ex) {
-            UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
+            LogToTraceAdapter.LogError(ex);
+            //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
             if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
               CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
             }

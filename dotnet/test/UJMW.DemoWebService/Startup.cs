@@ -28,6 +28,7 @@ using UJMW.DemoWcfService;
 using Microsoft.AspNetCore;
 using DistributedDataFlow;
 using Demo;
+using Logging.SmartStandards;
 
 namespace Security {
 
@@ -269,6 +270,9 @@ namespace Security {
       var logDir = Path.GetFullPath(Path.GetDirectoryName(logFileFullName));
       Directory.CreateDirectory(logDir);
       loggerfactory.AddFile(logFileFullName);
+
+      SmartStandardsTraceLogPipe.InitializeAsLoggerInput();
+      //DevLogger.LogMethod = loggerfactory.CreateLogger<DevLogger>();
 
       //required for the www-root
       app.UseStaticFiles();

@@ -39,7 +39,29 @@
   <Import Project="..\UJMW.DynamicClient\UJMW.DynamicClient.projitems" Label="Shared" />
 
   <ItemGroup>
+    <Compile Include="..\UJMW.DynamicClient.net461\LogToTraceAdapter.cs" Link="LogToTraceAdapter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicClient\%28Setup%29\LogToTraceAdapter.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>LogToTraceAdapter.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicClient\%28Setup%29\LogToTraceAdapter.tt">
+      <LastGenOutput>LogToTraceAdapter.cs</LastGenOutput>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -269,21 +269,6 @@ namespace System.Web.UJMW {
     public static Action<Exception> FactoryExceptionVisitor { get; set; } = (ex) => Trace.TraceError(ex.Message);
     
     public static bool HideExeptionMessageInFaultProperty { get; set; } = false;
-
-    /// <summary></summary>
-    /// <param name="logLevel">0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal</param>
-    /// <param name="message"></param>
-    public delegate void LoggingMethod(int logLevel, string message);
-    /// <summary>
-    /// A method to process logging output (LogLevel: 0:Trace|1:Verbose|2:Info|3:Warning|4:Error|5:Fatal)
-    /// </summary>
-    public static LoggingMethod LoggingHook { get; set; } = (logLevel, message) => {
-      if (logLevel < 1)       Trace.WriteLine(message);
-      else if (logLevel == 1) Debug.WriteLine(message);      
-      else if (logLevel == 2) Trace.TraceInformation(message);  
-      else if (logLevel == 3) Trace.TraceWarning(message);    
-      else if (logLevel > 3)  Trace.TraceError(message);   
-    };
     
   }
 

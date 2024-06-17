@@ -33,13 +33,13 @@ using System.Web.UJMW;
   //  }
   //);
 
-  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-    "http://localhost:55202/DemoService.svc" //MVC
-  );
-
   //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-  //  "http://localhost:55205/DemoService.svc" //WCF
+  //  "http://localhost:55202/DemoService.svc" //MVC
   //);
+
+  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+    "http://localhost:55205/DemoService.svc" //WCF
+  );
 
   try {
 
