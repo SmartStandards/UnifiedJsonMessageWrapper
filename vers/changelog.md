@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: reduced risk for memory-leakage on DynmaicClient (internal HttpClient is now reused and thread-safety was increased therefore)
+*(none)*
+
+
+
+## v 3.0.2
+released **2024-06-19**, including:
+ - Fix: reduced risk for memory-leakage on DynmaicClient (internal HttpClient is now reused and thread-safety was increased therefore)
 
 
 
