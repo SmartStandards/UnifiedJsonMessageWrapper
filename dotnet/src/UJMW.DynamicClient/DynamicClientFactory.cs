@@ -79,14 +79,7 @@ namespace System.Web.UJMW {
     }
 
     public static TApplicable CreateInstance<TApplicable>(Func<string> urlGetter, Func<string> httpAuthHeaderGetter = null) {
-    
-      HttpClient httpClient;
-      if(UjmwClientConfiguration.HttpClientFactory != null) {
-        httpClient = UjmwClientConfiguration.HttpClientFactory.Invoke();
-      }
-      else {
-        httpClient = new HttpClient();
-      }
+      HttpClient httpClient = GetHttpClient();
 
       if (httpAuthHeaderGetter == null && UjmwClientConfiguration.DefaultAuthHeaderGetter != null) {
         httpAuthHeaderGetter = ()=>UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(typeof(TApplicable));
@@ -98,14 +91,7 @@ namespace System.Web.UJMW {
     }
 
     public static object CreateInstance(Type applicableType,Func<string> urlGetter, Func<string> httpAuthHeaderGetter) {
-   
-      HttpClient httpClient;
-      if (UjmwClientConfiguration.HttpClientFactory != null) {
-        httpClient = UjmwClientConfiguration.HttpClientFactory.Invoke();
-      }
-      else {
-        httpClient = new HttpClient();
-      }
+      HttpClient httpClient = GetHttpClient();
 
       if (httpAuthHeaderGetter == null && UjmwClientConfiguration.DefaultAuthHeaderGetter != null) {
         httpAuthHeaderGetter = ()=>UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(applicableType);
@@ -113,7 +99,7 @@ namespace System.Web.UJMW {
 
       var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter, httpClient.Dispose);
-      return CreateInstance(applicableType,invoker);
+      return CreateInstance(applicableType, invoker);
     }
 
     public static TApplicable CreateInstance<TApplicable>(IHttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
@@ -144,7 +130,14 @@ namespace System.Web.UJMW {
       return BuildDynamicType(typeof(TApplicable));
     }
 
+    private static Dictionary<Type,Type> _ProxyTypesPerContract = new Dictionary<Type, Type>();
     internal static Type BuildDynamicType(Type applicableType) {
+
+      lock (_ProxyTypesPerContract) {
+        if(_ProxyTypesPerContract.TryGetValue(applicableType, out Type generatdProxyType)) {
+          return generatdProxyType;
+        }
+      }
 
       Type iDynamicProxyInvokerType = typeof(IAbstractWebcallInvoker);
       MethodInfo iDynamicProxyInvokerTypeInvokeMethod = iDynamicProxyInvokerType.GetMethod(nameof(IAbstractWebcallInvoker.InvokeWebCall));
@@ -431,6 +424,11 @@ namespace System.Web.UJMW {
 
       var dynamicType = typeBuilder.CreateType();
       // assemblyBuilder.Save("Dynassembly.dll")
+
+      lock (_ProxyTypesPerContract) {
+        _ProxyTypesPerContract[applicableType] = dynamicType;
+      }
+
       return dynamicType;
     }
 
@@ -446,5 +444,28 @@ namespace System.Web.UJMW {
       }
     }
 
+    //https://www.aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
+    private static HttpClient _SharedHttpClient = null;
+
+    private static HttpClient GetHttpClient() {
+      if (_SharedHttpClient == null) {
+        if (UjmwClientConfiguration.HttpClientFactory != null) {
+          _SharedHttpClient = UjmwClientConfiguration.HttpClientFactory.Invoke();
+        }
+        else {
+          _SharedHttpClient = new HttpClient();
+        }
+      }
+      return _SharedHttpClient;
+    }
+
+    public static void DisposeHttpClient() {
+      if (_SharedHttpClient != null) {
+        _SharedHttpClient.Dispose();
+        _SharedHttpClient = null;
+      }
+    }
+
   }
+
 }

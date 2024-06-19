@@ -12,20 +12,37 @@ using System.Web.UJMW;
     var currentTenant = new AmbientField("currentTenant", true);
     currentTenant.Value = "Rabbit";
 
-  UjmwClientConfiguration.ConfigureRequestSidechannel((ctct, chnl) => {
-    //chnl.ProvideUjmwUnderlineProperty();
-    chnl.ProvideHttpHeader("my-ambient-data");
-    chnl.CaptureDataVia(AmbienceHub.CaptureCurrentValuesTo);
-  });
+    UjmwClientConfiguration.ConfigureRequestSidechannel((ctct, chnl) => {
+      //chnl.ProvideUjmwUnderlineProperty();
+      chnl.ProvideHttpHeader("my-ambient-data");
+      chnl.CaptureDataVia(AmbienceHub.CaptureCurrentValuesTo);
+    });
 
-  //UjmwClientConfiguration.ConfigureResponseBackchannel((ctct, chnl) => {
-  //  chnl.AcceptUjmwUnderlineProperty();
-  //  chnl.ProcessDataVia(AmbienceHub.RestoreValuesFrom);
-  //});
+    //UjmwClientConfiguration.ConfigureResponseBackchannel((ctct, chnl) => {
+    //  chnl.AcceptUjmwUnderlineProperty();
+    //  chnl.ProcessDataVia(AmbienceHub.RestoreValuesFrom);
+    //});
 
   #endregion
 
   UjmwClientConfiguration.DefaultAuthHeaderGetter = ((c) => "its me");
+
+  UJMW.DemoWcfService.IDemoService svc;
+
+  /////////////////
+  bool wcf = false;
+  /////////////////
+  
+  if (wcf) {
+    svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+      "http://localhost:55205/DemoService.svc" //WCF
+    );
+  }
+  else {
+    svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
+      "http://localhost:55202/DemoService.svc" //MVC
+    );
+  }
 
   //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
   //  ()=> "http://localhost:55202/DemoService.svc" , () => {
@@ -33,17 +50,7 @@ using System.Web.UJMW;
   //  }
   //);
 
-  //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-  //  "http://localhost:55202/DemoService.svc" //MVC
-  //);
-
-  var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
-    "http://localhost:55205/DemoService.svc" //WCF
-  );
-
   try {
-
-
 
     var resultw = svc.BaseMethod();
     var result = svc.GetData(number);
