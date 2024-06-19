@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.0.1",
-  "currentVersionWithSuffix": "3.0.1",
+  "currentVersion": "3.0.2",
+  "currentVersionWithSuffix": "3.0.2",
   "releaseType": "official",
-  "previousVersion": "3.0.0",
+  "previousVersion": "3.0.1",
   "changeGrade": "patch",
   "currentMajor": 3,
   "currentMinor": 0,
-  "currentPatch": 1,
-  "versionDateInfo": "2024-06-17",
-  "versionTimeInfo": "11:16:11",
-  "versionNotes": "- Removed Loggin-Hooks and switched over to SmartStandards Tracing convention.\n"
+  "currentPatch": 2,
+  "versionDateInfo": "2024-06-19",
+  "versionTimeInfo": "08:39:25",
+  "versionNotes": "- Fix: reduced risk for memory-leakage on DynmaicClient (internal HttpClient is now reused and thread-safety was increased therefore)\n"
 }
