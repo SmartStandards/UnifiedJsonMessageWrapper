@@ -30,7 +30,7 @@ using System.Web.UJMW;
   UJMW.DemoWcfService.IDemoService svc;
 
   /////////////////
-  bool wcf = false;
+  bool wcf = true;
   /////////////////
   
   if (wcf) {
