@@ -167,7 +167,8 @@ namespace Security {
       services.AddDynamicUjmwControllers(r => {
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
-          ControllerRoute = "DemoService.svc",
+          //ControllerRoute = "DemoService.svc",
+          ControllerRoute = "v1/[Controller].svc",
           //EnableResponseSidechannel = false,
           //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
           //AuthAttributeConstructorParams = new object[] { new string[] { } }

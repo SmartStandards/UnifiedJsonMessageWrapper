@@ -48,7 +48,7 @@ namespace System.Web.UJMW {
 
         bool contractFound = UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
 
-        LogToTraceAdapter.LogTrace($"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
+        DevToTraceLogger.LogTrace(0, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
 
         ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
 
@@ -84,7 +84,7 @@ namespace System.Web.UJMW {
         //it seems not to work properly when changing the host afterwards:
         //host.Authentication.AuthenticationSchemes = hostAuthenticationSchemes;
 
-        LogToTraceAdapter.LogTrace($"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
+        DevToTraceLogger.LogTrace(0, $"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
 
         CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
         WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();

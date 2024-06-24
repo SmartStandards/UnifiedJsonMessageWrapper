@@ -84,7 +84,7 @@ namespace System.Web.UJMW {
         if (!_MethodInfoCache.TryGetValue(fullCallUrl, out corellationState.ContractMethod)) {
 
           if (!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
-            LogToTraceAdapter.LogError($"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
+            DevToTraceLogger.LogError(0, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
             throw new WebFaultException(HttpStatusCode.InternalServerError);
           }
           _MethodInfoCache[fullCallUrl] = corellationState.ContractMethod;
@@ -109,7 +109,7 @@ namespace System.Web.UJMW {
 
         if (!authSuccess) {
 
-          LogToTraceAdapter.LogWarning("Rejected incomming request because AuthHeaderEvaluator returned false!");
+          DevToTraceLogger.LogWarning(0, "Rejected incomming request because AuthHeaderEvaluator returned false!");
 
           if (string.IsNullOrWhiteSpace(failedReason)) {
             failedReason = "Forbidden";
@@ -186,7 +186,7 @@ namespace System.Web.UJMW {
           }
         }
         else {
-          LogToTraceAdapter.LogWarning("Rejected incomming request because of missing side channel");
+          DevToTraceLogger.LogWarning(0, "Rejected incomming request because of missing side channel");
           HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No sidechannel provided.";
           throw new WebFaultException(HttpStatusCode.BadRequest);
         }

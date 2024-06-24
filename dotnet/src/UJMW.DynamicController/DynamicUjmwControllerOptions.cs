@@ -5,7 +5,7 @@ namespace System.Web.UJMW {
 
     /// <summary>
     /// Controller-Route
-    /// (you can use {0} {1} {...} to address type-names from generic arguments}
+    /// (you can use {0} {1} {...} to address type-names from generic arguments} OR "[Controller]" to address the controller name)
     /// </summary>
     public string ControllerRoute { get; set; } = "[controller]";
 
