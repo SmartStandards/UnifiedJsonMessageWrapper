@@ -27,11 +27,16 @@ namespace System.Web.UJMW {
     /// Otherwise this will cause to an exception!
     /// </summary>
     /// <typeparam name="TApplicable"></typeparam>
+    /// <param name="useShortHttpTimeout">
+    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
+    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// </param>
     /// <returns></returns>
-    public static TApplicable CreateInstance<TApplicable>() {
+    public static TApplicable CreateInstance<TApplicable>(bool useShortHttpTimeout = false) {
       return CreateInstance<TApplicable>(
         () => UjmwClientConfiguration.DefaultUrlGetter.Invoke(typeof(TApplicable)),
-        () => UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(typeof(TApplicable))
+        () => UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(typeof(TApplicable)),
+        useShortHttpTimeout
       );
     }
 
@@ -41,14 +46,21 @@ namespace System.Web.UJMW {
     /// Otherwise this will cause to an exception!
     /// </summary>
     /// <param name="applicableType"></param>
+    /// <param name="useShortHttpTimeout">
+    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
+    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// </param>
     /// <returns></returns>
-    public static object CreateInstance(Type applicableType) {
+    public static object CreateInstance(Type applicableType, bool useShortHttpTimeout= false) {
       return CreateInstance(
         applicableType, 
         () => UjmwClientConfiguration.DefaultUrlGetter.Invoke(applicableType),
-        () => UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(applicableType)
+        () => UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(applicableType),
+        useShortHttpTimeout
       );
     }
+
+    #region " Convenience Overloads with STRINGS instead of callbacks "
 
     public static TApplicable CreateInstance<TApplicable>(string url){
       return CreateInstance<TApplicable>(    
@@ -78,8 +90,27 @@ namespace System.Web.UJMW {
       );
     }
 
-    public static TApplicable CreateInstance<TApplicable>(Func<string> urlGetter, Func<string> httpAuthHeaderGetter = null) {
-      HttpClient httpClient = GetHttpClient();
+    #endregion
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <typeparam name="TApplicable"></typeparam>
+    /// <param name="urlGetter"></param>
+    /// <param name="httpAuthHeaderGetter"></param>
+    /// <param name="useShortHttpTimeout">
+    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
+    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// </param>
+    /// <returns></returns>
+    public static TApplicable CreateInstance<TApplicable>(Func<string> urlGetter, Func<string> httpAuthHeaderGetter = null, bool useShortHttpTimeout = false) {
+      HttpClient httpClient;
+      if (useShortHttpTimeout) {
+        httpClient = GetHttpClientShortTimeout();
+      }
+      else {
+        httpClient = GetHttpClient();
+      }
 
       if (httpAuthHeaderGetter == null && UjmwClientConfiguration.DefaultAuthHeaderGetter != null) {
         httpAuthHeaderGetter = ()=>UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(typeof(TApplicable));
@@ -90,8 +121,25 @@ namespace System.Web.UJMW {
       return CreateInstance<TApplicable>(invoker);
     }
 
-    public static object CreateInstance(Type applicableType,Func<string> urlGetter, Func<string> httpAuthHeaderGetter) {
-      HttpClient httpClient = GetHttpClient();
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="applicableType"></param>
+    /// <param name="urlGetter"></param>
+    /// <param name="httpAuthHeaderGetter"></param>
+    /// <param name="useShortHttpTimeout">
+    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
+    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// </param>
+    /// <returns></returns>
+    public static object CreateInstance(Type applicableType, Func<string> urlGetter, Func<string> httpAuthHeaderGetter, bool useShortHttpTimeout = false) {
+      HttpClient httpClient;
+      if (useShortHttpTimeout) {
+        httpClient = GetHttpClientShortTimeout();
+      }
+      else {
+        httpClient = GetHttpClient();
+      }
 
       if (httpAuthHeaderGetter == null && UjmwClientConfiguration.DefaultAuthHeaderGetter != null) {
         httpAuthHeaderGetter = ()=>UjmwClientConfiguration.DefaultAuthHeaderGetter.Invoke(applicableType);
@@ -446,23 +494,42 @@ namespace System.Web.UJMW {
 
     //https://www.aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
     private static HttpClient _SharedHttpClient = null;
+    private static HttpClient _SharedHttpClientShortTimeout = null;
 
     private static HttpClient GetHttpClient() {
       if (_SharedHttpClient == null) {
         if (UjmwClientConfiguration.HttpClientFactory != null) {
-          _SharedHttpClient = UjmwClientConfiguration.HttpClientFactory.Invoke();
+          _SharedHttpClient = UjmwClientConfiguration.HttpClientFactory.Invoke(false);
         }
         else {
           _SharedHttpClient = new HttpClient();
+          _SharedHttpClient.Timeout = TimeSpan.FromMinutes(10);
         }
       }
       return _SharedHttpClient;
+    }
+
+    private static HttpClient GetHttpClientShortTimeout() {
+      if (_SharedHttpClientShortTimeout == null) {
+        if (UjmwClientConfiguration.HttpClientFactory != null) {
+          _SharedHttpClientShortTimeout = UjmwClientConfiguration.HttpClientFactory.Invoke(true);
+        }
+        else {
+          _SharedHttpClientShortTimeout = new HttpClient();
+          _SharedHttpClientShortTimeout.Timeout = TimeSpan.FromSeconds(3);
+        }
+      }
+      return _SharedHttpClientShortTimeout;
     }
 
     public static void DisposeHttpClient() {
       if (_SharedHttpClient != null) {
         _SharedHttpClient.Dispose();
         _SharedHttpClient = null;
+      }
+      if (_SharedHttpClientShortTimeout != null) {
+        _SharedHttpClientShortTimeout.Dispose();
+        _SharedHttpClientShortTimeout = null;
       }
     }
 

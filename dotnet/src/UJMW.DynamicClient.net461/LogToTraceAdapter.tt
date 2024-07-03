@@ -33,7 +33,7 @@
       content = EnsureUsing(content, "System.CodeDom.Compiler");
       content = EnsureUsing(content, "System.Runtime.CompilerServices");
 
-      content = content.Replace("{usings}\n","using System;\nusing System.Text;\nusing System.IO;\n");
+      content = content.Replace("{usings}\n","using System;\nusing System.Security.Cryptography;\nusing System.Reflection;\nusing System.ComponentModel;\nusing System.Text;\nusing System.IO;\n");
 
       string compilerGeneratedAttributes = "[CompilerGeneratedAttribute()][GeneratedCode( tool:\"" + sourceInfo + "\", version:\"" + vers + "\")]";
 
@@ -69,12 +69,16 @@ namespace Logging.SmartStandards {
   partial class DevToTraceLogger {
 
     private static string _LibPrefix = "(" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Name + ") ";
-
+    
     public static void LogCritical(int id, string messageTemplate, params object[] args) {
       LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogCritical(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+    }
+    public static void LogCritical(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
 
     public static void LogError(int id, string messageTemplate, params object[] args) {
@@ -83,12 +87,20 @@ namespace Logging.SmartStandards {
     public static void LogError(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 4, id, _LibPrefix + ex.Serialize(), new object[] {ex});
     }
+    public static void LogError(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 4, id, _LibPrefix + ex.Serialize(), new object[] { ex });
+    }
 
     public static void LogWarning(int id, string messageTemplate, params object[] args) {
       LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogWarning(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+    }
+    public static void LogWarning(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
 
     public static void LogInformation(int id, string messageTemplate, params object[] args) {
@@ -97,6 +109,10 @@ namespace Logging.SmartStandards {
     public static void LogInformation(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 2, id, _LibPrefix + ex.Serialize(), new object[] {ex});
     }
+    public static void LogInformation(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 2, id, _LibPrefix + ex.Serialize(), new object[] { ex });
+    }
 
     public static void LogDebug(int id, string messageTemplate, params object[] args) {
       LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + messageTemplate, args);
@@ -104,12 +120,20 @@ namespace Logging.SmartStandards {
     public static void LogDebug(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + ex.Serialize(), new object[] {ex});
     }
+    public static void LogDebug(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + ex.Serialize(), new object[] { ex });
+    }
 
     public static void LogTrace(int id, string messageTemplate, params object[] args) {
       LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogTrace(int id, System.Exception ex) {
       LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+    }
+    public static void LogTrace(System.Exception ex) {
+      int id = ExceptionSerializer.GetGenericIdFromException(ex);
+      LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
 
   }

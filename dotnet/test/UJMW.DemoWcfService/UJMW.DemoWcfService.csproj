@@ -53,13 +53,11 @@
       <HintPath>..\..\vendor\nuget\SmartAmbience.2.1.1\lib\net46\SmartAmbience.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
-    <Reference Include="SmartStandards.AuthTokenHandling, Version=2.7.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.2.7.0\lib\net46\SmartStandards.AuthTokenHandling.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="SmartStandards.AuthTokenHandling, Version=2.8.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.2.8.3\lib\net46\SmartStandards.AuthTokenHandling.dll</HintPath>
     </Reference>
-    <Reference Include="SmartStandards.Logging, Version=999.0.0.20061, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartStandards.Logging.0.3.0\lib\net46\SmartStandards.Logging.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="SmartStandards.Logging, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartStandards.Logging.1.0.2\lib\net46\SmartStandards.Logging.dll</HintPath>
     </Reference>
     <Reference Include="SwaggerWcf, Version=1.2.16.414, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\vendor\nuget\KornSW.SwaggerWcf.1.2.16.414\lib\net46\SwaggerWcf.dll</HintPath>

@@ -214,7 +214,7 @@ namespace System.Web.UJMW {
 
               }
               catch (Exception ex) {
-                DevToTraceLogger.LogError(0, ex);
+                DevToTraceLogger.LogError(ex);
                 //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {

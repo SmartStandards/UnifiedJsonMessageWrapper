@@ -142,11 +142,22 @@ namespace System.Web.UJMW {
       return cfg;
     }
 
-    public static Func<HttpClient> HttpClientFactory { get; set; } = (
-      () => {
-        HttpClientHandler httpClientHandler = new HttpClientHandler();
-        httpClientHandler.UseProxy = false;
 
+    /// <summary>
+    /// Creates an HttpClient and configures its default options
+    /// </summary>
+    /// <param name="shortTimeout">
+    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
+    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// </param>
+    /// <returns></returns>
+    public delegate HttpClient HttpClientFactoryMethod(bool shortTimeout);
+
+    public static HttpClientFactoryMethod HttpClientFactory { get; set; } = (
+      (bool shortTimeout) => {
+        HttpClientHandler httpClientHandler = new HttpClientHandler();
+
+        httpClientHandler.UseProxy = false;
         //if (httpClientHandler.Proxy is WebProxy) {
         //  ((WebProxy)httpClientHandler.Proxy).BypassProxyOnLocal = true;
         //}
@@ -155,6 +166,13 @@ namespace System.Web.UJMW {
         //}
 
         HttpClient httpClient = new HttpClient(httpClientHandler);
+        if (shortTimeout) {
+          httpClient.Timeout = TimeSpan.FromSeconds(3);
+        }
+        else {
+          httpClient.Timeout = TimeSpan.FromMinutes(10);
+        }
+
         return httpClient;
       }
     );

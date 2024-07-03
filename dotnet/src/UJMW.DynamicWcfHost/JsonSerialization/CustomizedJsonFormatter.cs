@@ -319,24 +319,24 @@ namespace System.Web.UJMW {
               UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(_ContractType, _ContractMethod, inputs);
             }
             catch (TargetInvocationException ex) {
-              throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+              throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72001", ex.InnerException);
             }
             catch (Exception ex) {
-              throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+              throw new ApplicationException($"ArgumentPreEvaluator for '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message + " #72001", ex);
             }
           }
           try {
             return _BaseInvoker.Invoke(instance, inputs, out outputs);
           }
           catch (TargetInvocationException ex) {
-            throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+            throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72000", ex.InnerException);
           }
           catch (Exception ex) {
-            throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+            throw new ApplicationException($"BL-Method '{_ContractMethod.Name}' has thrown an Exception: " + ex.Message + " #72000", ex);
           }
         }
         catch (Exception ex) {
-          DevToTraceLogger.LogError(0, ex);
+          DevToTraceLogger.LogError(ex);
           //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
           if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
             CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
