@@ -57,6 +57,9 @@ namespace System.Web.UJMW {
       return null;
     }
 
+    private string _CachedEndpointUrl = null;
+    private DateTime _EndpointUrlCacheTime = DateTime.MinValue;
+
     public object InvokeWebCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
          
       if(methodName == nameof(IDisposable.Dispose)) {
@@ -64,10 +67,17 @@ namespace System.Web.UJMW {
         return null;
       }
 
-      string rootUrl = _UrlGetter.Invoke();
-      if (!rootUrl.EndsWith("/")) {
-        rootUrl += "/";
-      }  
+      if (_EndpointUrlCacheTime < DateTime.Now) {
+        _CachedEndpointUrl = _UrlGetter.Invoke();
+        if (!_CachedEndpointUrl.EndsWith("/")) {
+          _CachedEndpointUrl += "/";
+        }
+        _EndpointUrlCacheTime = DateTime.Now.AddSeconds(
+          UjmwClientConfiguration.UrlGetterCacheSec
+        );
+      }
+
+      string endpointUrl = _CachedEndpointUrl;
 
       int currentTry = 0;
       do {
@@ -75,12 +85,15 @@ namespace System.Web.UJMW {
 
         try {
 
-          return InvokeWebCallInternal(rootUrl, methodName, arguments, argumentNames, methodSignatureString);
+          return InvokeWebCallInternal(endpointUrl, methodName, arguments, argumentNames, methodSignatureString);
 
         }
         catch (Exception ex) {
-          if(!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, ref rootUrl)) {
+          if(!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, ref endpointUrl)) {
             throw;
+          }
+          if (!endpointUrl.EndsWith("/")) {
+            endpointUrl += "/";
           }
         }
 

@@ -7,19 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
-
-
-
-## v 3.0.4
-released **2024-07-03**, including:
- - new revision without significant changes
-
-
-
-## v 3.0.3
-released **2024-06-24**, including:
- - new revision without significant changes
+* **new Feature**: added L2 caching for results of UrlGetter/AuthHeaderGetter (for 60/20sec's)
 
 
 

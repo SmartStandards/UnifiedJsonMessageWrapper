@@ -167,12 +167,12 @@ namespace System.Web.UJMW {
                   }
                   else {
                     string msg = "Rejected incomming request because of missing side channel";
-                    DevToTraceLogger.LogWarning(0, msg);
+                    DevToTraceLogger.LogWarning(72003, msg);
                     throw new Exception(msg);
                   }
                 }
 
-                DevToTraceLogger.LogTrace(0, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
+                DevToTraceLogger.LogTrace(72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 

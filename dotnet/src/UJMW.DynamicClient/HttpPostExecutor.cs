@@ -29,6 +29,9 @@ namespace System.Web.UJMW {
       _AuthHeaderGetter = authHeaderGetter;
     }
 
+    private string _CachedAuthHeader = null;
+    private DateTime _AuthHeaderCacheTime = DateTime.MinValue;
+
     public int ExecuteHttpPost(
       string url,
       string requestContent,
@@ -38,10 +41,13 @@ namespace System.Web.UJMW {
       out string reasonPhrase
     ) {
 
-      string authHeaderValue = null;
       if (_AuthHeaderGetter != null) {
-        //always on demand, because it could be a new one after expiration...
-        authHeaderValue = _AuthHeaderGetter.Invoke(); 
+        if (_AuthHeaderCacheTime < DateTime.Now) {
+          _CachedAuthHeader = _AuthHeaderGetter.Invoke();
+          _AuthHeaderCacheTime = DateTime.Now.AddSeconds(
+            UjmwClientConfiguration.AuthHeaderGetterCacheSec
+          );
+        }
       }
 
       HttpContent content = new StringContent(requestContent, Encoding.UTF8, "application/json");
@@ -57,8 +63,8 @@ namespace System.Web.UJMW {
 
         request.Content = content;
 
-        if (!string.IsNullOrWhiteSpace(authHeaderValue)) {
-          request.Headers.Add("Authorization", authHeaderValue);
+        if (!string.IsNullOrWhiteSpace(_CachedAuthHeader)) {
+          request.Headers.Add("Authorization", _CachedAuthHeader);
         }
 
         var requestTask = _HttpClient.SendAsync(request);

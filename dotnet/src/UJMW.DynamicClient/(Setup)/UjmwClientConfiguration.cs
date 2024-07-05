@@ -39,12 +39,26 @@ namespace System.Web.UJMW {
     );
     public static AuthHeaderGetterMethod DefaultAuthHeaderGetter { get; set; } = (t)=> null;
 
+    /// <summary>
+    /// When using a long living client instance,
+    /// then this value is used to control, when the given getter will be invoked again.
+    /// Default is 20sec.
+    /// </summary>
+    public static int AuthHeaderGetterCacheSec = 20;
+
     public delegate string UrlGetterMethod(
       Type contractType
     );
     public static UrlGetterMethod DefaultUrlGetter { get; set; } = (
       (t)=> throw new ApplicationException($"To initialize a DynamicUjmwClient whitout specifying an url explicitely, the '{nameof(UjmwClientConfiguration)}.{nameof(UjmwClientConfiguration.DefaultUrlGetter)}' must be initialized instead!")
     );
+
+    /// <summary>
+    /// When using a long living client instance,
+    /// then this value is used to control, when the given getter will be invoked again.
+    /// Default is 60sec.
+    /// </summary>
+    public static int UrlGetterCacheSec = 60;
 
     /// <summary>
     /// Returns true, if another attempt should me made!

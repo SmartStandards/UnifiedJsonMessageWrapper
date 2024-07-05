@@ -311,7 +311,7 @@ namespace System.Web.UJMW {
         //if (UjmwHostConfiguration.LoggingHook != null) {
         //  UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
         //}
-        DevToTraceLogger.LogTrace(0, $"Invoking UJMW call to UJMW Operation '{_ContractMethod.Name}'");
+        DevToTraceLogger.LogTrace(72000, $"Invoking UJMW call to UJMW Operation '{_ContractMethod.Name}'");
 
         try {
           if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
