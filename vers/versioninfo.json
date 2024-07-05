@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.0.4",
-  "currentVersionWithSuffix": "3.0.4",
+  "currentVersion": "3.1.0",
+  "currentVersionWithSuffix": "3.1.0",
   "releaseType": "official",
-  "previousVersion": "3.0.3",
-  "changeGrade": "patch",
+  "previousVersion": "3.0.2",
+  "changeGrade": "minor",
   "currentMajor": 3,
-  "currentMinor": 0,
-  "currentPatch": 4,
-  "versionDateInfo": "2024-07-03",
-  "versionTimeInfo": "13:19:56",
-  "versionNotes": "- new revision without significant changes\n"
+  "currentMinor": 1,
+  "currentPatch": 0,
+  "versionDateInfo": "2024-07-05",
+  "versionTimeInfo": "13:41:07",
+  "versionNotes": "- new Feature: added L2 caching for results of UrlGetter/AuthHeaderGetter (for 60/20sec's)\n"
 }
