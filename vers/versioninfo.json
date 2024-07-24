@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.1.0",
-  "currentVersionWithSuffix": "3.1.0",
+  "currentVersion": "3.1.1",
+  "currentVersionWithSuffix": "3.1.1",
   "releaseType": "official",
-  "previousVersion": "3.0.2",
-  "changeGrade": "minor",
+  "previousVersion": "3.1.0",
+  "changeGrade": "patch",
   "currentMajor": 3,
   "currentMinor": 1,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-07-05",
-  "versionTimeInfo": "13:41:07",
-  "versionNotes": "- new Feature: added L2 caching for results of UrlGetter/AuthHeaderGetter (for 60/20sec's)\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-07-24",
+  "versionTimeInfo": "08:14:36",
+  "versionNotes": "- more conrete tracking of Exceptions from Sidechannel-Restore-methods\n"
 }

@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* more conrete tracking of Exceptions from Sidechannel-Restore-methods
+*(none)*
+
+
+
+## v 3.1.1
+released **2024-07-24**, including:
+ - more conrete tracking of Exceptions from Sidechannel-Restore-methods
 
 
 
