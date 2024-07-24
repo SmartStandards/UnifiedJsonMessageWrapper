@@ -153,22 +153,38 @@ namespace System.Web.UJMW {
               }
               rdr.Read();
             }
-            if (sideChannelReceived) {
-              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
-              break;
-            }
           }
           catch (Exception ex) {
             HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No valid JSON";
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
+
+          if (sideChannelReceived) {
+            try {
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+            }
+            catch (Exception ex) {
+              DevToTraceLogger.LogError(ex);
+              HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
+              throw new WebFaultException(HttpStatusCode.BadRequest);
+            }
+            break;
+          }
+
         }
         else { //lets look into the http header
           if (httpRequest.Headers.TryGetValue(acceptedChannel, out string rawSideChannelContent)) {
             var serializer = new Newtonsoft.Json.JsonSerializer();
             sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
             sideChannelReceived = true;
-            _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+            try {
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+            }
+            catch (Exception ex) {
+              DevToTraceLogger.LogError(ex);
+              HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
+              throw new WebFaultException(HttpStatusCode.BadRequest);
+            }
             break;
           }
         }
@@ -182,7 +198,14 @@ namespace System.Web.UJMW {
             _InboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
             //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
             //passed to the processing method...
-            _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+            try {
+              _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
+            }
+            catch (Exception ex) {
+              DevToTraceLogger.LogError(ex);
+              HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
+              throw new WebFaultException(HttpStatusCode.BadRequest);
+            }
           }
         }
         else {
@@ -190,7 +213,6 @@ namespace System.Web.UJMW {
           HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No sidechannel provided.";
           throw new WebFaultException(HttpStatusCode.BadRequest);
         }
-
       }
 
       ///// (end) RESTORE INCOMMING SIDECHANNEL /////

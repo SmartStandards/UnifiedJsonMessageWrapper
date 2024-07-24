@@ -183,10 +183,10 @@ namespace System.Web.UJMW {
                     );
                   }
                   catch (TargetInvocationException ex) {
-                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72001", ex.InnerException);
                   }
                   catch (Exception ex) {
-                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72001", ex);
                   }
                 }
 
@@ -196,10 +196,10 @@ namespace System.Web.UJMW {
                   returnVal = contractMethod.Invoke(svc, serviceMethodParams);
                 }
                 catch (TargetInvocationException ex) {
-                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message, ex.InnerException);
+                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72000", ex.InnerException);
                 }
                 catch (Exception ex) {
-                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message, ex);
+                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72000", ex);
                 }
 
                 //map the return value
