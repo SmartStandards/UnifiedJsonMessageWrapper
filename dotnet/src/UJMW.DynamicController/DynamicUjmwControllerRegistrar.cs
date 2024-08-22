@@ -1,8 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Web.UJMW.SelfAnnouncement;
 
 namespace System.Web.UJMW {
 
@@ -13,6 +17,27 @@ namespace System.Web.UJMW {
 
     private Dictionary<Type, DynamicUjmwControllerOptions> _Entries = new Dictionary<Type, DynamicUjmwControllerOptions>();
     private ControllerFeature _GrabbedControllerFeature = null;
+
+    void IApplicationFeatureProvider<ControllerFeature>.PopulateFeature(
+      IEnumerable<ApplicationPart> parts, ControllerFeature feature
+    ) {
+      foreach (var _Entry in _Entries) {
+        DynamicUjmwControllerRegistrar.CreateAndRegisterController(feature, _Entry.Key, _Entry.Value);
+      }
+
+      if (_AnnouncementTriggerEndpointRequested) {
+        Type controllerType = typeof(AnnouncementTriggerEndpointController);
+        feature.Controllers.Add(controllerType.GetTypeInfo());
+        SelfAnnouncementHelper.RegisterEndpoint(
+          "UJMW.AnnouncementTriggerEndpoint",
+          "UJMW AnnouncementTriggerEndpoint",
+          AnnouncementTriggerEndpointController.Route,
+           EndpointCategory.AnnouncementTriggerEndpoint
+        );
+      }
+
+      _GrabbedControllerFeature = feature;
+    }
 
     public void AddControllerFor<TService>(string controllerRoute) {
       this.AddControllerFor(typeof(TService), new DynamicUjmwControllerOptions { ControllerRoute = controllerRoute });
@@ -33,29 +58,23 @@ namespace System.Web.UJMW {
       }
     }
 
-    void IApplicationFeatureProvider<ControllerFeature>.PopulateFeature(
-      IEnumerable<ApplicationPart> parts, ControllerFeature feature
-    ) {
-      foreach (var _Entry in _Entries) {
-        DynamicUjmwControllerRegistrar.CreateAndRegisterController(feature, _Entry.Key, _Entry.Value);
-      }
-      _GrabbedControllerFeature = feature;
+    private bool _AnnouncementTriggerEndpointRequested = false;
+    public void AddAnnouncementTriggerEndpoint() {
+      _AnnouncementTriggerEndpointRequested = true;
     }
 
     private static void CreateAndRegisterController(ControllerFeature feature, Type serviceType, DynamicUjmwControllerOptions options) {
-      Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(serviceType, options, out string controllerRoute);
+     
+      Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(
+        serviceType, options, out string controllerRoute, out string controllerTitle
+      );
+
       feature.Controllers.Add(dynamicController.GetTypeInfo());
-      lock (_AllRegisteredServiceTypesByRoute) {
-        _AllRegisteredServiceTypesByRoute[controllerRoute] = serviceType;
-      }
-    }
 
-    private static Dictionary<string, Type> _AllRegisteredServiceTypesByRoute = new Dictionary<string, Type>();
+      SelfAnnouncementHelper.RegisterEndpoint(
+        serviceType, controllerTitle, controllerRoute, EndpointCategory.DynamicUjmwController, options
+      );
 
-    public static KeyValuePair<string, Type>[] GetAllRegisteredServiceTypesByRoute() {
-      lock (_AllRegisteredServiceTypesByRoute) {
-        return _AllRegisteredServiceTypesByRoute.ToArray();
-      }
     }
 
   }

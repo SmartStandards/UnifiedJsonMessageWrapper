@@ -46,10 +46,10 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _SwaggerSchemaAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerSchemaAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
     
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null) {
-      return BuildDynamicControllerType(serviceType, options, out string dummy);
+      return BuildDynamicControllerType(serviceType, options, out string dummyRoute, out string dummyTitle);
     }
 
-    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute) {
+    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute, out string controllerTitle) {
       if(options == null) {
         options = new DynamicUjmwControllerOptions();
       }
@@ -90,7 +90,7 @@ namespace System.Web.UJMW {
         svcName = svcName.Substring(1);
       }
 
-      string controllerTitle = options.ControllerTitle;  
+      controllerTitle = options.ControllerTitle;  
       if (string.IsNullOrEmpty(controllerTitle)) {
         controllerTitle = svcName;
         if (genArgs.Any()) {
@@ -122,6 +122,8 @@ namespace System.Web.UJMW {
         }
       }
 
+      controllerRoute = controllerRoute.Replace("[Controller]", svcName + classDiscriminator);
+
       TypeBuilder typeBuilder = moduleBuilder.DefineType(
         svcName + classDiscriminator + "Controller",
         TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
@@ -133,7 +135,7 @@ namespace System.Web.UJMW {
       );
       typeBuilder.SetCustomAttribute(RouteAttribBuilder);
 
-      if(_TagsAttributeContructor != null) {
+      if (_TagsAttributeContructor != null) {
         CustomAttributeBuilder tagsAttribBuilder = new CustomAttributeBuilder(
          _TagsAttributeContructor, new object[] { new string[] { controllerTitle } }
         );

@@ -1,34 +1,23 @@
+using Demo;
+using DistributedDataFlow;
+using Logging.SmartStandards;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi.Models;
-using System;
-using Microsoft.AspNetCore.Mvc.Formatters;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Configuration;
-using System.IO;
-using Swashbuckle.AspNetCore.SwaggerGen;
-using Microsoft.OpenApi.Writers;
+using Microsoft.OpenApi.Models;
 using Security.AccessTokenHandling;
-using Microsoft.AspNetCore.Authentication.Negotiate;
-using Security.AccessTokenHandling.OAuthServer;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
-using Microsoft.AspNetCore.Mvc.Controllers;
-using System.Collections.Generic;
+using System;
+using System.IO;
 using System.Linq;
-using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
-using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using System.Text;
 using System.Web.UJMW;
-using Microsoft.AspNetCore.Authorization;
-using System.Net.Http;
+using System.Web.UJMW.SelfAnnouncement;
 using UJMW.DemoWcfService;
-using Microsoft.AspNetCore;
-using DistributedDataFlow;
-using Demo;
-using Logging.SmartStandards;
 
 namespace Security {
 
@@ -196,6 +185,8 @@ namespace Security {
         r.AddControllerFor<IGenericInterface<Foo, int>>(repoControllerOptions);
         r.AddControllerFor<IGenericInterface<Bar, string>>(repoControllerOptions);
 
+        r.AddAnnouncementTriggerEndpoint();
+
       });
 
       services.AddSwaggerGen(c => {
@@ -265,7 +256,10 @@ namespace Security {
     }
     
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerfactory) {
+    public void Configure(
+      IApplicationBuilder app, IWebHostEnvironment env,
+      ILoggerFactory loggerfactory, IHostApplicationLifetime lifetimeEvents
+    ) {
 
       var logFileFullName = _Configuration.GetValue<string>("LogFileName");
       var logDir = Path.GetFullPath(Path.GetDirectoryName(logFileFullName));
@@ -284,8 +278,8 @@ namespace Security {
         app.UseDeveloperExceptionPage();
       }
 
+      var baseUrl = _Configuration.GetValue<string>("BaseUrl");
       if (_Configuration.GetValue<bool>("EnableSwaggerUi")) {
-        var baseUrl = _Configuration.GetValue<string>("BaseUrl");
 
         app.UseSwagger(o => {
           //warning: needs subfolder! jsons cant be within same dir as swaggerui (below)
@@ -315,7 +309,7 @@ namespace Security {
       }
 
       app.UseHttpsRedirection();
-
+      
       app.UseRouting();
 
       //CORS: muss zwischen 'UseRouting' und 'UseEndpoints' liegen!
@@ -332,7 +326,43 @@ namespace Security {
         endpoints.MapControllers();
       });
 
-      var allRoutesToAnnounce = DynamicUjmwControllerRegistrar.GetAllRegisteredServiceTypesByRoute();
+      SelfAnnouncementHelper.Configure(
+        lifetimeEvents, app.ServerFeatures,
+        (string[] baseUrls, EndpointInfo[] endpoints, bool act, ref string info) => {
+
+          var sb = new StringBuilder(); 
+          string timestamp = DateTime.Now.ToLongTimeString();
+
+          Console.WriteLine("--------------------------------------");
+          if (act) {
+            Console.WriteLine("ANNOUNCE:");
+          }
+          else {
+            Console.WriteLine("UN-ANNOUNCE:");
+          }
+          Console.WriteLine("--------------------------------------");
+          foreach (EndpointInfo ep in endpoints) {
+            foreach (string url in baseUrls) {
+              Console.WriteLine(ep.ToString(url));
+              sb.Append(ep.ToString(url));
+              if (act) {
+                sb.AppendLine(" >> ONLINE @" + timestamp);
+              }
+              else {
+                sb.AppendLine(" >> offline @" + timestamp);
+              }
+
+            }
+          }
+          Console.WriteLine("--------------------------------------");
+
+          File.WriteAllText("_AnnouncementInfo.txt", sb.ToString());
+
+          info = "was additionally written into file '_AnnouncementInfo.txt'";
+
+        },
+        autoTriggerInterval: 1
+      );
 
     }
 

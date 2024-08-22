@@ -1,4 +1,7 @@
 ﻿
+using Microsoft.Extensions.Options;
+using System.Linq;
+
 namespace System.Web.UJMW {
 
   public class DynamicUjmwControllerOptions {

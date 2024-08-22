@@ -49,6 +49,7 @@
   <ItemGroup>
     <None Remove="ORSCF.SimpleVisitDataRepository.WebAPI.xml" />
     <None Remove="Security.WebAPI.csproj.vspscc" />
+    <None Remove="_AnnouncementInfo.txt" />
   </ItemGroup>
 
   <ItemGroup>
