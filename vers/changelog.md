@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: added Support for self announcement of endpoints to a given registry
+*(none)*
+
+
+
+## v 3.2.0
+released **2024-09-03**, including:
+ - **new Feature**: added Support for self announcement of endpoints to a given registry
 
 
 
