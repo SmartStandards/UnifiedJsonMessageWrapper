@@ -3,13 +3,20 @@ using Security.AccessTokenHandling;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Runtime.Remoting.Contexts;
 using System.ServiceModel;
+using System.ServiceModel.Description;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web;
+using System.Web.Hosting;
 using System.Web.ModelBinding;
+using System.Web.Services.Description;
 using System.Web.UJMW;
+using System.Web.UJMW.SelfAnnouncement;
 
 namespace UJMW.DemoWcfService {
 
@@ -24,6 +31,10 @@ namespace UJMW.DemoWcfService {
     private static bool _IsInitialized = false;
     public void Init(HttpApplication context) {
 
+      context.BeginRequest += (s, a) => {
+        SelfAnnouncementHelper.OnApplicationStarted();
+      };
+
       if (_IsInitialized) {
         return;
       }
@@ -31,7 +42,7 @@ namespace UJMW.DemoWcfService {
         _IsInitialized = true;
       }
 
-      if(AmbientField.ContextAdapter == null) {
+      if (AmbientField.ContextAdapter == null) {
         AmbientField.ContextAdapter = new AmbienceToAppdomainAdapter();
       }
 
@@ -40,6 +51,11 @@ namespace UJMW.DemoWcfService {
 
       UjmwHostConfiguration.AuthHeaderEvaluator = (
         (string rawAuthHeader, Type contractType, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
+         
+          if(contractType == typeof(IAnnouncementTriggerEndpoint)) {
+            return true;
+          }
+          
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
             httpReturnCode = 403;
@@ -134,13 +150,48 @@ namespace UJMW.DemoWcfService {
 
       UjmwHostConfiguration.SetupCompleted();
 
-  }
+      string announcementInfoFile = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "_AnnouncementInfo.txt");
 
-    public static void RestoreValuesFrom(
-      IEnumerable<KeyValuePair<string, string>> sourceToRestore, string flowingContractName) { 
-    }
-    public static void RestoreValuesFrom(
-      IEnumerable<KeyValuePair<string, string>> sourceToRestore) {
+      SelfAnnouncementHelper.Configure(
+        (string[] baseUrls, EndpointInfo[] endpoints, bool act, ref string info) => {
+
+          var sb = new StringBuilder();
+          string timestamp = DateTime.Now.ToLongTimeString();
+
+          Console.WriteLine("--------------------------------------");
+          if (act) {
+            Console.WriteLine("ANNOUNCE:");
+          }
+          else {
+            Console.WriteLine("UN-ANNOUNCE:");
+          }
+          Console.WriteLine("--------------------------------------");
+          foreach (EndpointInfo ep in endpoints) {
+            foreach (string url in baseUrls) {
+              Console.WriteLine(ep.ToString(url));
+              sb.Append(ep.ToString(url));
+              if (act) {
+                sb.AppendLine(" >> ONLINE @" + timestamp);
+              }
+              else {
+                sb.AppendLine(" >> offline @" + timestamp);
+              }
+
+            }
+          }
+          Console.WriteLine("--------------------------------------");
+
+          File.WriteAllText(announcementInfoFile, sb.ToString());
+
+          info = "was additionally written into file '_AnnouncementInfo.txt'";
+
+        },
+        autoTriggerInterval: 1
+      );
+
+      //kann einkommentiert werden, um datei direkt anzuzeigen
+      //System.Diagnostics.Process.Start(announcementInfoFile);
+
     }
 
     public void Dispose() {

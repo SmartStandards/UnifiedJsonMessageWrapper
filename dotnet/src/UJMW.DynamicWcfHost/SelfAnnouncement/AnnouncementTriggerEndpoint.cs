@@ -1,94 +1,107 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using System.IO;
+﻿using Logging.SmartStandards;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
+using System.ServiceModel;
+using System.ServiceModel.Web;
 
 namespace System.Web.UJMW.SelfAnnouncement {
 
-  [Route(Route)]
-  internal class AnnouncementTriggerEndpointController : Controller {
+  [ServiceContract]
+  public interface IAnnouncementTriggerEndpoint {
 
-    public const string Route = "Announcement.svc";
+    [OperationContract]
+    [WebInvoke(Method = "GET")]
+    object ShowState();
 
-    [HttpGet(), Produces("application/json")]
-    public IActionResult ShowState() {
+    [OperationContract]
+    [WebInvoke(Method = "GET")]
+    object Announce();
+
+    [OperationContract]
+    [WebInvoke(Method = "GET")]
+    object Unannounce();
+
+  }
+
+  public class AnnouncementTriggerEndpoint : IAnnouncementTriggerEndpoint {
+
+    public AnnouncementTriggerEndpoint() {
+      SelfAnnouncementHelper.OnApplicationStarted();
+    }
+
+    public object ShowState() {
+
       if (string.IsNullOrWhiteSpace(SelfAnnouncementHelper.LastFault)) {
-        return Ok(new {
+        return new {
           lastActionTime = SelfAnnouncementHelper.LastActionTime,
           lastAction = SelfAnnouncementHelper.LastAction,
           baseUrls = SelfAnnouncementHelper.BaseUrls,
           endpoints = GetReducedEndpointInfo(),
           lastAddInfo = SelfAnnouncementHelper.LastAddInfo,
           lastFault = SelfAnnouncementHelper.LastFault
-        });
+        };
       }
       else {
-        return Ok(new {
+        return new {
           lastActionTime = SelfAnnouncementHelper.LastActionTime,
           lastAction = SelfAnnouncementHelper.LastAction,
           lastFault = SelfAnnouncementHelper.LastFault,
           lastAddInfo = SelfAnnouncementHelper.LastAddInfo,
-        });
+        };
       }
     }
 
-    [HttpGet(nameof(Announce)), Produces("application/json")]
-    public IActionResult Announce() {
+    public object Announce() {
       string addInfo = null;
       try {
-        if(!SelfAnnouncementHelper.TriggerSelfAnnouncement(out addInfo, false)) {
-          return Ok(new {
+        if (!SelfAnnouncementHelper.TriggerSelfAnnouncement(out addInfo, false)) {
+          return new {
             action = "announce",
             fault = "Failed",
             addInfo = addInfo,
-          });
-        }   
+          };
+        }
       }
       catch (Exception ex) {
-        return Ok(new {
+        return new {
           action = "announce",
           fault = ex.Message,
           addInfo = addInfo,
-        });
+        };
       }
-      return Ok(new {
+      return new {
         action = "announce",
         baseUrls = SelfAnnouncementHelper.BaseUrls,
         endpoints = GetReducedEndpointInfo(),
         addInfo = addInfo,
         fault = (string)null,
-      });
+      };
     }
 
-    [HttpGet(nameof(Unannounce)), Produces("application/json")]
-    public IActionResult Unannounce() {
+    public object Unannounce() {
       string addInfo = null;
       try {
         if (!SelfAnnouncementHelper.TriggerSelfAnnouncement(out addInfo, false)) {
-          return Ok(new {
+          return new {
             action = "unannounce",
             fault = "Failed",
             addInfo = addInfo,
-          });
+          };
         }
       }
       catch (Exception ex) {
-        return Ok(new {
+        return new {
           action = "unannounce",
           fault = ex.Message,
           addInfo = addInfo,
-        });
+        };
       }
-      return Ok(new {
+      return new {
         action = "unannounce",
         baseUrls = SelfAnnouncementHelper.BaseUrls,
         endpoints = GetReducedEndpointInfo(),
         addInfo = addInfo,
         fault = (string)null,
-      });
+      };
     }
 
     private object[] GetReducedEndpointInfo() {

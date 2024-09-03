@@ -7,7 +7,7 @@ namespace System.Web.UJMW {
 
   public delegate bool ServiceContractInterfaceSelectorMethod(
     Type serviceImplementationType,
-    string url,
+    string relativeAddress,
     out Type serviceContractInterfaceType
   );
 
@@ -103,7 +103,7 @@ namespace System.Web.UJMW {
     }
 
     public static ServiceContractInterfaceSelectorMethod ContractSelector { get; set; } = (
-      (Type serviceImplementationType, string url, out Type serviceContractInterfaceType) => {
+      (Type serviceImplementationType, string relativeAddress, out Type serviceContractInterfaceType) => {
 
         Type[] allInterfaces = serviceImplementationType.GetInterfaces().Where(
          (i) => (i != typeof(IDisposable))
@@ -129,7 +129,7 @@ namespace System.Web.UJMW {
           return false;
         }
 
-        string[] urlTokens = url.Split('/');
+        string[] urlTokens = relativeAddress.Split('/');
         string endpointNameInUrl = urlTokens[urlTokens.Length - 1];
         if (endpointNameInUrl.EndsWith(".svc")) {
           endpointNameInUrl = endpointNameInUrl.Substring(0, endpointNameInUrl.Length - 4);

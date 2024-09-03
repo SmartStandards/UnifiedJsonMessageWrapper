@@ -10,8 +10,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
       string contractIdentifyingName,
       string title,
       string relativeRoute,
-      EndpointCategory endpointCategory,
-      DynamicUjmwControllerOptions ujmwOptions = null
+      EndpointCategory endpointCategory
     ) {
 
       this.ContractType = contractType;
@@ -26,7 +25,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
       if (this.RelativeRoute.StartsWith("/")) {
         this.RelativeRoute = this.RelativeRoute.Substring(1, this.RelativeRoute.Length - 1);
       }
-      this.UjmwOptions = ujmwOptions;
+
     }
 
     /// <summary>
@@ -44,11 +43,6 @@ namespace System.Web.UJMW.SelfAnnouncement {
     /// NOTE: has NEVER a leading slash (technical ensured)
     /// </summary>
     public string RelativeRoute { get; private set; }
-
-    /// <summary>
-    /// WARNING: can be null, if the endpoint is not an ujmw endpoint!
-    /// </summary>
-    public DynamicUjmwControllerOptions UjmwOptions { get; private set; }
 
     public override string ToString() {
       return $"{RelativeRoute} ({ContractIdentifyingName})";

@@ -1,11 +1,9 @@
 ﻿using Logging.SmartStandards;
-using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Extensions.Hosting;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
+using System.Web.Hosting;
 
 namespace System.Web.UJMW.SelfAnnouncement {
 
@@ -29,6 +27,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
   public static class SelfAnnouncementHelper {
 
     private static string[] _BaseUrls = null;
+    private static bool _DisableAutoEvaluatedBaseUrls = false;
+
     private static AnnouncementMethod _SelfAnnouncementMethod = null;
     private static int _AutoTriggerInterval = -1;
 
@@ -38,19 +38,17 @@ namespace System.Web.UJMW.SelfAnnouncement {
     private static Task _AutoTriggerTask = null;
     private static DateTime _NextAutoAnnounce = DateTime.MinValue;
 
-    #region " FULL Convenience w. auto-event wire-up "
-
     /// <summary>
     ///  Configures the self announcement framework.
-    ///  This overload allows to choose between automatic announcement (in default),
-    ///  recurring automatic announcement and manual announcement (see the 'autoTriggerInterval').
+    ///  This overload enables automatic evaluation of the application's baseAddress.
+    ///  This gives more convenience, but there are some traps in WCF!
+    ///  The Auto-announce wont start until 'SelfAnnouncementHelper.OnApplicationStarted() has been called - 
+    ///  BUT you should NOT do this directly from a IHttpModule, because under IISExpress you will louse your
+    ///  Port-Information! If youre using external triggers (via 'SelfAnnouncementTriggerEndpoint') just skip any
+    ///  call to 'OnApplicationStarted' - it will be done implicitely. If not, you should add the followig code as
+    ///  FIRST statement within your IHttpModule: 
+    ///  context.BeginRequest += (s, a) => SelfAnnouncementHelper.OnApplicationStarted();
     /// </summary>
-    /// <param name="hostApplicationLifetime">
-    ///   can be requested to be injected in the 'Configure'-method
-    /// </param>
-    /// <param name="featureCollection">
-    ///   can be retrieved from your IApplicationBuilder like this: app.ServerFeatures
-    /// </param>
     /// <param name="selfAnnouncementMethod">
     ///  a callback to dispatch the endpoint information to the target registry which collects all urls
     /// </param>
@@ -62,78 +60,26 @@ namespace System.Web.UJMW.SelfAnnouncement {
     ///  from external via http (requires, that the SelfAnnouncementTriggerEndpoint has been initialized).
     /// </param>
     public static void Configure(
-      IHostApplicationLifetime hostApplicationLifetime,
-      IFeatureCollection featureCollection,
       AnnouncementMethod selfAnnouncementMethod,
       int autoTriggerInterval = 0
     ) {
 
-      //register an eventhandler to wait at the right moment...
-      hostApplicationLifetime.ApplicationStarted.Register(() => {
+      if (_SelfAnnouncementMethod != null) {
+        throw new Exception("The 'Configure' method has already been called!");
+      }
+      if (selfAnnouncementMethod == null) {
+        throw new Exception("The 'selfAnnouncementMethod' must not be null!");
+      }
 
-        //... when the 'IServerAddressesFeature' will be available:
-        var addressFeature = featureCollection.Get<IServerAddressesFeature>();
-
-        //auto evaluate the current hosting address
-        if (addressFeature.Addresses.Any()) {
-
-          //configure
-          SelfAnnouncementHelper.Configure(
-            addressFeature.Addresses.ToArray(),
-            selfAnnouncementMethod,
-            autoTriggerInterval
-          );
-
-          //if were not in maunal mode...
-          if (autoTriggerInterval >= 0) {
-
-            //prepare wireup for auto de-announce at application stop
-            hostApplicationLifetime.ApplicationStopping.Register(
-              SelfAnnouncementHelper.OnApplicationStopping
-            );
-
-          }
-
-          //now were done - lets notify that were ready
-          //(this will implicitely start auto-announce, if configured)
-          SelfAnnouncementHelper.OnApplicationStarted();
-
-        }
-
-      });
-
-    }
-
-    #endregion
-
-    /// <summary>
-    ///  Configures the self announcement framework for manual usage
-    ///  Either by calling the 'TriggerSelfAnnouncement()' method or
-    ///  from external via http (requires, that the SelfAnnouncementTriggerEndpoint has been initialized).
-    /// </summary>
-    /// <param name="baseUrls"></param>
-    /// <param name="selfAnnouncementMethod">
-    ///  a callback to dispatch the endpoint information to the target registry which collects all urls
-    /// </param>
-    public static void Configure(
-      string[] baseUrls,
-      AnnouncementMethod selfAnnouncementMethod
-    ) {
-
-      Configure(
-        baseUrls,
-        selfAnnouncementMethod,
-        -1 //the public method will not offer enablement funktionality for the autoTrigger,
-           //because it would only work if additinal application-event wirepups will be done...
-           //if this is the goal, then the other convenience overload should be used (see below) 
-      );
-
+      ConfigureInternal(selfAnnouncementMethod, autoTriggerInterval);
     }
 
     /// <summary>
     ///  Configures the self announcement framework.
+    ///  This overload disabled automatic evaluation of the application's baseAddress and uses the given baseUrls explicitely!
     /// </summary>
-    /// <param name="baseUrls"></param>
+    /// <param name="baseUrls">
+    /// </param>
     /// <param name="selfAnnouncementMethod">
     ///  a callback to dispatch the endpoint information to the target registry which collects all urls
     /// </param>
@@ -143,13 +89,11 @@ namespace System.Web.UJMW.SelfAnnouncement {
     ///  If set to -1, the self announce must be triggered manually ->
     ///  either by calling the 'TriggerSelfAnnouncement()' method or
     ///  from external via http (requires, that the SelfAnnouncementTriggerEndpoint has been initialized).
-    ///  IMPORTANT: to use auto announce (and un-announce), youll need to wire-up or call the 
-    ///  'OnApplicationStarted' and 'OnApplicationStopping' methods (see comments, how to do so)
     /// </param>
-    private static void Configure(
+    public static void Configure(
       string[] baseUrls,
       AnnouncementMethod selfAnnouncementMethod,
-      int autoTriggerInterval
+      int autoTriggerInterval = 0
     ) {
 
       if (_SelfAnnouncementMethod != null) {
@@ -162,6 +106,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         throw new ArgumentException("There is no baseUrl!");
       }
 
+      _DisableAutoEvaluatedBaseUrls = true;
       _BaseUrls = baseUrls.Select((u) => {
         if (u.EndsWith("/")) {
           return u;
@@ -171,8 +116,24 @@ namespace System.Web.UJMW.SelfAnnouncement {
         }
       }).ToArray();
 
+      ConfigureInternal(selfAnnouncementMethod, autoTriggerInterval);
+
+    }
+
+    private static void ConfigureInternal(
+      AnnouncementMethod selfAnnouncementMethod,
+      int autoTriggerInterval = 0
+    ) {
+
       _SelfAnnouncementMethod = selfAnnouncementMethod;
       _AutoTriggerInterval = autoTriggerInterval;
+
+      lock (_RegisteredEndpoints) {
+        EndpointInfo[] configuredEndpoints = EndpointEnumerationHelper.EnumerateWcfEndpoints();
+        foreach (EndpointInfo ep in configuredEndpoints) {
+          _RegisteredEndpoints.Add(ep);
+        }
+      }
 
       if (_ApplicationReady) {
         StartAutoAnnounce();
@@ -182,7 +143,12 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
     internal static string[] BaseUrls {
       get {
-        return _BaseUrls;
+        if (_BaseUrls == null) {
+          EnsureBaseUrlsPresent();
+        }
+        lock (_BaseUrls) {
+          return _BaseUrls;
+        }
       }
     }
 
@@ -196,7 +162,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
     public static void RegisterEndpoint(
       string contractIdentifyingName,
-      string controllerTitle,
+      string serviceTitle,
       string relativeRoute,
       EndpointCategory endpointCategory
     ) {
@@ -206,7 +172,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _RegisteredEndpoints.Add(
           new EndpointInfo(
              null, contractIdentifyingName,
-             controllerTitle, relativeRoute, endpointCategory, null
+             serviceTitle, relativeRoute, endpointCategory
           )
         );
 
@@ -217,8 +183,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
       Type contractType,
       string controllerTitle,
       string relativeRoute,
-      EndpointCategory endpointCategory,
-      DynamicUjmwControllerOptions ujmwOptions = null
+      EndpointCategory endpointCategory
     ) {
 
       lock (_RegisteredEndpoints) {
@@ -226,7 +191,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _RegisteredEndpoints.Add(
           new EndpointInfo(
              contractType, SelfAnnouncementHelper.BuildContractidentifyingName(contractType),
-             controllerTitle, relativeRoute, endpointCategory, ujmwOptions
+             controllerTitle, relativeRoute, endpointCategory
           )
         );
 
@@ -249,7 +214,9 @@ namespace System.Web.UJMW.SelfAnnouncement {
             }
             Threading.Thread.Sleep(1000);
           }
-        });  
+        });
+
+        //TODO: prüfen ab man das via 'HostingEnvironment.QueueBackgroundWorkItem' tun kann
 
       }
 
@@ -261,9 +228,10 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
     internal static bool TriggerSelfAnnouncement(out string addInfo, bool catchExceptions = true) {
 
-      if(_BaseUrls == null) {
+      if(_SelfAnnouncementMethod == null) {
         throw new Exception("Calling this method is not allowed before the 'Configure' method has been called!");
       }
+      OnApplicationStarted();
 
       LastAction = "announce";
       LastActionTime = DateTime.Now;
@@ -298,9 +266,10 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
     public static void TriggerUnAnnouncement() {
 
-      if (_BaseUrls == null) {
+      if (_SelfAnnouncementMethod == null) {
         throw new Exception("Calling this method is not allowed before the 'Configure' method has been called!");
       }
+      OnApplicationStarted();
 
       LastAction = "unannounce";
       LastActionTime = DateTime.Now;
@@ -325,12 +294,30 @@ namespace System.Web.UJMW.SelfAnnouncement {
       }
     }
 
+    private static void EnsureBaseUrlsPresent() { 
+      if(_BaseUrls == null) {
+        if (_DisableAutoEvaluatedBaseUrls) {
+          //wird durch die configure-methode überklatscht
+          //und vorher findet sowieso kein annunce statt
+          _BaseUrls = new string[] { };
+        }
+        else {
+          _BaseUrls = EndpointEnumerationHelper.GetBaseAddressesFromConfig();
+          string baseAddressFromCurrentRequest = EndpointEnumerationHelper.GetBaseAddressFromCurrentRequest();
+          if (!string.IsNullOrWhiteSpace(baseAddressFromCurrentRequest) && !_BaseUrls.Contains(baseAddressFromCurrentRequest)) {
+            Array.Resize(ref _BaseUrls, _BaseUrls.Length + 1);
+            _BaseUrls[_BaseUrls.Length - 1] = baseAddressFromCurrentRequest;
+          }
+        }
+      }
+    }
+
     /// <summary>
-    /// If Auto announce is used, then this
-    /// needs to be called from the main method 
-    /// when the application startup phase has been completed.
-    /// (you can easyly do this by wireing up the
-    /// 'IHostApplicationLifetime.ApplicationStarted'-Event)
+    ///  WARNING: you should NOT call this directly from a IHttpModule, because under IISExpress you will louse your
+    ///  Port-Information! If youre using external triggers (via 'SelfAnnouncementTriggerEndpoint') just skip any
+    ///  call to 'OnApplicationStarted' - it will be done implicitely. If not, you should add the followig code as
+    ///  FIRST statement within your IHttpModule: 
+    ///  context.BeginRequest += (s, a) => SelfAnnouncementHelper.OnApplicationStarted();
     /// </summary>
     public static void OnApplicationStarted() {
 
@@ -339,10 +326,18 @@ namespace System.Web.UJMW.SelfAnnouncement {
       }
       _ApplicationReady = true;
 
+      EnsureBaseUrlsPresent();
+     
       //only if were alredy configured...
       if (_SelfAnnouncementMethod != null) {
         StartAutoAnnounce();
       }
+
+      HostingEnvironment.RegisterObject(
+        new HostingEnvironmentShutdownNotifier(
+          SelfAnnouncementHelper.OnApplicationStopping
+        )
+      );
 
     }
 
@@ -364,7 +359,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _AutoTriggerTask.Wait();
         _AutoTriggerTask.Dispose();
         _AutoTriggerTask = null;
-      }  
+      }
     }
 
     /// <summary>
@@ -420,6 +415,20 @@ namespace System.Web.UJMW.SelfAnnouncement {
     internal static string LastAddInfo { get; private set; } = "";
     internal static string LastFault { get; private set; } = "";
 
+  }
+
+  internal class HostingEnvironmentShutdownNotifier : IRegisteredObject {
+
+    private Action _CallbackOnShutdown;
+
+    public HostingEnvironmentShutdownNotifier(Action callbackOnShutdown) {
+      _CallbackOnShutdown = callbackOnShutdown;
+    }
+
+    public void Stop(bool immediate) {
+      if (immediate) return;
+      _CallbackOnShutdown.Invoke();
+    }
 
   }
 

@@ -72,7 +72,7 @@ namespace System.Web.UJMW {
       feature.Controllers.Add(dynamicController.GetTypeInfo());
 
       SelfAnnouncementHelper.RegisterEndpoint(
-        serviceType, controllerTitle, controllerRoute, EndpointCategory.DynamicUjmwController, options
+        serviceType, controllerTitle, controllerRoute, EndpointCategory.DynamicUjmwFacade, options
       );
 
     }

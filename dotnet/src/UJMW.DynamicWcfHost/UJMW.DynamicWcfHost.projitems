@@ -9,17 +9,21 @@
     <Import_RootNamespace>System</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\AnnouncementTriggerEndpoint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\EndpointEnumerationHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\EndpointInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\SelfAnnouncementHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)[Helpers]\InternalExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Dispatching\ServiceBehaviorToApplyDispatchHooks.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Dispatching\DispatchMessageInspector.cs" />      
+    <Compile Include="$(MSBuildThisFileDirectory)Dispatching\DispatchMessageInspector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FaultHandling\CustomFaultBodyWriter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FaultHandling\RawFaultMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)JsonSerialization\CustomizedJsonContentTypeMapper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)JsonSerialization\CustomizedWebHttpBehaviourForJson.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)JsonSerialization\CustomizedJsonFormatter.cs" /> 
+    <Compile Include="$(MSBuildThisFileDirectory)JsonSerialization\CustomizedJsonFormatter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Setup\IncommingRequestSideChannelConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Setup\OutgoingResponseSideChannelConfiguration.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Setup\UjmwHostConfiguration.cs" />     
+    <Compile Include="$(MSBuildThisFileDirectory)Setup\UjmwHostConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwServiceHostFactory.cs" />
   </ItemGroup>
   <ItemGroup>

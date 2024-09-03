@@ -25,7 +25,7 @@ namespace UJMW.DemoWcfService {
   public class DemoService : IDemoService {
 #endif
 
-     private static AmbientField currentTenant = new AmbientField("currentTenant", true);
+    private static AmbientField currentTenant = new AmbientField("currentTenant", true);
 
     /*
      *  To test the demo send a HTTP-POST to
