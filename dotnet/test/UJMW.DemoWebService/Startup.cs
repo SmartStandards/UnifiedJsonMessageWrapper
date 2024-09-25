@@ -154,36 +154,26 @@ namespace Security {
       services.AddSingleton<IDemoFileService>(svc);
 
       services.AddDynamicUjmwControllers(r => {
+
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
-          //ControllerRoute = "DemoService.svc",
-          ControllerRoute = "v1/[Controller].svc",
-          //EnableResponseSidechannel = false,
-          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
-          //AuthAttributeConstructorParams = new object[] { new string[] { } }
+          ControllerRoute = "v1/[Controller].svc"
         });
 
         r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {
-          ControllerRoute = "FileStore",
-          EnableResponseSidechannel = false,
-          EnableRequestSidechannel = false,
-          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
-          //AuthAttributeConstructorParams = new object[] { new string[] { } }
+          ControllerRoute = "FileStore"
         });
 
         var repoControllerOptions = new DynamicUjmwControllerOptions {
           ControllerRoute = "Repo/{0}",
-          EnableResponseSidechannel = false,
-          EnableRequestSidechannel = false,
-          //AuthAttribute = typeof(EvaluateBearerTokenAttribute),
-          //AuthAttributeConstructorParams = new object[] { new string[] { } }
-          ClassNameDiscriminator = "_{0}_",
-          ControllerTitle = "Gen ({0})"
-
+          ControllerTitle = "Gen ({0})",
+          ControllerNamePattern = "{0}Repository"
         };
-
         r.AddControllerFor<IGenericInterface<Foo, int>>(repoControllerOptions);
         r.AddControllerFor<IGenericInterface<Bar, string>>(repoControllerOptions);
+
+        r.AddControllerFor<IFooStore>();
+        r.AddControllerFor<IBarStore>();
 
         r.AddAnnouncementTriggerEndpoint();
 
@@ -368,4 +358,8 @@ namespace Security {
 
   }
 
+  public interface IFooStore : IGenericInterface<Foo, int> { 
+  }
+  public interface IBarStore : IGenericInterface<Bar, string> {
+  }
 }

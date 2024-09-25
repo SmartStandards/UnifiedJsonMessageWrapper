@@ -23,7 +23,6 @@ namespace System.Web.UJMW {
     private const string UjmwReturnPropertyName = "return";
     private const string UjmwFaultPropertyName = "fault";
     private const string UjmwSideChannelPropertyName = "_";
-    private const string UjmwResponseDtoNamespaceSuffix = "Dtos.";
     private const string UjmwResponseDtoSuffix = "Response";
     private const string UjmwRequestDtoSuffix = "Request";
 
@@ -78,54 +77,96 @@ namespace System.Web.UJMW {
 
       var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
 
-      // ##### CLASS DEFINITION #####
+      ////////////// NAMING ///////////////////////////////////////////////////////////////////
 
-      string svcName = serviceType.Name;
-      string[] genArgs = new string[] {};
+      string originalTypeName = serviceType.Name;
+
+      string[] genArgs = new string[] { };
       if (serviceType.IsGenericType) {
-        svcName = svcName.Substring(0, svcName.IndexOf('`'));
-        genArgs = serviceType.GetGenericArguments().Select((t)=>t.Name).ToArray();
+        originalTypeName = originalTypeName.Substring(0, originalTypeName.IndexOf('`'));
+        genArgs = serviceType.GetGenericArguments().Select((t) => t.Name).ToArray();
       }
-      if (serviceType.IsInterface && svcName.StartsWith("I") && char.IsUpper(svcName[1])) {
-        svcName = svcName.Substring(1);
+      if (serviceType.IsInterface && originalTypeName.StartsWith("I") && char.IsUpper(originalTypeName[1])) {
+        originalTypeName = originalTypeName.Substring(1);
       }
+
+      string legacyClassDiscriminator = options.ClassNameDiscriminator;
+
+      // CONTROLLER
+
+      string controllerNamePattern = options.ControllerNamePattern;
+      if (string.IsNullOrEmpty(controllerNamePattern)) {
+        controllerNamePattern = "[Controller]";
+        if (!string.IsNullOrEmpty(legacyClassDiscriminator)) {
+          //stange behaviour from the past:
+          controllerNamePattern = $"[Controller]{legacyClassDiscriminator}";
+        }
+        else if(genArgs.Any()) {
+          controllerNamePattern = $"[Controller]_{string.Join("_", genArgs)}";
+        }
+      }
+      string controllerName = controllerNamePattern.Replace("[Controller]", originalTypeName);
+      for (int i = 0; i < genArgs.Length; i++) {
+        controllerName = controllerName.Replace($"{{{i}}}", genArgs[i]);
+      }
+
+      // WRAPPERS
+
+      string wrapperNamePattern = options.WrapperNamePattern;
+      if (string.IsNullOrEmpty(wrapperNamePattern)) {
+        wrapperNamePattern = "{Controller}[Method]";
+        if (!string.IsNullOrEmpty(legacyClassDiscriminator)) {
+          //stange behaviour from the past:
+          wrapperNamePattern = wrapperNamePattern + legacyClassDiscriminator;
+        }
+      }
+      else if (!wrapperNamePattern.Contains("[Method]")) {
+        wrapperNamePattern = wrapperNamePattern + "_[Method]";
+      }
+      wrapperNamePattern = wrapperNamePattern.Replace("[Controller]", originalTypeName);
+      wrapperNamePattern = wrapperNamePattern.Replace("{Controller}", controllerName);
+      for (int i = 0; i < genArgs.Length; i++) {
+        wrapperNamePattern = wrapperNamePattern.Replace($"{{{i}}}", genArgs[i]);
+      }
+
+      // TITLE
 
       controllerTitle = options.ControllerTitle;  
       if (string.IsNullOrEmpty(controllerTitle)) {
-        controllerTitle = svcName;
         if (genArgs.Any()) {
-          controllerTitle = controllerTitle + " (" + string.Join(", ", genArgs) + ")";
+          controllerTitle = $"{{Controller}} ({string.Join(", ", genArgs)})";
+        }
+        else {
+          controllerTitle = "{Controller}";
         }
       }
+      controllerTitle = controllerTitle.Replace("[Controller]", originalTypeName);
+      controllerTitle = controllerTitle.Replace("{Controller}", controllerName);
+      for (int i = 0; i < genArgs.Length; i++) {
+        controllerTitle = controllerTitle.Replace($"{{{i}}}", genArgs[i]);
+      }
+
+      // ROUTE
 
       controllerRoute = options.ControllerRoute;
       if (string.IsNullOrEmpty(controllerRoute)) {
-        controllerRoute = svcName;
         if (genArgs.Any()) {
-          controllerRoute = controllerRoute + "/" + string.Join("-", genArgs);
+          controllerRoute = $"[Controller]/{string.Join("-", genArgs)}";
+        }
+        else {
+          controllerRoute = "[Controller]";
         }
       }
-
-      string classDiscriminator = options.ClassNameDiscriminator;
-      if (string.IsNullOrEmpty(classDiscriminator)) {
-        classDiscriminator = "";
-        if (genArgs.Any()) {
-          classDiscriminator = classDiscriminator + "_" + string.Join("_", genArgs);
-        }
+      controllerRoute = controllerRoute.Replace("[Controller]", originalTypeName);
+      controllerRoute = controllerRoute.Replace("{Controller}", controllerName);
+      for (int i = 0; i < genArgs.Length; i++) {
+        controllerRoute = controllerRoute.Replace($"{{{i}}}", genArgs[i]);
       }
 
-      if (genArgs.Any()) {
-        for (int i = 0; i < genArgs.Length; i++) {
-          controllerTitle = controllerTitle.Replace($"{{{i}}}", genArgs[i]);
-          controllerRoute = controllerRoute.Replace($"{{{i}}}", genArgs[i]);
-          classDiscriminator = classDiscriminator.Replace($"{{{i}}}", genArgs[i]);
-        }
-      }
-
-      controllerRoute = controllerRoute.Replace("[Controller]", svcName + classDiscriminator);
+      ///////////////////////////////////////////////////////////////////////
 
       TypeBuilder typeBuilder = moduleBuilder.DefineType(
-        svcName + classDiscriminator + "Controller",
+        controllerName + "Controller", //<< pattern by microsoft...
         TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
         baseType
       );
@@ -191,11 +232,11 @@ namespace System.Web.UJMW {
           if (serviceMethod.IsPublic) {
 
             Type requestType = DynamicUjmwControllerFactory.GetOrCreateDto(
-              serviceType, svcName, classDiscriminator, serviceMethod, moduleBuilder, false, options
+              serviceType, wrapperNamePattern, serviceMethod, moduleBuilder, false, options
             );
 
             Type responseType = DynamicUjmwControllerFactory.GetOrCreateDto(
-              serviceType, svcName, classDiscriminator, serviceMethod, moduleBuilder, true, options
+              serviceType, wrapperNamePattern, serviceMethod, moduleBuilder, true, options
             );
 
             var methodBuilder = typeBuilder.DefineMethod(
@@ -320,25 +361,30 @@ namespace System.Web.UJMW {
 
     private static Dictionary<string, Type> _DtoTypeCache = new Dictionary<string, Type>();
 
-    private static Type GetOrCreateDto(Type serviceType, string serviceName, string classDiscriminator, MethodInfo methodInfo, ModuleBuilder moduleBuilder, bool response, DynamicUjmwControllerOptions options) {
-      string dtoTypeName = serviceType.Namespace + serviceName + UjmwResponseDtoNamespaceSuffix + methodInfo.Name;
-      if (!string.IsNullOrWhiteSpace(classDiscriminator)) {
-        dtoTypeName = dtoTypeName + classDiscriminator;
-      }
+    /// <summary></summary>
+    /// <param name="serviceType"></param>
+    /// <param name="wrapperNamePattern">The only allowed placeholder at this time is '[Method]'</param>
+    /// <param name="methodInfo"></param>
+    /// <param name="moduleBuilder"></param>
+    /// <param name="response"></param>
+    /// <param name="options"></param>
+    /// <returns></returns>
+    private static Type GetOrCreateDto(Type serviceType, string wrapperNamePattern, MethodInfo methodInfo, ModuleBuilder moduleBuilder, bool response, DynamicUjmwControllerOptions options) {
+      string wrapperTypeFullName = serviceType.Namespace + ".MessageWrappers." + wrapperNamePattern.Replace("[Method]", methodInfo.Name);
       if (response) {
-        dtoTypeName = dtoTypeName + UjmwResponseDtoSuffix;
+        wrapperTypeFullName = wrapperTypeFullName + UjmwResponseDtoSuffix;
       }
       else {
-        dtoTypeName = dtoTypeName + UjmwRequestDtoSuffix;
+        wrapperTypeFullName = wrapperTypeFullName + UjmwRequestDtoSuffix;
       }
       lock (_DtoTypeCache ) {
-        if (_DtoTypeCache.ContainsKey(dtoTypeName)) {
-          return _DtoTypeCache[dtoTypeName];
+        if (_DtoTypeCache.ContainsKey(wrapperTypeFullName)) {
+          return _DtoTypeCache[wrapperTypeFullName];
         }
         else {
 
           TypeBuilder typeBuilder = moduleBuilder.DefineType(
-            dtoTypeName,
+            wrapperTypeFullName,
             TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout
           );
 
@@ -374,7 +420,7 @@ namespace System.Web.UJMW {
           }
 
           Type dtoType = typeBuilder.CreateType();
-          _DtoTypeCache[dtoTypeName] = dtoType;
+          _DtoTypeCache[wrapperTypeFullName] = dtoType;
           return dtoType;
         }
       }
