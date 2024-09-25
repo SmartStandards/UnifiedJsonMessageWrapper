@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.2.0",
-  "currentVersionWithSuffix": "3.2.0",
+  "currentVersion": "3.3.0",
+  "currentVersionWithSuffix": "3.3.0",
   "releaseType": "official",
-  "previousVersion": "3.1.1",
+  "previousVersion": "3.2.0",
   "changeGrade": "minor",
   "currentMajor": 3,
-  "currentMinor": 2,
+  "currentMinor": 3,
   "currentPatch": 0,
-  "versionDateInfo": "2024-09-03",
-  "versionTimeInfo": "13:28:44",
-  "versionNotes": "- new Feature: added Support for self announcement of endpoints to a given registry\n"
+  "versionDateInfo": "2024-09-25",
+  "versionTimeInfo": "09:49:46",
+  "versionNotes": "- new Feature: added more flexibility to configure controller and wrapper-names to avoid name collisions\n"
 }

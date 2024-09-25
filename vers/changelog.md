@@ -7,9 +7,15 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-- **new Feature**: added more flexibility to configure controller and wrapper-names to avoid name collisions
+*(none)*
 
-  
+
+
+## v 3.3.0
+released **2024-09-25**, including:
+ - **new Feature**: added more flexibility to configure controller and wrapper-names to avoid name collisions
+
+
 
 ## v 3.2.0
 released **2024-09-03**, including:
