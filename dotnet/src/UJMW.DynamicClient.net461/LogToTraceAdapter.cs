@@ -23,45 +23,46 @@ namespace Logging.SmartStandards {
 
   internal partial class LogToTraceAdapter {
 
-    private static Dictionary<string, TraceSource> _TraceSourcePerChannelName;
+    private static Dictionary<string, TraceSource> _TraceSourcePerAudienceToken = new Dictionary<string, TraceSource>();
 
-    private static TraceSource GetTraceSourcePerChannelName(string channelName) {
-
-      if (_TraceSourcePerChannelName is null) _TraceSourcePerChannelName = new Dictionary<string, TraceSource>();
+    private static TraceSource GetTraceSourcePerAudienceName(string audience) {
 
       TraceSource traceSource;
 
-      if (!_TraceSourcePerChannelName.TryGetValue(channelName, out traceSource)) { // Lazily wire up the trace source...
+      lock (_TraceSourcePerAudienceToken) {
+        if (!_TraceSourcePerAudienceToken.TryGetValue(audience, out traceSource)) { // Lazily wire up the trace source...
 
-        // ... but ensure the desired listener was initialized before:
+          // ... but ensure the desired listener was initialized before:
 
-        bool found = false;
+          bool found = false;
 
-        foreach (TraceListener l in Trace.Listeners) {
-          if (l.GetType().Name.EndsWith("TraceLogPipe")) { // convention!
-            found = true;
-            break;
+          foreach (TraceListener l in Trace.Listeners) {
+            if (l.GetType().Name.EndsWith("TraceLogPipe")) { // convention!
+              found = true;
+              break;
+            }
           }
+
+          if (!found) return null;
+
+          // actual wire-up
+
+          traceSource = new TraceSource(audience);
+          traceSource.Switch.Level = SourceLevels.All;
+          traceSource.Listeners.Clear(); // Otherwise the default listener will be registered twice
+          traceSource.Listeners.AddRange(Trace.Listeners); // Wire up all CURRENTLY existing trace listeners (they have to be initialized before!)
+
+          _TraceSourcePerAudienceToken[audience] = traceSource;
+
         }
-
-        if (!found) return null;
-
-        // actual wire-up
-
-        traceSource = new TraceSource(channelName);
-        traceSource.Switch.Level = SourceLevels.All;
-        traceSource.Listeners.Clear(); // Otherwise the default listener will be registered twice
-        traceSource.Listeners.AddRange(Trace.Listeners); // Wire up all CURRENTLY existing trace listeners (they have to be initialized before!)
-
-        _TraceSourcePerChannelName[channelName] = traceSource;
-
       }
+
       return traceSource;
     }
 
-    internal static void LogToTrace(string channelName, int level, int id, string messageTemplate, params object[] args) {
+    internal static void LogToTrace(string audience, int level, int id, string messageTemplate, params object[] args) {
 
-      TraceSource traceSource = GetTraceSourcePerChannelName(channelName);
+      TraceSource traceSource = GetTraceSourcePerAudienceName(audience);
 
       if (traceSource is null) return;
 
