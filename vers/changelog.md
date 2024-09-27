@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* updated embedded LogToTraceAdapter to avoid concurrency problems
+*(none)*
+
+
+
+## v 3.3.1
+released **2024-09-27**, including:
+ - updated embedded LogToTraceAdapter to avoid concurrency problems
 
 
 

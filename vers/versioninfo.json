@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.3.0",
-  "currentVersionWithSuffix": "3.3.0",
+  "currentVersion": "3.3.1",
+  "currentVersionWithSuffix": "3.3.1",
   "releaseType": "official",
-  "previousVersion": "3.2.0",
-  "changeGrade": "minor",
+  "previousVersion": "3.3.0",
+  "changeGrade": "patch",
   "currentMajor": 3,
   "currentMinor": 3,
-  "currentPatch": 0,
-  "versionDateInfo": "2024-09-25",
-  "versionTimeInfo": "09:49:46",
-  "versionNotes": "- new Feature: added more flexibility to configure controller and wrapper-names to avoid name collisions\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2024-09-27",
+  "versionTimeInfo": "08:07:48",
+  "versionNotes": "- updated embedded LogToTraceAdapter to avoid concurrency problems\n"
 }
