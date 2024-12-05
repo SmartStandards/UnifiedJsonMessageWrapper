@@ -3,6 +3,7 @@ using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace System.Web.UJMW {
 
@@ -67,17 +68,25 @@ namespace System.Web.UJMW {
           request.Headers.Add("Authorization", _CachedAuthHeader);
         }
 
-        var requestTask = _HttpClient.SendAsync(request);
-        requestTask.Wait();
+        try {
+         
+          Task<HttpResponseMessage> requestTask = _HttpClient.SendAsync(request);
+          requestTask.Wait();
 
-        var contentRetrivalTask = requestTask.Result.Content.ReadAsStringAsync();
-        contentRetrivalTask.Wait();
-        responseContent = contentRetrivalTask.Result;
+          Task<string> contentRetrivalTask = requestTask.Result.Content.ReadAsStringAsync();
+          contentRetrivalTask.Wait();
+          responseContent = contentRetrivalTask.Result;
 
-        responseHeaders = requestTask.Result.Headers;
-        reasonPhrase = requestTask.Result.ReasonPhrase;
+          responseHeaders = requestTask.Result.Headers;
+          reasonPhrase = requestTask.Result.ReasonPhrase;
 
-        return (int)requestTask.Result.StatusCode;
+          return (int)requestTask.Result.StatusCode;
+
+        }
+        catch (TaskCanceledException ex) {
+          throw new TimeoutException($"The http call was canceled (configured timeout is {_HttpClient.Timeout.TotalSeconds}s)", ex);
+        }
+
       }
 
     }
