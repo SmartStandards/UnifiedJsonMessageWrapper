@@ -7,6 +7,8 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
+* **breaking Change**: CustomizingFlags instead of bool shortTimeout
+* **new Feature**: add option 'UseCombinedDynamicAssembly' to reduce memory footprint
 * improved exception-message on post timeout
 
 

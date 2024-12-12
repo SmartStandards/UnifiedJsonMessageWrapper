@@ -118,6 +118,11 @@ namespace System.Web.UJMW {
 
     public static bool HideExeptionMessageInFaultProperty { get; set; } = false;
 
+    /// <summary>
+    /// EXPERIMENTAL: generate all proxy-classes in only one shared dynamic assembly to reduce memory footprint
+    /// </summary>
+    public static bool UseCombinedDynamicAssembly = false;
+
   }
 
 }

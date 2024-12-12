@@ -84,6 +84,8 @@ namespace Security {
         }
       );
 
+      UjmwHostConfiguration.UseCombinedDynamicAssembly = true;
+
       UjmwHostConfiguration.ConfigureRequestSidechannel(
         (serviceType, sideChannel) => {
           if (HasDataFlowSideChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
@@ -354,6 +356,9 @@ namespace Security {
         autoTriggerInterval: 1
       );
 
+
+      //var ass = AppDomain.CurrentDomain.GetAssemblies().Where((a)=>a.IsDynamic).ToArray();
+      //var tps = ass.First().GetTypes();
     }
 
   }

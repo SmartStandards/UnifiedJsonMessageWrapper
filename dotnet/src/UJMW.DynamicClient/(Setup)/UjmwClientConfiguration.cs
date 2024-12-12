@@ -160,15 +160,18 @@ namespace System.Web.UJMW {
     /// <summary>
     /// Creates an HttpClient and configures its default options
     /// </summary>
-    /// <param name="shortTimeout">
-    /// Indicates that the instance to be created will be used for an usecase where a long timeout could
-    /// freeze a synchronous dependent operation. So a fast failure is prefferred more than loosing to much waittime.
+    /// <param name="customizingFlags">
+    /// Will be provided by the callers of DynamicClientFactory.CreateInstance (optionally).
+    /// You can use this to offer different customizing flavors in order to provide adjusted
+    /// transport-layer configurations like special timouts or proxy-settings.
+    /// This wont be evaluated by the UJMW framework in default, it is just a channel to 
+    /// support extended customizing usecases.
     /// </param>
     /// <returns></returns>
-    public delegate HttpClient HttpClientFactoryMethod(bool shortTimeout);
+    public delegate HttpClient HttpClientFactoryMethod(string[] customizingFlags = null);
 
     public static HttpClientFactoryMethod HttpClientFactory { get; set; } = (
-      (bool shortTimeout) => {
+      (string[] customizingFlags) => {
         HttpClientHandler httpClientHandler = new HttpClientHandler();
 
         httpClientHandler.UseProxy = false;
@@ -180,16 +183,16 @@ namespace System.Web.UJMW {
         //}
 
         HttpClient httpClient = new HttpClient(httpClientHandler);
-        if (shortTimeout) {
-          httpClient.Timeout = TimeSpan.FromSeconds(3);
-        }
-        else {
-          httpClient.Timeout = TimeSpan.FromMinutes(10);
-        }
+        httpClient.Timeout = TimeSpan.FromMinutes(10);
 
         return httpClient;
       }
     );
+
+    /// <summary>
+    /// EXPERIMENTAL: generate all proxy-classes in only one shared dynamic assembly to reduce memory footprint
+    /// </summary>
+    public static bool UseCombinedDynamicAssembly = false;
 
   }
 

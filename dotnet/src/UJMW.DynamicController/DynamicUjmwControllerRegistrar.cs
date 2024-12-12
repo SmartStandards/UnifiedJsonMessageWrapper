@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Web.UJMW.SelfAnnouncement;
 
 namespace System.Web.UJMW {
@@ -63,10 +64,23 @@ namespace System.Web.UJMW {
       _AnnouncementTriggerEndpointRequested = true;
     }
 
+    private static ModuleBuilder _CombinedBuilder = null;
+
     private static void CreateAndRegisterController(ControllerFeature feature, Type serviceType, DynamicUjmwControllerOptions options) {
-     
+
+      ModuleBuilder builder;
+      if (UjmwHostConfiguration.UseCombinedDynamicAssembly) {
+        if (_CombinedBuilder == null) {
+          _CombinedBuilder = DynamicUjmwControllerFactory.CreateAssemblyModuleBuilder("UJMW.InMemoryControllers");
+        }
+        builder = _CombinedBuilder;
+      }
+      else {
+        builder = DynamicUjmwControllerFactory.CreateAssemblyModuleBuilder("UJMW.InMemoryControllers." + serviceType.Name);
+      }
+
       Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(
-        serviceType, options, out string controllerRoute, out string controllerTitle
+        serviceType, options, out string controllerRoute, out string controllerTitle, builder
       );
 
       feature.Controllers.Add(dynamicController.GetTypeInfo());

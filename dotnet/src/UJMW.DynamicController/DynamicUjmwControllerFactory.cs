@@ -36,7 +36,6 @@ namespace System.Web.UJMW {
 
     private static ConstructorInfo _TagsAttributeContructor = Type.GetType("Microsoft.AspNetCore.Http.TagsAttribute, Microsoft.AspNetCore.Http.Extensions", false)?.GetConstructors()?.FirstOrDefault();
 
-
     //optional
     private const string swashbuckle = "Swashbuckle.AspNetCore.Annotations";
     private static ConstructorInfo _SwaggerOperationAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerOperationAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
@@ -49,6 +48,27 @@ namespace System.Web.UJMW {
     }
 
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute, out string controllerTitle) {
+      ModuleBuilder moduleBuilder = CreateAssemblyModuleBuilder("UJMW.InMemoryControllers." + serviceType.Name);
+      return BuildDynamicControllerType(serviceType, options, out controllerRoute, out controllerTitle, moduleBuilder);
+    }
+
+    internal static ModuleBuilder CreateAssemblyModuleBuilder(string assemblyName) {
+      var an = new AssemblyName(assemblyName);
+#if NET46
+      AssemblyBuilder assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
+#endif
+#if NET5
+      AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(an, AssemblyBuilderAccess.Run);
+#endif
+      return assemblyBuilder.DefineDynamicModule(an.Name);
+    }
+
+    internal static Type BuildDynamicControllerType(
+      Type serviceType, DynamicUjmwControllerOptions options,
+      out string controllerRoute, out string controllerTitle,
+      ModuleBuilder moduleBuilder
+    ) {
+
       if(options == null) {
         options = new DynamicUjmwControllerOptions();
       }
@@ -60,23 +80,10 @@ namespace System.Web.UJMW {
         ).Single();
       }
 
-      AssemblyBuilder assemblyBuilder = null;
       Type baseType = typeof(DynamicControllerBase<>).MakeGenericType(serviceType);
 
       MethodInfo invokeMethod = baseType.GetMethod("InvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic);
      
-      //##### ASSEMBLY & MODULE DEFINITION #####
-
-      var assemblyName = new AssemblyName(serviceType.Name + ".DyamicControllers");
-
-#if NET46
-      assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
-#else
-      assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-#endif
-
-      var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
-
       ////////////// NAMING ///////////////////////////////////////////////////////////////////
 
       string originalTypeName = serviceType.Name;
