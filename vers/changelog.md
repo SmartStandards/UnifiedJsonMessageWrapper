@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: CustomizingFlags can now be null
+*(none)*
+
+
+
+## v 4.0.1
+released **2024-12-23**, including:
+ - Fix: CustomizingFlags can now be null
 
 
 

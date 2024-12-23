@@ -1,13 +1,13 @@
 {
-  "currentVersion": "3.3.1",
-  "currentVersionWithSuffix": "3.3.1",
+  "currentVersion": "4.0.1",
+  "currentVersionWithSuffix": "4.0.1",
   "releaseType": "official",
-  "previousVersion": "3.3.0",
+  "previousVersion": "4.0.0",
   "changeGrade": "patch",
-  "currentMajor": 3,
-  "currentMinor": 3,
+  "currentMajor": 4,
+  "currentMinor": 0,
   "currentPatch": 1,
-  "versionDateInfo": "2024-09-27",
-  "versionTimeInfo": "08:07:48",
-  "versionNotes": "- updated embedded LogToTraceAdapter to avoid concurrency problems\n"
+  "versionDateInfo": "2024-12-23",
+  "versionTimeInfo": "12:07:17",
+  "versionNotes": "- Fix: CustomizingFlags can now be null\n"
 }
