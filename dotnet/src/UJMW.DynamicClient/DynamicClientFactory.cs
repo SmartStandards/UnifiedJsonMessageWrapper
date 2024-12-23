@@ -523,6 +523,9 @@ namespace System.Web.UJMW {
 
 
     private static HttpClient GetHttpClient(string[] customizingFlags) {
+      if(customizingFlags == null) {
+        customizingFlags = new string[0];
+      }
       lock (_HttpClientsPerCustomizing) {
         HttpClient client;
         string flagsDiscriminator = string.Join("|", customizingFlags);

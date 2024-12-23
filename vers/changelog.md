@@ -7,6 +7,12 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
+* Fix: CustomizingFlags can now be null
+
+
+
+## v 4.0.0
+released **2024-12-12**, including:
 * **breaking Change**: CustomizingFlags instead of bool shortTimeout
 * **new Feature**: add option 'UseCombinedDynamicAssembly' to reduce memory footprint
 * improved exception-message on post timeout
