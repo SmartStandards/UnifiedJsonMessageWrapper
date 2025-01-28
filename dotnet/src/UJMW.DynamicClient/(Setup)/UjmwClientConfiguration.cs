@@ -5,8 +5,12 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+
 //using System.Runtime.Remoting.Messaging;
 using System.Text.RegularExpressions;
+
+[assembly: InternalsVisibleTo("UJMW.Tests")]
 
 namespace System.Web.UJMW {
 

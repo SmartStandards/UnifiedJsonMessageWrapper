@@ -56,7 +56,7 @@ namespace System.Web.UJMW {
     }
 
     [TestMethod]
-    public void DynamicClientTest1() {
+    public void DynamicClientTest() {
 
       UjmwClientConfiguration.ConfigureRequestSidechannel((t, sideChannel) => {
         sideChannel.ProvideUjmwUnderlineProperty();
@@ -79,6 +79,65 @@ namespace System.Web.UJMW {
 
     }
 
+    [TestMethod]
+    public void DynamicClientTimeoutTest() {
+
+      HttpClientHandler httpClientHandler = new HttpClientHandler();
+      httpClientHandler.UseProxy = false;
+      HttpClient httpClient = new HttpClient(httpClientHandler);
+      httpClient.Timeout = TimeSpan.FromMilliseconds(200);
+
+      var client = DynamicClientFactory.CreateInstance<IMyService>(
+        new WebClientBasedHttpPostExecutor(httpClient),
+        () => "http://localhost/nonExisitingEndpoint"
+      );
+
+      Exception catchedEx = null;
+      try {
+        client.Calculate(1, 2);
+      }
+      catch (Exception ex) {
+        catchedEx = ex;   
+      }
+
+      Assert.IsNotNull(catchedEx);
+      Assert.IsTrue(catchedEx.Message.Contains("timeout"));
+
+    }
+
+    //public interface IMyService2 {
+    //  object Test(string windowsLogin, ref int returnCode);
+    //}
+    //[TestMethod, Ignore]
+    //public void DynamicClientTimeoutTest2() {
+
+    //  HttpClientHandler httpClientHandler = new HttpClientHandler();
+    //  httpClientHandler.UseProxy = false;
+    //  HttpClient httpClient = new HttpClient(httpClientHandler);
+    //  httpClient.Timeout = TimeSpan.FromMilliseconds(200);
+
+    //  var client = DynamicClientFactory.CreateInstance<IMyService2>(
+    //    new WebClientBasedHttpPostExecutor(
+    //      httpClient,
+    //      () => "TEMP"
+    //    ),
+    //    () => "TEMP"
+    //  );
+
+    //  int returnCode = -1;
+    //  Exception catchedEx = null;
+    //  try {
+    //    client.Test("Foo", ref returnCode);
+    //  }
+    //  catch (Exception ex) {
+    //    catchedEx = ex;
+    //  }
+
+    //  Assert.IsNotNull(catchedEx);
+    //  Assert.IsTrue(catchedEx.Message.Contains("timeout"));
+
+    //}
+
   }
 
-}
+ }

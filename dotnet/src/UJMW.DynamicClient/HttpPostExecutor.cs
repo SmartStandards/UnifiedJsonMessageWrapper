@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -69,22 +70,33 @@ namespace System.Web.UJMW {
         }
 
         try {
-         
-          Task<HttpResponseMessage> requestTask = _HttpClient.SendAsync(request);
-          requestTask.Wait();
+          try {
 
-          Task<string> contentRetrivalTask = requestTask.Result.Content.ReadAsStringAsync();
-          contentRetrivalTask.Wait();
-          responseContent = contentRetrivalTask.Result;
+            Task<HttpResponseMessage> requestTask = _HttpClient.SendAsync(request);
+            requestTask.Wait();
 
-          responseHeaders = requestTask.Result.Headers;
-          reasonPhrase = requestTask.Result.ReasonPhrase;
+            Task<string> contentRetrivalTask = requestTask.Result.Content.ReadAsStringAsync();
+            contentRetrivalTask.Wait();
+            responseContent = contentRetrivalTask.Result;
 
-          return (int)requestTask.Result.StatusCode;
+            responseHeaders = requestTask.Result.Headers;
+            reasonPhrase = requestTask.Result.ReasonPhrase;
 
+            return (int)requestTask.Result.StatusCode;
+
+          }
+          catch (AggregateException ex) {
+            if (ex.InnerExceptions.Count == 1) {
+              throw ex.InnerExceptions[0];
+            }
+            throw;
+          }
         }
         catch (TaskCanceledException ex) {
-          throw new TimeoutException($"The http call was canceled (configured timeout is {_HttpClient.Timeout.TotalSeconds}s)", ex);
+          throw new TimeoutException($"The http call to '{url}' was canceled (configured timeout is {_HttpClient.Timeout.TotalSeconds}s)", ex);
+        }
+        catch (Exception ex) {
+          throw new Exception($"The http call to '{url}' failed: {ex.Message}" , ex);
         }
 
       }

@@ -155,7 +155,8 @@ namespace System.Web.UJMW {
             }
           }
           catch (Exception ex) {
-            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No valid JSON";
+            HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "Could not read JSON-Envelope to probe for Sidechannel-Property ('_'): " + ex.Message;
+            DevToTraceLogger.LogError(new Exception(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value, ex));
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
 
