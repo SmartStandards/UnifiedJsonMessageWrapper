@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* improved exception messages
+*(none)*
+
+
+
+## v 4.0.2
+released **2025-01-28**, including:
+ - improved exception messages
 
 
 
