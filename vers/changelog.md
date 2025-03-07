@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+- BugFix: WCF SelfAnnunce now delivers contract names insted of service class names
 
 
 

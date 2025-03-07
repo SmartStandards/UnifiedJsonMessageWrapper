@@ -105,7 +105,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
       return new EndpointInfo(
         contractType,
-        SelfAnnouncementHelper.BuildContractidentifyingName(serviceType),
+        SelfAnnouncementHelper.BuildContractidentifyingName(contractType),
         serviceType.Name,
         relativeUrl,
         epCategory
