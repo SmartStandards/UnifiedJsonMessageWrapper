@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.ServiceModel.Activation;
 using System.Threading.Tasks;
 using System.Web.Hosting;
 
@@ -244,14 +245,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _SelfAnnouncementMethod.Invoke(_BaseUrls, RegisteredEndpoints, true, ref addInfo);
         LastAddInfo = addInfo;
 
-        string msg = $"Self-Announcement completed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Announcement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogInformation(72007, msg);
 
         LastFault = null;
       }
       catch(Exception ex) {
         LastFault = ex.Message;
-        string msg = $"Self-Announcement failed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Announcement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogError(72007, new Exception(msg, ex));
 
         if (!catchExceptions) {
@@ -282,14 +283,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _SelfAnnouncementMethod.Invoke(_BaseUrls, RegisteredEndpoints, false, ref addInfo);
         LastAddInfo = addInfo;
 
-        string msg = $"Self-Unannouncement completed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Unannouncement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogInformation(72007, msg);
 
         LastFault = null;
       }
       catch (Exception ex) {
         LastFault = ex.Message;
-        string msg = $"Self-Unannouncement failed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Unannouncement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogError(72007, new Exception(msg, ex));
       }
     }
@@ -309,6 +310,9 @@ namespace System.Web.UJMW.SelfAnnouncement {
             _BaseUrls[_BaseUrls.Length - 1] = baseAddressFromCurrentRequest;
           }
         }
+      }
+      if (!_DisableAutoEvaluatedBaseUrls) {
+        _BaseUrls = _BaseUrls.Concat(UjmwServiceHostFactory._CollectedBaseUrls).Distinct().ToArray();
       }
     }
 

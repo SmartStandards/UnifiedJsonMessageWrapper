@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* fixed some edge-cases when detecting urls for self-announcement
 
 
 

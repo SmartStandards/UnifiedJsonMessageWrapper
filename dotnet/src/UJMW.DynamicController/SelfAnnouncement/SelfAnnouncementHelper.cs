@@ -1,6 +1,7 @@
 ﻿using Logging.SmartStandards;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using System.Linq;
@@ -67,6 +68,43 @@ namespace System.Web.UJMW.SelfAnnouncement {
       AnnouncementMethod selfAnnouncementMethod,
       int autoTriggerInterval = 0
     ) {
+      Configure(
+        hostApplicationLifetime, featureCollection, selfAnnouncementMethod, null, autoTriggerInterval
+      );
+    }
+
+    /// <summary>
+    ///  Configures the self announcement framework.
+    ///  This overload allows to choose between automatic announcement (in default),
+    ///  recurring automatic announcement and manual announcement (see the 'autoTriggerInterval').
+    /// </summary>
+    /// <param name="hostApplicationLifetime">
+    ///   can be requested to be injected in the 'Configure'-method
+    /// </param>
+    /// <param name="featureCollection">
+    ///   can be retrieved from your IApplicationBuilder like this: app.ServerFeatures
+    /// </param>
+    /// <param name="selfAnnouncementMethod">
+    ///  a callback to dispatch the endpoint information to the target registry which collects all urls
+    /// </param>
+    /// <param name="overrideBaseUrls">
+    ///  Normally the urls will be enumerated using the 'IServerAddressesFeature' from the given featureCollection.
+    ///  Use this param to define explicitely which application base-urls should be populated.
+    /// </param>
+    /// <param name="autoTriggerInterval">
+    ///  Auto trigger interval in Minutes.
+    ///  If set to 0, the self announnce will be triggered only once (after the webapplication has booted initially).
+    ///  If set to -1, the self announce must be triggered manually ->
+    ///  either by calling the 'TriggerSelfAnnouncement()' method or
+    ///  from external via http (requires, that the SelfAnnouncementTriggerEndpoint has been initialized).
+    /// </param>
+    public static void Configure(
+      IHostApplicationLifetime hostApplicationLifetime,
+      IFeatureCollection featureCollection,
+      AnnouncementMethod selfAnnouncementMethod,
+      string[] overrideBaseUrls,
+      int autoTriggerInterval = 0
+    ) {
 
       //register an eventhandler to wait at the right moment...
       hostApplicationLifetime.ApplicationStarted.Register(() => {
@@ -74,12 +112,16 @@ namespace System.Web.UJMW.SelfAnnouncement {
         //... when the 'IServerAddressesFeature' will be available:
         var addressFeature = featureCollection.Get<IServerAddressesFeature>();
 
+        if (overrideBaseUrls == null || overrideBaseUrls.Length == 0) {
+          overrideBaseUrls = addressFeature.Addresses.ToArray();
+        }
+
         //auto evaluate the current hosting address
-        if (addressFeature.Addresses.Any()) {
+        if (overrideBaseUrls.Any()) {
 
           //configure
           SelfAnnouncementHelper.Configure(
-            addressFeature.Addresses.ToArray(),
+            overrideBaseUrls,
             selfAnnouncementMethod,
             autoTriggerInterval
           );
@@ -276,14 +318,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _SelfAnnouncementMethod.Invoke(_BaseUrls, RegisteredEndpoints, true, ref addInfo);
         LastAddInfo = addInfo;
 
-        string msg = $"Self-Announcement completed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Announcement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'",_BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogInformation(72007, msg);
 
         LastFault = null;
       }
       catch(Exception ex) {
         LastFault = ex.Message;
-        string msg = $"Self-Announcement failed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Announcement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogError(72007, new Exception(msg, ex));
 
         if (!catchExceptions) {
@@ -313,14 +355,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _SelfAnnouncementMethod.Invoke(_BaseUrls, RegisteredEndpoints, false, ref addInfo);
         LastAddInfo = addInfo;
 
-        string msg = $"Self-Unannouncement completed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Unannouncement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogInformation(72007, msg);
 
         LastFault = null;
       }
       catch (Exception ex) {
         LastFault = ex.Message;
-        string msg = $"Self-Unannouncement failed for {RegisteredEndpoints.Count()} endpoints with base-url '{_BaseUrls}'. {addInfo}\n{epInfoLines}";
+        string msg = $"Self-Unannouncement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
         DevToTraceLogger.LogError(72007, new Exception(msg, ex));
       }
     }

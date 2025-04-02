@@ -35,12 +35,18 @@ namespace System.Web.UJMW {
     public UjmwServiceHostFactory() {
     }
 
+    internal static string[] _CollectedBaseUrls = new string[] { };
+
     protected override ServiceHost CreateServiceHost(Type serviceImplementationType, Uri[] baseAddresses) {
       try {
 
         UjmwHostConfiguration.WaitForSetupCompleted();
-
+      
         Uri primaryUri = baseAddresses[0];
+
+        _CollectedBaseUrls = _CollectedBaseUrls.Concat(
+          baseAddresses.Select((uri)=> uri.ToString())
+        ).Distinct().ToArray();
 
         if (UjmwHostConfiguration.ForceHttps) {
           primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
