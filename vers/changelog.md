@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* fixed some edge-cases when detecting urls for self-announcement
+*(none)*
+
+
+
+## v 4.0.4
+released **2025-04-02**, including:
+ - fixed some edge-cases when detecting urls for self-announcement
 
 
 
