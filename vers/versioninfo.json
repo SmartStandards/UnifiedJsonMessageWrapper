@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.0.4",
-  "currentVersionWithSuffix": "4.0.4",
+  "currentVersion": "4.0.5",
+  "currentVersionWithSuffix": "4.0.5",
   "releaseType": "official",
-  "previousVersion": "4.0.3",
+  "previousVersion": "4.0.4",
   "changeGrade": "patch",
   "currentMajor": 4,
   "currentMinor": 0,
-  "currentPatch": 4,
-  "versionDateInfo": "2025-04-02",
-  "versionTimeInfo": "10:03:29",
-  "versionNotes": "- fixed some edge-cases when detecting urls for self-announcement\n"
+  "currentPatch": 5,
+  "versionDateInfo": "2025-04-15",
+  "versionTimeInfo": "08:28:22",
+  "versionNotes": "- Fix: removed IDisposable redirection to httpclient\n"
 }

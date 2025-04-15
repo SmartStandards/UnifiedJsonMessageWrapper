@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: removed IDisposable redirection to httpclient
+*(none)*
+
+
+
+## v 4.0.5
+released **2025-04-15**, including:
+ - Fix: removed IDisposable redirection to httpclient
 
 
 
