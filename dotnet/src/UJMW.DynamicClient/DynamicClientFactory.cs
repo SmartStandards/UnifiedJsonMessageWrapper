@@ -119,7 +119,7 @@ namespace System.Web.UJMW {
       }
 
       var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter, httpClient.Dispose);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(typeof(TApplicable), httpPostExecutor, urlGetter);
       return CreateInstance<TApplicable>(invoker);
     }
 
@@ -144,7 +144,7 @@ namespace System.Web.UJMW {
       }
 
       var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
-      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter, httpClient.Dispose);
+      UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
       return CreateInstance(applicableType, invoker);
     }
 
