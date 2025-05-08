@@ -134,7 +134,7 @@ namespace System.Web.UJMW {
         if (acceptedChannel == "_") {
           try {
             //we need to introspect the message...
-            string rawMessage = this.GetBodyFromWcfMessage(ref incomingWcfMessage);
+            string rawMessage = this.GetJsonBodyFromWcfMessage(ref incomingWcfMessage);
             var sr = new StringReader(rawMessage);
             var rdr = new JsonTextReader(sr);
             rdr.Read();
@@ -307,7 +307,7 @@ namespace System.Web.UJMW {
       }
     }
 
-    private string GetBodyFromWcfMessage(ref Message message) {
+    private string GetJsonBodyFromWcfMessage(ref Message message) {
       //PFUI!!!
       Byte[] bodyBytes;
       MessageBuffer buffer = message.CreateBufferedCopy(Int32.MaxValue);
@@ -317,7 +317,12 @@ namespace System.Web.UJMW {
       //vvv nötig, weil jede message nur 1x gelsen werden kann
       message = buffer.CreateMessage();
       bodyBytes = buffer.CreateMessage().GetBody<byte[]>();
-      return System.Text.Encoding.UTF8.GetString(bodyBytes);
+      for (int i = 0; i< bodyBytes.Length; i++) {
+        if(bodyBytes[i] == 123) {// '{' character!
+          return System.Text.Encoding.UTF8.GetString(bodyBytes,i, bodyBytes.Length - i);
+        }
+      }
+      return string.Empty;
     }
 
     internal static bool TryGetContractMethod(Type serviceContractType, string methodName, out MethodInfo method) {

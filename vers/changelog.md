@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* Fix: skipping invalid chars when reading messagebody (under WCF) to extract "_"-prop. Had some occ. of invalid BOM chars as part of the content
 
 
 
