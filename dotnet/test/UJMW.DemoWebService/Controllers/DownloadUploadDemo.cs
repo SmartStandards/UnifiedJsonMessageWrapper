@@ -1,27 +1,69 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 
 namespace Security.Controllers {
+  public class UjmwDtoSchemaFilter : ISchemaFilter {
+    public void Apply(OpenApiSchema schema, SchemaFilterContext context) {
+      //if (context.Type == typeof(MyDto)) // DTO auswählen
+      //{
+
+      //if (UjmwHostConfiguration.SideChannelSamlces == "") {
+      //var cx =new schemafi
+
+      //}
+      //else {
+
+      //}
+
+      //TODO: das hier ausprogrammieren damit "_"-Property scheit im Swagger aussght!
+
+      //schema.Properties.Remove("_");  //GEHT!!!!!
+
+
+      //GEHT AUCH: für sinnvolle dokue
+      schema.Properties["_"].Title = "UJMW-Sidechannel";
+      schema.Properties["_"].Description = "Optional set of contextual indentifiers (DataFlow)";
+      schema.Properties["_"].Example = OpenApiAnyFactory.CreateFromJson("{ \"System\":null,\"Silo\":null}");
+      
+
+      //schema.Example = null ;
+      //}
+    }
+  }
 
   [SwaggerSchema("ddddddddddddd")]
+  [SwaggerSchemaFilter(typeof(UjmwDtoSchemaFilter))]
   public class Dto {
 
+    [DefaultValue(typeof(object),"{ \"OptionalProperty1\": \"some contextual information\"}")]
 
-      [SwaggerSchema("fffffffffffffffff")]
+    public Dictionary<string,string> _ { get; set; }
+
+    [SwaggerSchema("fffffffffffffffff")]
       public string foo { get; set; }
       //konvention  return stream out string fileName / out string mimeType
     }
+
+
   [Route("afs"),Tags("UIUIUI")]
   public class DownloadUploadDemo : Controller {
 
-  
+
+    [HttpGet(), Route("sss"),]
+    public Dto AAAAAAAAAAAAAAAAAAAA() {
+      return null;
+    }
+
+
 
     [HttpGet()]
-
     public IActionResult Download() {
       Stream stream = System.IO.File.OpenRead("C:\\Temp\\AFS-Demo\\FOO.txt");
 
