@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <AssemblyName>UJMW.DynamicClient</AssemblyName>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>UJMW.DynamicController</AssemblyName>
     <RootNamespace>System</RootNamespace>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   
   <PropertyGroup>
-    <PackageId>UJMW.DynamicClient</PackageId>
-    <Description>A dynamic web api client, using the 'Unified JSON Message Wrapper' standard</Description>
+    <PackageId>UJMW.DynamicController</PackageId>
+    <Description>A dynamic Service-Facade (Controller) for ASP core WebApi, using the 'Unified JSON Message Wrapper' standard</Description>
     <Product>UJMW</Product>
     <Company>(public domain)</Company>
     <Copyright>SmartStandards</Copyright>
@@ -21,28 +21,32 @@
   </PropertyGroup>
   
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>..\..\dist\bin-net6.0\UJMW.DynamicClient.xml</DocumentationFile>
-    <OutputPath>..\..\dist\bin-net6.0\</OutputPath>
+    <DocumentationFile>..\..\dist\bin-net8.0\UJMW.DynamicController.xml</DocumentationFile>
+    <OutputPath>..\..\dist\bin-net8.0\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <NoWarn>1701;1702;1591</NoWarn>
     <DefineConstants>TRACE;DEBUG;NET5</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <OutputPath>..\..\dist\bin-net6.0\</OutputPath>
-    <DocumentationFile>..\..\dist\bin-net6.0\UJMW.DynamicClient.xml</DocumentationFile>
+    <OutputPath>..\..\dist\bin-net8.0\</OutputPath>
+    <DocumentationFile>..\..\dist\bin-net8.0\UJMW.DynamicController.xml</DocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <NoWarn>1701;1702;1591</NoWarn>
     <DefineConstants>TRACE;NET5</DefineConstants>
   </PropertyGroup>
 
-  <Import Project="..\UJMW.DynamicClient\UJMW.DynamicClient.projitems" Label="Shared" />
+  <Import Project="..\UJMW.DynamicController\UJMW.DynamicController.projitems" Label="Shared" />
 
   <ItemGroup>
     <Compile Include="..\UJMW.DynamicClient.net48\LogToTraceAdapter.cs" Link="LogToTraceAdapter.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
@@ -51,15 +55,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicClient\%28Setup%29\LogToTraceAdapter.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>LogToTraceAdapter.tt</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicClient\%28Setup%29\LogToTraceAdapter.tt">
+    <None Update="C:\TKP\%28git%29\UnifiedJsonMessageWrapper\dotnet\src\UJMW.DynamicController\%28Setup%29\LogToTraceAdapter.tt">
       <LastGenOutput>LogToTraceAdapter.cs</LastGenOutput>
     </None>
   </ItemGroup>

@@ -18,9 +18,15 @@
       <group targetFramework=".NETFramework4.6">
         <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
       </group>
+      <group targetFramework=".NETFramework4.8">
+        <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
+      </group>    
       <group targetFramework="net6.0">
         <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
       </group>
+      <!--<group targetFramework="net8.0">
+        <dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />
+      </group>-->      
     </dependencies>
   </metadata>
   <files>
@@ -30,9 +36,17 @@
     <file src="dist\bin-net46\UJMW.DynamicClient.dll" target="lib/net46" />
     <file src="dist\bin-net46\UJMW.DynamicClient.xml" target="lib/net46" />
     <file src="dist\bin-net46\UJMW.DynamicClient.pdb" target="lib/net46" />
+    <!-- .NET 4.8 -->
+    <file src="dist\bin-net48\UJMW.DynamicClient.dll" target="lib/net48" />
+    <file src="dist\bin-net48\UJMW.DynamicClient.xml" target="lib/net48" />
+    <file src="dist\bin-net48\UJMW.DynamicClient.pdb" target="lib/net48" /> 
     <!-- .NET 6.0 -->
     <file src="dist\bin-net6.0\UJMW.DynamicClient.dll" target="lib/net6.0" />
     <file src="dist\bin-net6.0\UJMW.DynamicClient.xml" target="lib/net6.0" />
     <file src="dist\bin-net6.0\UJMW.DynamicClient.pdb" target="lib/net6.0" />
+    <!-- .NET 6.0 -->
+    <!--<file src="dist\bin-net8.0\UJMW.DynamicClient.dll" target="lib/net8.0" />
+    <file src="dist\bin-net8.0\UJMW.DynamicClient.xml" target="lib/net8.0" />
+    <file src="dist\bin-net8.0\UJMW.DynamicClient.pdb" target="lib/net8.0" />-->   
   </files>
 </package>

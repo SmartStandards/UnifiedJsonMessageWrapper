@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Security</RootNamespace>
     <AssemblyName>UJMW.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">15.0</VisualStudioVersion>
@@ -62,6 +62,7 @@
       <HintPath>..\..\vendor\nuget\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\..\vendor\NuGet\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
@@ -83,9 +84,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net461\UJMW.DynamicClient.net461.csproj">
+    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net48\UJMW.DynamicClient.net48.csproj">
       <Project>{b0ba06fe-6437-4b9e-8c76-3adfc8d191d2}</Project>
-      <Name>UJMW.DynamicClient.net461</Name>
+      <Name>UJMW.DynamicClient.net48</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="..\UJMW.Tests\UJMW.Tests.projitems" Label="Shared" />

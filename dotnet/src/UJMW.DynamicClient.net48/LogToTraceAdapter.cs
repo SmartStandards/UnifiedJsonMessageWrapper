@@ -71,35 +71,35 @@ namespace Logging.SmartStandards {
       switch (level) {
 
         case 5: { // Critical (aka "Fatal")
-          eventType = TraceEventType.Critical; // 1
-          break;
-        }
+            eventType = TraceEventType.Critical; // 1
+            break;
+          }
 
         case 4: { // Error
-          eventType = TraceEventType.Error; // 2
-          break;
-        }
+            eventType = TraceEventType.Error; // 2
+            break;
+          }
 
         case 3: { // Warning
-          eventType = TraceEventType.Warning; // 4
-          break;
-        }
+            eventType = TraceEventType.Warning; // 4
+            break;
+          }
 
         case 2: { // Info
-          eventType = TraceEventType.Information; // 8
-          break;
-        }
+            eventType = TraceEventType.Information; // 8
+            break;
+          }
 
         case 1: { // Debug
-          eventType = TraceEventType.Transfer; // 4096 - ' There is no "Debug" EventType => use something else
-                                               // 0 "Trace" (aka "Verbose")
-          break;
-        }
+            eventType = TraceEventType.Transfer; // 4096 - ' There is no "Debug" EventType => use something else
+                                                 // 0 "Trace" (aka "Verbose")
+            break;
+          }
 
         default: {
-          eventType = TraceEventType.Verbose; // 16
-          break;
-        }
+            eventType = TraceEventType.Verbose; // 16
+            break;
+          }
 
       }
 
@@ -127,14 +127,14 @@ namespace Logging.SmartStandards {
     /// <returns></returns>
     internal static string Serialize(this Exception ex, bool includeStacktrace = true) {
       StringBuilder sb = new StringBuilder(1000);
-      string messageMainLine = ex.Message ;
+      string messageMainLine = ex.Message;
       AppendRecursive(ex, sb, ref messageMainLine, includeStacktrace);
       sb.Insert(0, messageMainLine + Environment.NewLine);
       return sb.ToString();
     }
 
     private static void AppendRecursive(Exception ex, StringBuilder target, ref string messageMainLine, bool includeStacktrace, bool isInner = false) {
-     
+
       if (ex == null) {
         return;
       }
@@ -145,9 +145,9 @@ namespace Logging.SmartStandards {
       }
 
       if (includeStacktrace && !string.IsNullOrWhiteSpace(ex.StackTrace)) {
-          var tr = new StringReader(ex.StackTrace);
-          string currentStacktraceLine = tr.ReadLine()?.Trim();
-          while (currentStacktraceLine != null) {
+        var tr = new StringReader(ex.StackTrace);
+        string currentStacktraceLine = tr.ReadLine()?.Trim();
+        while (currentStacktraceLine != null) {
           target.AppendLine();
           target.Append("@   ");
           target.Append(currentStacktraceLine.Replace(" in ", Environment.NewLine + "@   "));
@@ -158,7 +158,7 @@ namespace Logging.SmartStandards {
       if ((ex.InnerException != null)) {
         messageMainLine = messageMainLine + " >> " + ex.InnerException.Message;
         target.AppendLine();
-        AppendRecursive( ex.InnerException,target, ref messageMainLine, includeStacktrace, true);
+        AppendRecursive(ex.InnerException, target, ref messageMainLine, includeStacktrace, true);
       }
 
     }
@@ -171,16 +171,16 @@ namespace Logging.SmartStandards {
         return ((Win32Exception)ex).NativeErrorCode;
       }
       int hashTagIndex = ex.Message.LastIndexOf("#");
-      if (hashTagIndex >= 0 && int.TryParse(ex.Message.Substring(hashTagIndex+1), out int id)) {
+      if (hashTagIndex >= 0 && int.TryParse(ex.Message.Substring(hashTagIndex + 1), out int id)) {
         return id;
       }
       else {
         using (var md5 = MD5.Create()) {
           int hash = BitConverter.ToInt32(md5.ComputeHash(Encoding.UTF8.GetBytes(ex.GetType().Name)), 0);
-          if(hash < 0) {
+          if (hash < 0) {
             return hash * -1;
           }
-         return hash;
+          return hash;
         }
       }
     }
@@ -202,12 +202,12 @@ namespace Logging.SmartStandards {
   partial class DevToTraceLogger {
 
     private static string _LibPrefix = "(" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Name + ") ";
-    
+
     public static void LogCritical(int id, string messageTemplate, params object[] args) {
       LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogCritical(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 5, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogCritical(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -218,7 +218,7 @@ namespace Logging.SmartStandards {
       LogToTraceAdapter.LogToTrace("Dev", 4, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogError(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 4, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 4, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogError(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -229,7 +229,7 @@ namespace Logging.SmartStandards {
       LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogWarning(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 3, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogWarning(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -240,7 +240,7 @@ namespace Logging.SmartStandards {
       LogToTraceAdapter.LogToTrace("Dev", 2, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogInformation(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 2, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 2, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogInformation(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -251,7 +251,7 @@ namespace Logging.SmartStandards {
       LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogDebug(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 1, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogDebug(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -262,7 +262,7 @@ namespace Logging.SmartStandards {
       LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + messageTemplate, args);
     }
     public static void LogTrace(int id, System.Exception ex) {
-      LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + ex.Serialize(), new object[] {ex});
+      LogToTraceAdapter.LogToTrace("Dev", 0, id, _LibPrefix + ex.Serialize(), new object[] { ex });
     }
     public static void LogTrace(System.Exception ex) {
       int id = ExceptionSerializer.GetGenericIdFromException(ex);
@@ -271,4 +271,4 @@ namespace Logging.SmartStandards {
 
   }
 
- }
+}

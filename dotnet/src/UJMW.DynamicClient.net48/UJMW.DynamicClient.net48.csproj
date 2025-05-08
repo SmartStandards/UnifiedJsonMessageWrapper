@@ -4,12 +4,12 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{B0BA06FE-6437-4B9E-8C76-3ADFC8D191D2}</ProjectGuid>
+    <ProjectGuid>{51B4B2EC-583D-4236-8E72-6517FCDEEFE8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>System</RootNamespace>
     <AssemblyName>UJMW.DynamicClient</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>false</Deterministic>
     <TargetFrameworkProfile />
@@ -18,21 +18,21 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\dist\bin-net46\</OutputPath>
+    <OutputPath>..\..\dist\bin-net48\</OutputPath>
     <DefineConstants>TRACE;DEBUG;NET46</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\..\dist\bin-net46\UJMW.DynamicClient.xml</DocumentationFile>
+    <DocumentationFile>..\..\dist\bin-net48\UJMW.DynamicClient.xml</DocumentationFile>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\dist\bin-net46\</OutputPath>
+    <OutputPath>..\..\dist\bin-net48\</OutputPath>
     <DefineConstants>TRACE;NET46</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\..\dist\bin-net46\UJMW.DynamicClient.xml</DocumentationFile>
+    <DocumentationFile>..\..\dist\bin-net48\UJMW.DynamicClient.xml</DocumentationFile>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -139,8 +139,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\UJMW.DynamicClient.net48\LogToTraceAdapter.cs">
-      <Link>LogToTraceAdapter.cs</Link>
+    <Compile Include="LogToTraceAdapter.cs">
+      <DependentUpon>LogToTraceAdapter.tt</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -150,6 +152,12 @@
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="LogToTraceAdapter.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>LogToTraceAdapter.cs</LastGenOutput>
+    </Content>
   </ItemGroup>
   <Import Project="..\UJMW.DynamicClient\UJMW.DynamicClient.projitems" Label="Shared" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
