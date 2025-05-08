@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.0.5",
-  "currentVersionWithSuffix": "4.0.5",
+  "currentVersion": "4.1.0",
+  "currentVersionWithSuffix": "4.1.0",
   "releaseType": "official",
-  "previousVersion": "4.0.4",
-  "changeGrade": "patch",
+  "previousVersion": "4.0.5",
+  "changeGrade": "minor",
   "currentMajor": 4,
-  "currentMinor": 0,
-  "currentPatch": 5,
-  "versionDateInfo": "2025-04-15",
-  "versionTimeInfo": "08:28:22",
-  "versionNotes": "- Fix: removed IDisposable redirection to httpclient\n"
+  "currentMinor": 1,
+  "currentPatch": 0,
+  "versionDateInfo": "2025-05-08",
+  "versionTimeInfo": "06:08:56",
+  "versionNotes": "- new Feature: Added Targets for .NET48 and .net8.0\n- Fix: skipping invalid chars when reading messagebody (under WCF) to extract \"_\"-prop. Had some occ. of invalid BOM chars as part of the content\n- Package-Updates (Demo-Projects only)\n"
 }
