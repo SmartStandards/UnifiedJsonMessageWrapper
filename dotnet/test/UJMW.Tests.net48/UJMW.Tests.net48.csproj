@@ -84,9 +84,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net48\UJMW.DynamicClient.net48.csproj">
+    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net461\UJMW.DynamicClient.net461.csproj">
       <Project>{b0ba06fe-6437-4b9e-8c76-3adfc8d191d2}</Project>
-      <Name>UJMW.DynamicClient.net48</Name>
+      <Name>UJMW.DynamicClient.net461</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="..\UJMW.Tests\UJMW.Tests.projitems" Label="Shared" />

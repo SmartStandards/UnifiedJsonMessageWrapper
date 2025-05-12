@@ -56,6 +56,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DynamicWcfHost.net48",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.Tests.net48", "test\UJMW.Tests.net48\UJMW.Tests.net48.csproj", "{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "js", "js", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		..\js\package.json = ..\js\package.json
+		..\js\src\ujmwClient.ts = ..\js\src\ujmwClient.ts
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -136,6 +142,7 @@ Global
 		{CACFB05C-FFF9-F43A-BFAC-683FEF52BA20} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
 		{EDE39C43-201D-4E87-A3EE-F4747E5CB409} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
 		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13} = {5EFC1751-7CFC-47C3-A462-7316FF3AF497}
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {4130D21C-FE8F-4925-93E7-217B4AF1B7D9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D2F37C1D-32F0-4BF2-AAEB-46B9D8C07D23}
