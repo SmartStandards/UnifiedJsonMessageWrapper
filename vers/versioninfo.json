@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.0",
-  "currentVersionWithSuffix": "4.1.0",
+  "currentVersion": "4.1.1",
+  "currentVersionWithSuffix": "4.1.1",
   "releaseType": "official",
-  "previousVersion": "4.0.5",
-  "changeGrade": "minor",
+  "previousVersion": "4.1.0",
+  "changeGrade": "patch",
   "currentMajor": 4,
   "currentMinor": 1,
-  "currentPatch": 0,
-  "versionDateInfo": "2025-05-08",
-  "versionTimeInfo": "06:08:56",
-  "versionNotes": "- new Feature: Added Targets for .NET48 and .net8.0\n- Fix: skipping invalid chars when reading messagebody (under WCF) to extract \"_\"-prop. Had some occ. of invalid BOM chars as part of the content\n- Package-Updates (Demo-Projects only)\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2025-05-12",
+  "versionTimeInfo": "13:36:19",
+  "versionNotes": "- new revision without significant changes\n"
 }
