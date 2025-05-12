@@ -7,9 +7,15 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: Added Targets for .NET48 and .net8.0
-* Fix: skipping invalid chars when reading messagebody (under WCF) to extract "_"-prop. Had some occ. of invalid BOM chars as part of the content
-* Package-Updates (Demo-Projects only)
+*(none)*
+
+
+
+## v 4.1.0
+released **2025-05-08**, including:
+ - **new Feature**: Added Targets for .NET48 and .net8.0
+ - Fix: skipping invalid chars when reading messagebody (under WCF) to extract "_"-prop. Had some occ. of invalid BOM chars as part of the content
+ - Package-Updates (Demo-Projects only)
 
 
 
