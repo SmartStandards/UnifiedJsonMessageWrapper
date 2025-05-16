@@ -98,7 +98,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         epCategory = EndpointCategory.AnnouncementTriggerEndpoint;
       }
       else if (factoryType != null) {
-        if (factoryType == typeof(UjmwServiceHostFactory)) {
+        if (typeof(UjmwServiceHostFactory).IsAssignableFrom(factoryType)) {
           epCategory = EndpointCategory.DynamicUjmwFacade;
         }
       }
