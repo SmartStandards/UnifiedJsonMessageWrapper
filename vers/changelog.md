@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: EndpointEnumeration now also identifies UJMW endpoints when UjmwServiceHostFactory was inherited!
+*(none)*
+
+
+
+## v 4.1.2
+released **2025-05-16**, including:
+ - Fix: EndpointEnumeration now also identifies UJMW endpoints when UjmwServiceHostFactory was inherited!
 
 
 
