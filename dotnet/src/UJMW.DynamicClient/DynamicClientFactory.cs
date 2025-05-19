@@ -508,6 +508,7 @@ namespace System.Web.UJMW {
 
     private static void CollectAllMethodsForType(Type t, List<MethodInfo> target) {
       foreach (MethodInfo mi in t.GetMethods()) {
+        if (target.Contains(mi)) continue;
         target.Add(mi);
       }
       if(t.BaseType != null) {

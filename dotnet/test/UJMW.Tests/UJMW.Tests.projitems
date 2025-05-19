@@ -9,6 +9,7 @@
     <Import_RootNamespace>Lib</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactoryTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Mocks.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientTests.cs" />
   </ItemGroup>
