@@ -15,7 +15,7 @@
     <icon>PackageIcon.png</icon>
     <projectUrl>https://github.com/SmartStandards/UnifiedJsonMessageWrapper</projectUrl>
     <dependencies>
-      <group targetFramework=".NETFramework4.6">
+      <group targetFramework=".NETFramework4.8">
         <!--<dependency id="Newtonsoft.Json" version="[13.0.3,13.9999]" />-->
       </group>
     </dependencies>
@@ -23,9 +23,9 @@
   <files>
     <!-- https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package#from-a-convention-based-working-directory -->
     <file src="PackageIcon.png" target="" />
-    <!-- .NET 4.6.1 -->
-    <file src="dist\bin-net46\UJMW.DynamicWcfHost.dll" target="lib/net46" />
-    <file src="dist\bin-net46\UJMW.DynamicWcfHost.xml" target="lib/net46" />
-    <file src="dist\bin-net46\UJMW.DynamicWcfHost.pdb" target="lib/net46" />
+    <!-- .NET 4.8 -->
+    <file src="dist\bin-net48\UJMW.DynamicWcfHost.dll" target="lib/net48" />
+    <file src="dist\bin-net48\UJMW.DynamicWcfHost.xml" target="lib/net48" />
+    <file src="dist\bin-net48\UJMW.DynamicWcfHost.pdb" target="lib/net48" />
   </files>
 </package>
