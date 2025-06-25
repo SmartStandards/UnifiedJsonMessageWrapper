@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using static System.Collections.Specialized.BitVector32;
 
@@ -110,10 +111,26 @@ namespace System.Web.UJMW.SelfAnnouncement {
       hostApplicationLifetime.ApplicationStarted.Register(() => {
 
         //... when the 'IServerAddressesFeature' will be available:
-        var addressFeature = featureCollection.Get<IServerAddressesFeature>();
+        IServerAddressesFeature addressFeature = featureCollection.Get<IServerAddressesFeature>();
 
         if (overrideBaseUrls == null || overrideBaseUrls.Length == 0) {
-          overrideBaseUrls = addressFeature.Addresses.ToArray();
+          overrideBaseUrls = addressFeature.Addresses.Where( //filter out non-http(s) bindings like 'net.tcp://...' or 'net.pipe://...'
+            (uglyBaseUrlBindingPattern)=> uglyBaseUrlBindingPattern.StartsWith("http", StringComparison.CurrentCultureIgnoreCase)
+          ).Select(
+            (uglyBaseUrlBindingPattern) => {
+
+              string baseUrl = uglyBaseUrlBindingPattern.Replace("//*", Environment.MachineName).Replace(":*", "");
+
+              if (baseUrl.StartsWith("http://", StringComparison.CurrentCultureIgnoreCase)) {
+                baseUrl = baseUrl.Replace(":80", ""); //remove unnecessary port specification for http
+              }
+              else if (baseUrl.StartsWith("https://", StringComparison.CurrentCultureIgnoreCase)) {
+                baseUrl = baseUrl.Replace(":443", ""); //remove unnecessary port specification for https
+              }
+
+              return baseUrl;
+            }
+          ).ToArray();
         }
 
         //auto evaluate the current hosting address
@@ -462,6 +479,34 @@ namespace System.Web.UJMW.SelfAnnouncement {
     internal static string LastAddInfo { get; private set; } = "";
     internal static string LastFault { get; private set; } = "";
 
+    #region " Convenience for getting an 'Origin' name "
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static string GetOriginNameGuess() {
+      return GetApplicationNameGuess(
+        Assembly.GetCallingAssembly()
+      ).Replace(" ", "") + "@" + System.Environment.MachineName;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static string GetApplicationNameGuess() {
+      return GetApplicationNameGuess(Assembly.GetCallingAssembly());
+    }
+
+    /// <summary></summary>
+    /// <param name="applicationRepresentingAssembly">WILL ONLY BE USED AS FALLBACK!</param>
+    /// <returns></returns>
+    public static string GetApplicationNameGuess(Assembly applicationRepresentingAssembly) {
+
+      Assembly entryAssembly = Assembly.GetEntryAssembly();
+      if (entryAssembly != null) {
+        return entryAssembly.GetName().Name;
+      }
+
+      return applicationRepresentingAssembly.GetName().Name;
+    }
+
+    #endregion
 
   }
 

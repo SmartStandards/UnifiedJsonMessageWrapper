@@ -7,9 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
-
-
+* Fix: SelfAnnouncementHelper - more robust detection of own application base-urls (for WCF and WebAPI)
 
 ## v 4.1.4
 released **2025-05-30**, including:

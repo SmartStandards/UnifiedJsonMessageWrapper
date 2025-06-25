@@ -341,3 +341,4 @@ healthchecksdb
 /dotnet/dist
 /dotnet/vendor/nuget
 /dotnet/test/UJMW.DemoWebService/_AnnouncementInfo.txt
+/**/vendor/nuget

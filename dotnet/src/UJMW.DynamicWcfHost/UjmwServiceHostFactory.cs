@@ -10,6 +10,7 @@ using System.ServiceModel.Dispatcher;
 using System.ServiceModel.Web;
 using System.Text;
 using System.Threading;
+using System.Web.Hosting;
 using System.Web.Services.Description;
 using System.Xml;
 
@@ -35,18 +36,26 @@ namespace System.Web.UJMW {
     public UjmwServiceHostFactory() {
     }
 
-    internal static string[] _CollectedBaseUrls = new string[] { };
+    private static WebHttpBinding _CustomizedWebHttpBindingSecured = null;
+    private static WebHttpBinding _CustomizedWebHttpBinding = null;
 
+    internal static string[] _CollectedApplicationBaseUrls = new string[] { };
+    internal static string[] _CollectedEndpointRelativeUrls = new string[] { };
+
+    /// <summary></summary>
+    /// <param name="serviceImplementationType"></param>
+    /// <param name="baseAddresses">ACHTUNG: MICROSOFT meint hier die baseAddresses der .svc-Datei selbst - also nicht die der Applikation!</param>
+    /// <returns></returns>
     protected override ServiceHost CreateServiceHost(Type serviceImplementationType, Uri[] baseAddresses) {
       try {
 
         UjmwHostConfiguration.WaitForSetupCompleted();
-      
-        Uri primaryUri = baseAddresses[0];
 
-        _CollectedBaseUrls = _CollectedBaseUrls.Concat(
-          baseAddresses.Select((uri)=> uri.ToString())
-        ).Distinct().ToArray();
+        CollectUrlsFrom(baseAddresses);
+
+        //TODO: macht dass wirklich sinn, dass wir immer nur die erste baseAddress nehmen?
+        // -> was wenn localost oder der servername hier kommt, aber ein A-Record angefragt wird?
+        Uri primaryUri = baseAddresses[0];
 
         if (UjmwHostConfiguration.ForceHttps) {
           primaryUri = new Uri(primaryUri.ToString().Replace("http://", "https://"));
@@ -56,6 +65,8 @@ namespace System.Web.UJMW {
 
         DevToTraceLogger.LogTrace(72001, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
 
+
+        //TODO: sollten wir hier nicht ALLE baseAddresses angeben?
         ServiceHost host = new ServiceHost(serviceImplementationType, new Uri[] { primaryUri });
 
         var inboundSideChannelCfg = UjmwHostConfiguration.GetRequestSideChannelConfiguration(contractInterface);
@@ -71,12 +82,14 @@ namespace System.Web.UJMW {
           outboundSideChannelCfg.UnderlinePropertyIsProvided,
           serviceImplementationType
         );
-        
+
         var endpoint = new ServiceEndpoint(
           customizedContractDescription,
           GetCustomizedWebHttpBinding(),
           new EndpointAddress(primaryUri)
         );
+
+        //TODO: sollte nwir hier nicht endpoints für ALLE baseAddresses adden?
         host.AddServiceEndpoint(endpoint);
 
         //https://weblogs.asp.net/scottgu/437027
@@ -166,8 +179,36 @@ namespace System.Web.UJMW {
       }
     }
 
-    private static WebHttpBinding _CustomizedWebHttpBindingSecured = null;
-    private static WebHttpBinding _CustomizedWebHttpBinding = null;
+    private static void CollectUrlsFrom(Uri[] concreteAddresses) {
+
+      string applicationVPathWithTrailingSlash = HostingEnvironment.ApplicationVirtualPath;
+      if (!applicationVPathWithTrailingSlash.EndsWith("/")) {
+        applicationVPathWithTrailingSlash += "/";
+      }
+
+      foreach (Uri uri in concreteAddresses) {
+
+        string endpointReleativePathWithoutLeadingSlash = uri.AbsolutePath.Substring(applicationVPathWithTrailingSlash.Length).TrimStart('/');
+        string applicationBaseUrlWithTrailingSlash;
+
+        //filtert u.a. auch komische TCP-bindings heraus, die UJMW nicht supportet!
+        if (uri.Scheme.Equals("http", StringComparison.CurrentCultureIgnoreCase) || uri.Scheme.Equals("https", StringComparison.CurrentCultureIgnoreCase)) {
+
+          if (uri.IsDefaultPort) {
+            applicationBaseUrlWithTrailingSlash = $"{uri.Scheme}://{uri.Host}{applicationVPathWithTrailingSlash}";
+          }
+          else {
+            applicationBaseUrlWithTrailingSlash = $"{uri.Scheme}://{uri.Host}:{uri.Port}{applicationVPathWithTrailingSlash}";
+          }
+
+          _CollectedApplicationBaseUrls = _CollectedApplicationBaseUrls.Concat(new string[] { applicationBaseUrlWithTrailingSlash }).Distinct().ToArray();
+          _CollectedEndpointRelativeUrls = _CollectedEndpointRelativeUrls.Concat(new string[] { endpointReleativePathWithoutLeadingSlash }).Distinct().ToArray();
+      
+        }
+
+      }
+
+    }
 
     public static WebHttpBinding GetCustomizedWebHttpBinding() {
       if (UjmwHostConfiguration.ForceHttps) {

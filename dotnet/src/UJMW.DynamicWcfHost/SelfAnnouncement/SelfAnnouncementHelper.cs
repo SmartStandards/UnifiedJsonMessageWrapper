@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.ServiceModel.Activation;
 using System.Threading.Tasks;
 using System.Web.Hosting;
@@ -296,6 +297,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
     }
 
     private static void EnsureBaseUrlsPresent() { 
+
       if(_BaseUrls == null) {
         if (_DisableAutoEvaluatedBaseUrls) {
           //wird durch die configure-methode überklatscht
@@ -311,9 +313,13 @@ namespace System.Web.UJMW.SelfAnnouncement {
           }
         }
       }
+
       if (!_DisableAutoEvaluatedBaseUrls) {
-        _BaseUrls = _BaseUrls.Concat(UjmwServiceHostFactory._CollectedBaseUrls).Distinct().ToArray();
+        //TODO: dangerous to rely on this only - they grow only by the use of appeared urls and an early announce could delete available
+        //urls in some registry doing automatic cleanups!!!
+        _BaseUrls = _BaseUrls.Concat(UjmwServiceHostFactory._CollectedApplicationBaseUrls).Distinct().ToArray();
       }
+
     }
 
     /// <summary>
@@ -418,6 +424,48 @@ namespace System.Web.UJMW.SelfAnnouncement {
     internal static DateTime LastActionTime { get; private set; } = DateTime.MinValue;
     internal static string LastAddInfo { get; private set; } = "";
     internal static string LastFault { get; private set; } = "";
+
+    #region " Convenience for getting an 'Origin' name "
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static string GetOriginNameGuess() {
+      return GetApplicationNameGuess(
+        Assembly.GetCallingAssembly()
+      ).Replace(" ", "") + "@" + System.Environment.MachineName;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static string GetApplicationNameGuess() {
+      return GetApplicationNameGuess(Assembly.GetCallingAssembly());
+    }
+
+    /// <summary></summary>
+    /// <param name="applicationRepresentingAssembly">WILL ONLY BE USED AS FALLBACK!</param>
+    /// <returns></returns>
+    public static string GetApplicationNameGuess(Assembly applicationRepresentingAssembly) {
+
+      //would be better, but will normally not work...
+      Assembly entryAssembly = System.Reflection.Assembly.GetEntryAssembly();
+      if (entryAssembly != null) {
+        return entryAssembly.GetName().Name;
+      }
+
+      string vPath = HostingEnvironment.ApplicationVirtualPath;
+      if (string.IsNullOrWhiteSpace(vPath) || vPath == "/") {
+        vPath = HostingEnvironment.SiteName;
+      }
+      else {
+        vPath = vPath.TrimEnd('/').TrimStart('/').Replace("/", "-");
+      }
+
+      if (!string.IsNullOrWhiteSpace(vPath)) {
+        return vPath;
+      }
+
+      return applicationRepresentingAssembly.GetName().Name;
+    }
+
+    #endregion
 
   }
 
