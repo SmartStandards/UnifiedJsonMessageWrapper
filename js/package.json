@@ -1,6 +1,6 @@
 {
   "name": "ujmw-dynamicclient",
-  "version": "4.1.5",
+  "version": "4.1.6",
   "description": "Unified Json Message Wrapper",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

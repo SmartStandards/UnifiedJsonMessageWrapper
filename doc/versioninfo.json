@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.5",
-  "currentVersionWithSuffix": "4.1.5",
+  "currentVersion": "4.1.6",
+  "currentVersionWithSuffix": "4.1.6",
   "releaseType": "",
-  "previousVersion": "4.1.4",
+  "previousVersion": "4.1.5",
   "changeGrade": "fix",
   "currentMajor": 4,
   "currentMinor": 1,
-  "currentPatch": 5,
-  "versionDateInfo": "2025-06-25",
-  "versionTimeInfo": "10:37:18",
-  "versionNotes": "- Fix: SelfAnnouncementHelper - more robust detection of own application base-urls (for WCF and WebAPI)\n"
+  "currentPatch": 6,
+  "versionDateInfo": "2025-07-03",
+  "versionTimeInfo": "06:59:16",
+  "versionNotes": "- new revision without significant changes\n"
 }
