@@ -181,7 +181,7 @@ namespace System.Web.UJMW {
 
     private static void CollectUrlsFrom(Uri[] concreteAddresses) {
 
-      string applicationVPathWithTrailingSlash = HostingEnvironment.ApplicationVirtualPath;
+      string applicationVPathWithTrailingSlash = HostingEnvironment.ApplicationVirtualPath ?? "/";
       if (!applicationVPathWithTrailingSlash.EndsWith("/")) {
         applicationVPathWithTrailingSlash += "/";
       }
