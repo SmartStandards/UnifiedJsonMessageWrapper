@@ -20,6 +20,8 @@ namespace System.Web.UJMW {
     private DynamicUjmwControllerFactory() { 
     }
 
+    internal const string RenderInfoSiteMethodName = "RenderInfoSite";
+
     private const string UjmwReturnPropertyName = "return";
     private const string UjmwFaultPropertyName = "fault";
     private const string UjmwSideChannelPropertyName = "_";
@@ -27,7 +29,8 @@ namespace System.Web.UJMW {
     private const string UjmwRequestDtoSuffix = "Request";
 
     private static ConstructorInfo _HttpPostAttributeConstructor = typeof(HttpPostAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 1).Single();
-    private static ConstructorInfo _ProducesAttributeConstructor = typeof(ProducesAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 1).Single();
+    private static ConstructorInfo _HttpGetAttributeConstructor = typeof(HttpGetAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
+    private static ConstructorInfo _ProducesAttributeConstructor = typeof(ProducesAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 2).Single();
     private static ConstructorInfo _ConsumesAttributeConstructor = typeof(ConsumesAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
@@ -83,7 +86,8 @@ namespace System.Web.UJMW {
       Type baseType = typeof(DynamicControllerBase<>).MakeGenericType(serviceType);
 
       MethodInfo invokeMethod = baseType.GetMethod("InvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic);
-     
+      MethodInfo renderInfoSite = baseType.GetMethod(RenderInfoSiteMethodName, BindingFlags.Instance | BindingFlags.NonPublic);
+
       ////////////// NAMING ///////////////////////////////////////////////////////////////////
 
       string originalTypeName = serviceType.Name;
@@ -231,6 +235,37 @@ namespace System.Web.UJMW {
 
       var allMethods = new List<MethodInfo>();
       CollectAllMethodsForType(serviceType, allMethods);
+
+      #region " Endpoint-Info-Site (via HTTP-GET) "
+      if (options.EnableInfoSite) {
+
+        var rootMethodBuilder = typeBuilder.DefineMethod(
+            RenderInfoSiteMethodName,
+            MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+            typeof(string),
+            new Type[] {}
+         );
+
+        CustomAttributeBuilder httpGetAttribBuilder = new CustomAttributeBuilder(
+          _HttpGetAttributeConstructor, new object[] {}
+        );
+        rootMethodBuilder.SetCustomAttribute(httpGetAttribBuilder);
+        CustomAttributeBuilder producesAttribBuilder = new CustomAttributeBuilder(
+          _ProducesAttributeConstructor, new object[] { "text/html", Array.Empty<string>() }
+        );
+        rootMethodBuilder.SetCustomAttribute(producesAttribBuilder);
+        {
+          var rootMethodIlGen = rootMethodBuilder.GetILGenerator();
+          rootMethodIlGen.Emit(OpCodes.Nop);
+          rootMethodIlGen.Emit(OpCodes.Ldarg_0); // < unsere klasseninstanz auf den stack
+          rootMethodIlGen.Emit(OpCodes.Callvirt, renderInfoSite); // _DynamicProxyInvoker.RenderInfoSite()
+                                                                  // jetzt liegt ein result auf dem stack...
+          rootMethodIlGen.Emit(OpCodes.Castclass, typeof(IActionResult)); // reference-types müssen gecastet werden, weil der retval in "object" ist
+          rootMethodIlGen.Emit(OpCodes.Ret);
+        }
+
+      }
+      #endregion
 
       foreach (var serviceMethod in allMethods) {
         var methodSignatureString = serviceMethod.ToString();

@@ -67,6 +67,11 @@ namespace System.Web.UJMW {
     /// </summary>
     public bool EnableAuthHeaderEvaluatorHook { get; set; } = true;
 
+    /// <summary>
+    /// If enabled, any user can access the controller via http-GET (without authentication) and will see an info-site.
+    /// </summary>
+    public bool EnableInfoSite { get; set; } = false;
+
     public Type AuthAttribute { get; set; } = null;
     public object[] AuthAttributeConstructorParams { get; set; } = new object[] { };
 

@@ -41,6 +41,16 @@ namespace System.Web.UJMW {
           DynamicUjmwControllerFactory.TryGetContractMethod(
             contractType, (string)actionUntyped, out calledContractMethod
           );
+
+          if(calledContractMethod == null &&
+            context.HttpContext.Request.Method.Equals("GET", StringComparison.CurrentCultureIgnoreCase) &&
+            DynamicUjmwControllerFactory.RenderInfoSiteMethodName.Equals((string)actionUntyped, StringComparison.CurrentCultureIgnoreCase)
+          ) {
+            //this info-site can be displayed without any auth-header (especially for GET-requests)
+            await next();
+            return;
+          }
+
         }
 
         int httpReturnCode = 200;

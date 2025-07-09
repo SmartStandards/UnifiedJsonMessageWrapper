@@ -1,5 +1,6 @@
 ﻿using Logging.SmartStandards;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -16,6 +17,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Reflection.PortableExecutable;
@@ -48,6 +50,10 @@ namespace System.Web.UJMW {
         get {
           return typeof(TServiceInterface);
         }
+      }
+
+      protected IActionResult RenderInfoSite() {
+        return Content($"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {_ServiceInstance.GetType().FullName}\n  </body>\n</html>", "text/html");    
       }
 
       protected object InvokeMethod(string methodName, object requestDto) {

@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* Added Info-Site when accessing the root-url of UJMW-Endpoints via HTTP-Get (needs to be enabled by DynamicUjmwControllerOptions.EnableInfoSite)
 
 
 

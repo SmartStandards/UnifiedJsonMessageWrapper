@@ -159,7 +159,8 @@ namespace Security {
 
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
-          ControllerRoute = "v1/[Controller].svc"
+          ControllerRoute = "v1/[Controller].svc",
+          EnableInfoSite = true,
         });
 
         r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {

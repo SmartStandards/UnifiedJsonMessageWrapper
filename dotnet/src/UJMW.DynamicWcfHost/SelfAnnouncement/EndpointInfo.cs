@@ -62,7 +62,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
     DynamicUjmwFacade = 1,
     AnnouncementTriggerEndpoint = 2,
     SwaggerDefinition = 3,
-    SwaggerUi = 4
+    SwaggerUi = 4,
+    Custom = 5
   }
 
 }
