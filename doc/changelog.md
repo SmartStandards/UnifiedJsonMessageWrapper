@@ -8,6 +8,7 @@ This files contains a version history including all changes relevant for semanti
 ## Upcoming Changes
 
 * Added Info-Site when accessing the root-url of UJMW-Endpoints via HTTP-Get (needs to be enabled by DynamicUjmwControllerOptions.EnableInfoSite)
+* Made WCF-self-evaluation of own Application-Base-URLs more robust!
 
 
 
