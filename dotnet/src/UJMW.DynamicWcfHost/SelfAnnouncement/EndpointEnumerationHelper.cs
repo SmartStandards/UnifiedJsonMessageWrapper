@@ -130,7 +130,30 @@ namespace System.Web.UJMW.SelfAnnouncement {
     }
 
     /// <summary>
-    /// Alle Urls haben ein '/' am ende!
+    /// Returns the Url always with a trailing Slash!
+    /// </summary>
+    /// <param name="uri"></param>
+    /// <returns></returns>
+    internal static string ExtractApplicationBaseAddressFromUri(Uri uri) {
+      string schemaAndHostName = uri.AbsoluteUri.Substring(0, uri.AbsoluteUri.Length - uri.AbsolutePath.Length);
+      if (!schemaAndHostName.EndsWith("/")) {
+        schemaAndHostName = schemaAndHostName + "/";
+      }
+      if (!string.IsNullOrWhiteSpace(HostingEnvironment.ApplicationVirtualPath)) {
+        schemaAndHostName = schemaAndHostName + HostingEnvironment.ApplicationVirtualPath.TrimStart('/');
+      }
+      if (!schemaAndHostName.EndsWith("/")) {
+        schemaAndHostName = schemaAndHostName + "/";
+      }
+      return schemaAndHostName;
+    }
+
+    /// <summary>
+    /// Comes form a dedicated sections within the 'web.config'
+    /// (XML-Path: system.serviceModel/services/service/host/baseAddresses).
+    /// Note: This method has a focus on extracting only the relevant application
+    /// base address including a hostname/alias as usable from externally (can also be an A-Record)
+    /// AND ensures a TRAILIJNG SLASH at the end of the URL.
     /// </summary>
     /// <returns></returns>
     public static string[] GetBaseAddressesFromConfig() {
@@ -140,17 +163,15 @@ namespace System.Web.UJMW.SelfAnnouncement {
 
       foreach (ServiceElement serviceElement in serviceModelSectionGroup.Services.Services) {
         foreach (BaseAddressElement baseAddressElement in serviceElement.Host.BaseAddresses) {
-          Uri endpointAddress = new Uri(baseAddressElement.BaseAddress);
-          string url = endpointAddress.AbsoluteUri.Substring(0, endpointAddress.AbsoluteUri.Length - endpointAddress.AbsolutePath.Length) + HostingEnvironment.ApplicationVirtualPath;
-          //string url = $"{baseAddress.Scheme}://{baseAddress.Host}:{baseAddress.Port}{HostingEnvironment.ApplicationVirtualPath}/";
-          baseAddresses.Add(url);
+          string applicationBaseFromConfig = ExtractApplicationBaseAddressFromUri(new Uri(baseAddressElement.BaseAddress));
+          baseAddresses.Add(applicationBaseFromConfig);
         }
       }
 
-      return baseAddresses.ToArray();
+      return baseAddresses.Distinct().ToArray();
     }
 
-    internal static string GetBaseAddressFromCurrentRequest() {
+    internal static string GetApplicationBaseAddressFromCurrentRequest() {
       Uri requestUrl = null;
       try {
         if(OperationContext.Current != null) {
@@ -176,15 +197,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
         return null;
       }
       else {
-
-        string url = requestUrl.AbsoluteUri.Substring(0, requestUrl.AbsoluteUri.Length - requestUrl.AbsolutePath.Length) + HostingEnvironment.ApplicationVirtualPath;
-        //string url = $"{requestUrl.Scheme}://{requestUrl.Host}:{requestUrl.Port}{HostingEnvironment.ApplicationVirtualPath}";
-        if (url.EndsWith("/")) {
-          return url;
-        }
-        else {
-          return url + "/";
-        }
+        string applicationBaseFromRequest = ExtractApplicationBaseAddressFromUri(requestUrl);
+        return applicationBaseFromRequest;
       }
 
     }

@@ -306,7 +306,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         }
         else {
           _BaseUrls = EndpointEnumerationHelper.GetBaseAddressesFromConfig();
-          string baseAddressFromCurrentRequest = EndpointEnumerationHelper.GetBaseAddressFromCurrentRequest();
+          string baseAddressFromCurrentRequest = EndpointEnumerationHelper.GetApplicationBaseAddressFromCurrentRequest();
           if (!string.IsNullOrWhiteSpace(baseAddressFromCurrentRequest) && !_BaseUrls.Contains(baseAddressFromCurrentRequest)) {
             Array.Resize(ref _BaseUrls, _BaseUrls.Length + 1);
             _BaseUrls[_BaseUrls.Length - 1] = baseAddressFromCurrentRequest;
