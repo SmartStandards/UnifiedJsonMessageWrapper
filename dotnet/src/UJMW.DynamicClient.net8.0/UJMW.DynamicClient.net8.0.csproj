@@ -13,10 +13,10 @@
     <Product>UJMW</Product>
     <Company>(public domain)</Company>
     <Copyright>SmartStandards</Copyright>
-    <Version>4.1.7</Version>
-    <AssemblyVersion>4.1.7</AssemblyVersion>
+    <Version>4.1.8</Version>
+    <AssemblyVersion>4.1.8</AssemblyVersion>
     <Authors>SmartStandards</Authors>
-    <FileVersion>4.1.7</FileVersion>
+    <FileVersion>4.1.8</FileVersion>
     <PackageTags></PackageTags>
   </PropertyGroup>
   

@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.7",
-  "currentVersionWithSuffix": "4.1.7",
+  "currentVersion": "4.1.8",
+  "currentVersionWithSuffix": "4.1.8",
   "releaseType": "",
-  "previousVersion": "4.1.6",
+  "previousVersion": "4.1.7",
   "changeGrade": "fix",
   "currentMajor": 4,
   "currentMinor": 1,
-  "currentPatch": 7,
-  "versionDateInfo": "2025-07-09",
-  "versionTimeInfo": "11:36:50",
-  "versionNotes": "- Added Info-Site when accessing the root-url of UJMW-Endpoints via HTTP-Get (needs to be enabled by DynamicUjmwControllerOptions.EnableInfoSite)\n- Made WCF-self-evaluation of own Application-Base-URLs more robust!\n"
+  "currentPatch": 8,
+  "versionDateInfo": "2025-07-29",
+  "versionTimeInfo": "15:50:59",
+  "versionNotes": "- new revision without significant changes\n"
 }

@@ -6,9 +6,9 @@
 
     <IsPackable>false</IsPackable>
 
-    <AssemblyVersion>4.1.7</AssemblyVersion>
+    <AssemblyVersion>4.1.8</AssemblyVersion>
 
-    <Version>4.1.7</Version>
+    <Version>4.1.8</Version>
 
     <AssemblyName>UJMW.Tests</AssemblyName>
 

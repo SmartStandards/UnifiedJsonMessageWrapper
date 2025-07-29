@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>UJMW.DynamicClient</id>
-    <version>4.1.7</version>
+    <version>4.1.8</version>
     <title>UJMW.DynamicClient</title>
     <authors>SmartStandards</authors>
     <owners>(public domain)</owners>
