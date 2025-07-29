@@ -271,7 +271,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
       if (_SelfAnnouncementMethod == null) {
         throw new Exception("Calling this method is not allowed before the 'Configure' method has been called!");
       }
-      OnApplicationStarted();
+      //OnApplicationStarted();
 
       LastAction = "unannounce";
       LastActionTime = DateTime.Now;
