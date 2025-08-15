@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+- BugFix: InvokeWebCallInternal - logging vorübergehend erweitert #96681
 
 
 
