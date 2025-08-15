@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-- BugFix: InvokeWebCallInternal - logging vorübergehend erweitert #96681
+*(none)*
+
+
+
+## v 4.1.9
+released **2025-08-15**, including:
+ - BugFix: InvokeWebCallInternal - logging vorï¿½bergehend erweitert #96681
 
 
 
