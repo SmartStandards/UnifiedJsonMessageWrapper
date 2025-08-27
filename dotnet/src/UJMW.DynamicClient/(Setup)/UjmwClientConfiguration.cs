@@ -198,6 +198,16 @@ namespace System.Web.UJMW {
     /// </summary>
     public static bool UseCombinedDynamicAssembly = false;
 
+    public delegate void RequestErrorDiagnosticMethod(
+      string fullUrl,MethodInfo method,string rawJsonRequest,int httpReturnCode,
+      string reasonPhrase,string rawJsonResponse
+    );
+
+    /// <summary>
+    /// will be invoked before throwing an exception back to the caller
+    /// </summary>
+    public static RequestErrorDiagnosticMethod RequestErrorDiagnosticHook { get; set; } = null;
+
   }
 
 }

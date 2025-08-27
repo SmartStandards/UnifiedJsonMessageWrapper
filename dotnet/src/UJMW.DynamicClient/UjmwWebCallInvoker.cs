@@ -184,7 +184,19 @@ namespace System.Web.UJMW {
         throw new UnauthorizedAccessException($"Authorization issue! Received HTTP code 401 - {reasonPhrase} (URL: '{fullUrl}').");
       }
       else if (httpReturnCode < 200 || httpReturnCode > 299) {
-        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'  (URL: '{fullUrl}' - Request: '{rawJsonRequest}').");
+     
+        if(UjmwClientConfiguration.RequestErrorDiagnosticHook != null) {
+          UjmwClientConfiguration.RequestErrorDiagnosticHook.Invoke(
+            fullUrl,
+            method,
+            rawJsonRequest,
+            httpReturnCode,
+            reasonPhrase,
+            rawJsonResponse
+          );
+        }
+
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'  (URL: '{fullUrl}')."); 
       }
 
       //some old technologies can only return XML-encapulated replies
