@@ -63,7 +63,7 @@ namespace System.Web.UJMW {
 
         bool contractFound = UjmwHostConfiguration.ContractSelector.Invoke(serviceImplementationType, primaryUri.ToString(), out Type contractInterface);
 
-        DevToTraceLogger.LogTrace(72001, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
+        DevLogger.LogTrace(0, 72001, $"Creating UjmwServiceHost for '{serviceImplementationType.FullName}' as '{contractInterface.FullName}' at '{primaryUri}'.");
 
 
         //TODO: sollten wir hier nicht ALLE baseAddresses angeben?
@@ -103,7 +103,7 @@ namespace System.Web.UJMW {
         //it seems not to work properly when changing the host afterwards:
         //host.Authentication.AuthenticationSchemes = hostAuthenticationSchemes;
 
-        DevToTraceLogger.LogTrace(72002, $"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
+        DevLogger.LogTrace(0, 72002, $"CURRENT AuthenticationSchemes -> {hostAuthenticationSchemes}");
 
         CustomBinding customizedBinding = new CustomBinding(endpoint.Binding);
         WebMessageEncodingBindingElement encodingBindingElement = customizedBinding.Elements.Find<WebMessageEncodingBindingElement>();

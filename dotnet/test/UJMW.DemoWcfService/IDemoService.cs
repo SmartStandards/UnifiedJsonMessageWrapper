@@ -1,5 +1,6 @@
 ﻿using DistributedDataFlow;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization;
 using System.ServiceModel;
@@ -127,6 +128,15 @@ namespace UJMW.DemoWcfService {
       get { return stringValue; }
       set { stringValue = value; }
     }
+
+    [DataMember]
+    public Dictionary<string,string> ADict { get; set; } = new Dictionary<string, string>();
+   
+
+    [DataMember]
+    public Object AObj { get; set; } = null;
+
+
   }
 
 }

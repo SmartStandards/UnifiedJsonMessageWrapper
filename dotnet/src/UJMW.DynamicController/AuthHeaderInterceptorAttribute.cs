@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Logging.SmartStandards;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Headers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -78,6 +79,7 @@ namespace System.Web.UJMW {
 
       }
       catch (Exception ex) {
+        DevLogger.LogCritical(ex);
         context.Result = new ContentResult() {
           StatusCode = 500,
           Content = "Error during token validation: " + ex.Message

@@ -39,7 +39,7 @@
   <Import Project="..\UJMW.DynamicClient\UJMW.DynamicClient.projitems" Label="Shared" />
 
   <ItemGroup>
-    <Compile Include="..\UJMW.DynamicClient.net48\LogToTraceAdapter.cs" Link="LogToTraceAdapter.cs" />
+    <Compile Include="..\UJMW.DynamicClient.net8.0\SmartStandards.Logging.cs" Link="SmartStandards.Logging.cs" />
   </ItemGroup>
 
   <ItemGroup>

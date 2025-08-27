@@ -6,7 +6,7 @@ namespace System.Web.UJMW {
   public static class SetupExtensions {
 
     public static void AddDynamicUjmwControllers(this IServiceCollection services, Action<DynamicUjmwControllerRegistrar> configMethod) {
-      IMvcBuilder builder = services.AddMvc(
+      IMvcBuilder builder = services.AddMvc(//Pkg: Microsoft.AspNetCore.Mvc
         //o => o.Conventions.Add(new GenericControllerRouteConvention(true))
       );
 

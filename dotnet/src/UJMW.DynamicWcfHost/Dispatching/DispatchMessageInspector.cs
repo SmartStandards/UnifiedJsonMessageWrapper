@@ -84,7 +84,7 @@ namespace System.Web.UJMW {
         if (!_MethodInfoCache.TryGetValue(fullCallUrl, out corellationState.ContractMethod)) {
 
           if (!TryGetContractMethod(serviceContractType, methodName, out corellationState.ContractMethod)) {
-            DevToTraceLogger.LogError(72005, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
+            DevLogger.LogError(0, 72005, $"Method '{methodName}' not found on contract type '{serviceContractType.Name}'!");
             throw new WebFaultException(HttpStatusCode.InternalServerError);
           }
           _MethodInfoCache[fullCallUrl] = corellationState.ContractMethod;
@@ -109,7 +109,7 @@ namespace System.Web.UJMW {
 
         if (!authSuccess) {
 
-          DevToTraceLogger.LogWarning(72004, "Rejected incomming request because AuthHeaderEvaluator returned false!");
+          DevLogger.LogWarning(0, 72004, "Rejected incomming request because AuthHeaderEvaluator returned false!");
 
           if (string.IsNullOrWhiteSpace(failedReason)) {
             failedReason = "Forbidden";
@@ -156,7 +156,7 @@ namespace System.Web.UJMW {
           }
           catch (Exception ex) {
             HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "Could not read JSON-Envelope to probe for Sidechannel-Property ('_'): " + ex.Message;
-            DevToTraceLogger.LogError(new Exception(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value, ex));
+            DevLogger.LogError(new Exception(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value, ex));
             throw new WebFaultException(HttpStatusCode.BadRequest);
           }
 
@@ -165,7 +165,7 @@ namespace System.Web.UJMW {
               _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
             }
             catch (Exception ex) {
-              DevToTraceLogger.LogError(ex);
+              DevLogger.LogError(ex);
               HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
               throw new WebFaultException(HttpStatusCode.BadRequest);
             }
@@ -182,7 +182,7 @@ namespace System.Web.UJMW {
               _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
             }
             catch (Exception ex) {
-              DevToTraceLogger.LogError(ex);
+              DevLogger.LogError(ex);
               HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
               throw new WebFaultException(HttpStatusCode.BadRequest);
             }
@@ -203,14 +203,14 @@ namespace System.Web.UJMW {
               _InboundSideChannelCfg.ProcessingMethod.Invoke(corellationState.ContractMethod, sideChannelContent);
             }
             catch (Exception ex) {
-              DevToTraceLogger.LogError(ex);
+              DevLogger.LogError(ex);
               HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = ex.Message;
               throw new WebFaultException(HttpStatusCode.BadRequest);
             }
           }
         }
         else {
-          DevToTraceLogger.LogWarning(72003, "Rejected incomming request because of missing side channel");
+          DevLogger.LogWarning(0, 72003, "Rejected incomming request because of missing side channel");
           HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value = "No sidechannel provided.";
           throw new WebFaultException(HttpStatusCode.BadRequest);
         }

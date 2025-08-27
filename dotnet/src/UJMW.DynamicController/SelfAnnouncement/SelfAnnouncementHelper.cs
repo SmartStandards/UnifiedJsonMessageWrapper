@@ -336,14 +336,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         LastAddInfo = addInfo;
 
         string msg = $"Self-Announcement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'",_BaseUrls)}'. {addInfo}\n{epInfoLines}";
-        DevToTraceLogger.LogInformation(72007, msg);
+        DevLogger.LogInformation(0, 72007, msg);
 
         LastFault = null;
       }
       catch(Exception ex) {
         LastFault = ex.Message;
         string msg = $"Self-Announcement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
-        DevToTraceLogger.LogError(72007, new Exception(msg, ex));
+        DevLogger.LogError(0, 72007, new Exception(msg, ex));
 
         if (!catchExceptions) {
           throw;
@@ -373,14 +373,14 @@ namespace System.Web.UJMW.SelfAnnouncement {
         LastAddInfo = addInfo;
 
         string msg = $"Self-Unannouncement completed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
-        DevToTraceLogger.LogInformation(72007, msg);
+        DevLogger.LogInformation(0, 72007, msg);
 
         LastFault = null;
       }
       catch (Exception ex) {
         LastFault = ex.Message;
         string msg = $"Self-Unannouncement failed for {RegisteredEndpoints.Count()} endpoints with base-url(s) '{string.Join("'+'", _BaseUrls)}'. {addInfo}\n{epInfoLines}";
-        DevToTraceLogger.LogError(72007, new Exception(msg, ex));
+        DevLogger.LogError(0, 72007, new Exception(msg, ex));
       }
     }
 

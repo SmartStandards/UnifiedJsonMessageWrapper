@@ -311,7 +311,7 @@ namespace System.Web.UJMW {
         //if (UjmwHostConfiguration.LoggingHook != null) {
         //  UjmwHostConfiguration.LoggingHook.Invoke(0, $"Incomming call to UJMW Operation '{_ControllerName}.{_OperationName}'");
         //}
-        DevToTraceLogger.LogTrace(72000, $"Invoking UJMW call to UJMW Operation '{_ContractMethod.Name}'");
+        DevLogger.LogTrace(0, 72000, $"Invoking UJMW call to UJMW Operation '{_ContractMethod.Name}'");
 
         try {
           if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
@@ -336,7 +336,7 @@ namespace System.Web.UJMW {
           }
         }
         catch (Exception ex) {
-          DevToTraceLogger.LogError(ex);
+          DevLogger.LogError(ex);
           //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
           if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
             CatchedExeptionFromCurrentOperation.Value = "BL-Exception";

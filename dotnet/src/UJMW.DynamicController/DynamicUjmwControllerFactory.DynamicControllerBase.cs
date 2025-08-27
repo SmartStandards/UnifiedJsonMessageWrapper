@@ -173,12 +173,12 @@ namespace System.Web.UJMW {
                   }
                   else {
                     string msg = "Rejected incomming request because of missing side channel";
-                    DevToTraceLogger.LogWarning(72003, msg);
+                    DevLogger.LogWarning(0, 72003, msg);
                     throw new Exception(msg);
                   }
                 }
 
-                DevToTraceLogger.LogTrace(72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
+                DevLogger.LogTrace(0, 72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 
@@ -220,7 +220,7 @@ namespace System.Web.UJMW {
 
               }
               catch (Exception ex) {
-                DevToTraceLogger.LogError(ex);
+                DevLogger.LogError(ex);
                 //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {

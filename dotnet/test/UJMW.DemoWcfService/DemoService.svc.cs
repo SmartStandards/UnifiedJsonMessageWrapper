@@ -46,6 +46,9 @@ namespace UJMW.DemoWcfService {
       if (composite.BoolValue) {
         composite.StringValue += "Suffix";
       }
+
+      composite.ADict["PascalKey"] = "TestValue";
+      composite.AObj = new CompositeType();
       return composite;
     }
 
