@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.9",
-  "currentVersionWithSuffix": "4.1.9",
+  "currentVersion": "4.1.10",
+  "currentVersionWithSuffix": "4.1.10",
   "releaseType": "",
-  "previousVersion": "4.1.8",
+  "previousVersion": "4.1.9",
   "changeGrade": "fix",
   "currentMajor": 4,
   "currentMinor": 1,
-  "currentPatch": 9,
-  "versionDateInfo": "2025-08-15",
-  "versionTimeInfo": "11:15:39",
-  "versionNotes": "- BugFix: InvokeWebCallInternal - logging vor�bergehend erweitert #96681\n"
+  "currentPatch": 10,
+  "versionDateInfo": "2025-08-27",
+  "versionTimeInfo": "09:26:36",
+  "versionNotes": "- Fixed compatibility to Logging-G2\n"
 }
