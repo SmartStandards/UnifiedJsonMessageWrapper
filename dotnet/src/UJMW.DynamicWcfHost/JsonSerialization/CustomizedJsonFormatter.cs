@@ -336,14 +336,16 @@ namespace System.Web.UJMW {
           }
         }
         catch (Exception ex) {
+
           DevLogger.LogError(ex);
-          //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
+
           if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
-            CatchedExeptionFromCurrentOperation.Value = "BL-Exception";
+            CatchedExeptionFromCurrentOperation.Value = "UJMW Invocation Error";
           }
           else {
             CatchedExeptionFromCurrentOperation.Value = ex.Message;
           }
+
           outputs = new object[0];
           return null;
         }

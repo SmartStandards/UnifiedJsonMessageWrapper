@@ -52,23 +52,33 @@ namespace System.Web.UJMW {
         }
       }
 
+      //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
       protected IActionResult RenderInfoSite() {
         return Content($"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {_ServiceInstance.GetType().FullName}\n  </body>\n</html>", "text/html");    
       }
 
+      //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
       protected object InvokeMethod(string methodName, object requestDto) {
+        try {
 
-        Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> redirector =
-          GetOrCreateRedirectorMethod(methodName, this);
+          Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> redirector =
+            GetOrCreateRedirectorMethod(methodName, this);
 
-        object responseDto = redirector.Invoke(
-          _ServiceInstance,
-          requestDto,
-          this.HttpContext.Request.Headers,
-          this.HttpContext.Response.Headers
-        );        
+          object responseDto = redirector.Invoke(
+            _ServiceInstance,
+            requestDto,
+            this.HttpContext.Request.Headers,
+            this.HttpContext.Response.Headers
+          );        
 
-        return responseDto;
+          return responseDto;
+        }
+        catch (Exception ex) {
+          //LAST DEFENCE - SHOULD NEVER HAPPEN
+          DevLogger.LogCritical(ex.Wrap(72500, $"UJMW Operation '{methodName}' failed: {ex.Message}"));
+          this.HttpContext.Response.StatusCode = 500;
+          throw;
+        }
       }
 
       private static Dictionary<string, Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object>> _RedirectorMethods =
@@ -127,12 +137,16 @@ namespace System.Web.UJMW {
               object responseDto = Activator.CreateInstance(responseDtoType);
               object[] serviceMethodParams = new object[paramCount];
 
-              //map the in-args
-              foreach (DtoValueMapper requestDtoValueMapper in requestDtoValueMappers) {
-                requestDtoValueMapper.MapRequestDtoToParam(requestDto, serviceMethodParams);
-              }
-          
               try {
+       
+                if(requestDto == null) {
+                  throw new Exception($"The request DTO is null or could not be deserialized!");
+                }
+
+                //map the in-args
+                foreach (DtoValueMapper requestDtoValueMapper in requestDtoValueMappers) {
+                  requestDtoValueMapper.MapRequestDtoToParam(requestDto, serviceMethodParams);
+                }
 
                 ///// RESTORE INCOMMING SIDECHANNEL /////
 
@@ -220,16 +234,18 @@ namespace System.Web.UJMW {
 
               }
               catch (Exception ex) {
+
                 DevLogger.LogError(ex);
-                //UjmwHostConfiguration.LoggingHook.Invoke(4, $"UJMW Operation has thrown Exception: {ex.Message}");
+
                 if (faultProp != null) {
                   if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
-                    faultProp.SetValue(responseDto, "BL-Exception");
+                    faultProp.SetValue(responseDto, "UJMW Invocation Error");
                   }
                   else {
                     faultProp.SetValue(responseDto, ex.Message);
                   }
                 }
+
               }
 
               ///// CAPTURE OUTGOING BACKCHANNEL /////
