@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.10",
-  "currentVersionWithSuffix": "4.1.10",
+  "currentVersion": "4.1.11",
+  "currentVersionWithSuffix": "4.1.11",
   "releaseType": "",
-  "previousVersion": "4.1.9",
+  "previousVersion": "4.1.10",
   "changeGrade": "fix",
   "currentMajor": 4,
   "currentMinor": 1,
-  "currentPatch": 10,
-  "versionDateInfo": "2025-08-27",
-  "versionTimeInfo": "09:26:36",
-  "versionNotes": "- Fixed compatibility to Logging-G2\n"
+  "currentPatch": 11,
+  "versionDateInfo": "2025-08-28",
+  "versionTimeInfo": "14:09:45",
+  "versionNotes": "- new revision without significant changes\n"
 }

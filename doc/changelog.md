@@ -11,6 +11,12 @@ This files contains a version history including all changes relevant for semanti
 
 
 
+## v 4.1.11
+released **2025-08-28**, including:
+ - new revision without significant changes
+
+
+
 ## v 4.1.10
 released **2025-08-27**, including:
  - Fixed compatibility to Logging-G2
