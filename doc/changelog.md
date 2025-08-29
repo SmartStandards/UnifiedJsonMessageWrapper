@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **breaking Change**: RetryDecider-Hook has been extended to supply the http return code (good to react on 401)
+*(none)*
+
+
+
+## v 5.0.0
+released **2025-08-29**, including:
+ - **breaking Change**: RetryDecider-Hook has been extended to supply the http return code (good to react on 401)
 
 
 
