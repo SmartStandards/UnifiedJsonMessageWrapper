@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **breaking Change**: RetryDecider-Hook has been extended to supply the http return code (good to react on 401)
 
 
 

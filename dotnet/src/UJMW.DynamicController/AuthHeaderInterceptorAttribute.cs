@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.Headers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Collections.Generic;
+using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -32,9 +33,8 @@ namespace System.Web.UJMW {
             rawHeader = null;
           }
         }
-
-        HostString apiCaller = context.HttpContext.Request.Host;
-        //MethodInfo calledContractMethod = GetMethodInfoFromContext(context);
+    
+        string apiCaller = context.HttpContext.Connection.RemoteIpAddress.ToString();
 
         Type contractType = GetContractTypeFromContext(context);
         MethodInfo calledContractMethod = null;
@@ -57,7 +57,7 @@ namespace System.Web.UJMW {
         int httpReturnCode = 200;
         string failedReason = string.Empty;
         if (!UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-          rawHeader, contractType, calledContractMethod, apiCaller.Host, ref httpReturnCode, ref failedReason
+          rawHeader, contractType, calledContractMethod, apiCaller, ref httpReturnCode, ref failedReason
         )) {
          
           if (httpReturnCode == 200) {
@@ -65,11 +65,16 @@ namespace System.Web.UJMW {
           }
 
           if (string.IsNullOrWhiteSpace(failedReason)) {
-            failedReason = "Forbidden";
+            if(httpReturnCode == 401) {
+              failedReason = "Unauthorized";
+            }
+            else {
+              failedReason = "Forbidden";
+            }
           }
 
           context.Result = new ContentResult() {
-            StatusCode = 401,
+            StatusCode = httpReturnCode,
             Content = failedReason
           };
 

@@ -72,12 +72,14 @@ namespace System.Web.UJMW {
     /// <param name="contractType"></param>
     /// <param name="ex"></param>
     /// <param name="tryNumber"></param>
+    /// <param name="httpCode"></param>
     /// <param name="url">NOTE: the url can also be modified sothat a fallback-url is used for the next try...</param>
     /// <returns></returns>
-    public delegate bool RetryDecitionMethod(
+    public delegate bool RetryDecisionMethod(
       Type contractType,
       Exception ex,
       int tryNumber,
+      int httpCode,
       ref string url
     );
 
@@ -86,8 +88,8 @@ namespace System.Web.UJMW {
     /// An sleep of 100ms is hardcoded internally, more can be placed inside of that hook.
     /// IMPORTANT: there is a hard limit of max 20 retries!
     /// </summary>
-    public static RetryDecitionMethod RetryDecider { get; set; } = (
-      (Type contractType, Exception ex, int tryNumber, ref string url) => { 
+    public static RetryDecisionMethod RetryDecider { get; set; } = (
+      (Type contractType, Exception ex, int tryNumber, int httpCode, ref string url) => { 
         if (ex is TimeoutException || ex.Message.Contains("Timeout")) {
           return (tryNumber == 1);//one retry per default...
         }

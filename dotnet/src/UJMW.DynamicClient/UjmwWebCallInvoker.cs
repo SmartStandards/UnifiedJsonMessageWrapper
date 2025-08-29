@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 
 namespace System.Web.UJMW {
@@ -83,13 +84,14 @@ namespace System.Web.UJMW {
       do {
         currentTry++;
 
+        int httpCode = 0;
         try {
 
-          return InvokeWebCallInternal(endpointUrl, methodName, arguments, argumentNames, methodSignatureString);
+          return InvokeWebCallInternal(endpointUrl, methodName, arguments, argumentNames, methodSignatureString, ref httpCode);
 
         }
         catch (Exception ex) {
-          if(!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, ref endpointUrl)) {
+          if (!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, httpCode, ref endpointUrl)) {
             throw;
           }
           if (!endpointUrl.EndsWith("/")) {
@@ -103,7 +105,9 @@ namespace System.Web.UJMW {
 
     }
 
-    private object InvokeWebCallInternal(string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+    private object InvokeWebCallInternal(
+      string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString, ref int httpReturnCode
+    ) {
 
       string fullUrl = rootUrl + methodName;
 
@@ -168,7 +172,7 @@ namespace System.Web.UJMW {
 
       // ############### HTTP POST #############################################
        
-      int httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
+      httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
         fullUrl,
         rawJsonRequest, requestHeaders,
         out string rawJsonResponse, out var responseHeaders,
@@ -180,8 +184,8 @@ namespace System.Web.UJMW {
       // Redirection messages(300 – 399)
       // Client error responses(400 – 499)
       // Server error responses(500 – 599)
-      if (httpReturnCode == 401) {
-        throw new UnauthorizedAccessException($"Authorization issue! Received HTTP code 401 - {reasonPhrase} (URL: '{fullUrl}').");
+      if (httpReturnCode == 401 || httpReturnCode == 403) {
+        throw new UnauthorizedAccessException($"Authorization issue! Received HTTP code {httpReturnCode} - {reasonPhrase} (URL: '{fullUrl}').");
       }
       else if (httpReturnCode < 200 || httpReturnCode > 299) {
      
@@ -196,7 +200,7 @@ namespace System.Web.UJMW {
           );
         }
 
-        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}'  (URL: '{fullUrl}')."); 
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}' (URL: '{fullUrl}')."); 
       }
 
       //some old technologies can only return XML-encapulated replies
