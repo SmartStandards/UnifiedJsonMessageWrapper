@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 [assembly: InternalsVisibleTo("UJMW.Tests")]
+[assembly: AssemblyMetadata("SourceContext","UJMW")]
 
 namespace System.Web.UJMW {
 

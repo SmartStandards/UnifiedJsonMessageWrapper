@@ -3,6 +3,8 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
+[assembly: AssemblyMetadata("SourceContext", "UJMW")]
+
 namespace System.Web.UJMW {
 
   public delegate bool ServiceContractInterfaceSelectorMethod(

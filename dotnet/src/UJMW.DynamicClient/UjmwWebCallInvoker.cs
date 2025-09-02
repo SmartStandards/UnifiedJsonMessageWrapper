@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Logging.SmartStandards;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -185,7 +186,7 @@ namespace System.Web.UJMW {
       // Client error responses(400 – 499)
       // Server error responses(500 – 599)
       if (httpReturnCode == 401 || httpReturnCode == 403) {
-        throw new UnauthorizedAccessException($"Authorization issue! Received HTTP code {httpReturnCode} - {reasonPhrase} (URL: '{fullUrl}').");
+        throw new UnauthorizedAccessException($"Authorization issue! Received HTTP code {httpReturnCode} - {reasonPhrase} (URL: '{fullUrl}'). #{httpReturnCode}");
       }
       else if (httpReturnCode < 200 || httpReturnCode > 299) {
      
@@ -200,7 +201,7 @@ namespace System.Web.UJMW {
           );
         }
 
-        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}' (URL: '{fullUrl}')."); 
+        throw new Exception($"Response indicates no success! Received HTTP code {httpReturnCode} - '{reasonPhrase}' (URL: '{fullUrl}'). #{httpReturnCode}"); 
       }
 
       //some old technologies can only return XML-encapulated replies
