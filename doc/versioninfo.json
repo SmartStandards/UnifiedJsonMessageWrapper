@@ -1,13 +1,13 @@
 {
-  "currentVersion": "4.1.11",
-  "currentVersionWithSuffix": "4.1.11",
+  "currentVersion": "5.0.0",
+  "currentVersionWithSuffix": "5.0.0",
   "releaseType": "",
-  "previousVersion": "4.1.10",
-  "changeGrade": "fix",
-  "currentMajor": 4,
-  "currentMinor": 1,
-  "currentPatch": 11,
-  "versionDateInfo": "2025-08-28",
-  "versionTimeInfo": "14:09:45",
-  "versionNotes": "- new revision without significant changes\n"
+  "previousVersion": "4.1.11",
+  "changeGrade": "major",
+  "currentMajor": 5,
+  "currentMinor": 0,
+  "currentPatch": 0,
+  "versionDateInfo": "2025-08-29",
+  "versionTimeInfo": "13:43:39",
+  "versionNotes": "- breaking Change: RetryDecider-Hook has been extended to supply the http return code (good to react on 401)\n"
 }
