@@ -9,6 +9,7 @@
     <Import_RootNamespace>System</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)CommandLineExecutor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\OutgoingRequestSideChannelConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\IncommingResponseSideChannelConfiguration.cs" />
@@ -16,6 +17,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\UjmwClientConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)HttpPostExecutor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwWebCallInvoker.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IAbstractWebcallInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IAbstractCallInvoker.cs" />
   </ItemGroup>
 </Project>

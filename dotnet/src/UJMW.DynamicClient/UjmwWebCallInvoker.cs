@@ -13,7 +13,7 @@ namespace System.Web.UJMW {
 
   //developed on base of 'https://github.com/KornSW/W3bstract/tree/master/W3bstract/W3bstract.WebServiceConnector/Client'
 
-  internal class UjmwWebCallInvoker: IAbstractWebcallInvoker {
+  internal class UjmwWebCallInvoker: IAbstractCallInvoker {
 
     private Type _ContractType;
     private IHttpPostExecutor _HttpPostExecutor;
@@ -39,7 +39,7 @@ namespace System.Web.UJMW {
       }
     }
 
-    private static MethodInfo FindMethod(Type declaringType,string methodName) {
+    internal static MethodInfo FindMethod(Type declaringType,string methodName) {
       MethodInfo m = declaringType.GetMethod(methodName);
       if(m != null) {
         return m; //99%
@@ -62,7 +62,7 @@ namespace System.Web.UJMW {
     private string _CachedEndpointUrl = null;
     private DateTime _EndpointUrlCacheTime = DateTime.MinValue;
 
-    public object InvokeWebCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+    public object InvokeCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
          
       if(methodName == nameof(IDisposable.Dispose)) {
         _OnDisposeInvoked.Invoke();

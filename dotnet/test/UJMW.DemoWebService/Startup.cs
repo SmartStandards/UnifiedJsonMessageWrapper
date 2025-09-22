@@ -17,6 +17,7 @@ using System.Reflection;
 using System.Text;
 using System.Web.UJMW;
 using System.Web.UJMW.SelfAnnouncement;
+using UJMW.DemoCommandLineExe;
 using UJMW.DemoWcfService;
 
 namespace Security {
@@ -108,6 +109,18 @@ namespace Security {
         }
       );
 
+      UjmwClientConfiguration.ConfigureRequestSidechannel((serviceType, sideChannel) => {
+        if (HasDataFlowSideChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
+          sideChannel.ProvideUjmwUnderlineProperty();
+          sideChannel.CaptureDataVia(
+            (snapshot) => AmbienceHub.CaptureCurrentValuesTo(snapshot, contractName)
+          );
+        }
+        else {
+          sideChannel.ProvideNoChannel();
+        }
+      });
+
       UjmwHostConfiguration.ConfigureResponseSidechannel(
         (serviceType, sideChannel) => {
           if (HasDataFlowBackChannelAttribute.TryReadFrom(serviceType, out string contractName)) {
@@ -155,6 +168,15 @@ namespace Security {
       services.AddSingleton<IDemoService>(svc);
       services.AddSingleton<IDemoFileService>(svc);
 
+      services.AddSingleton<IDemoCliService>((sc) => {
+        return DynamicClientFactory.CreateInstance<IDemoCliService>(
+          new CommandLineExecutor(
+            typeof(IDemoCliService),
+            "..\\UJMW.DemoCommandLineExe\\bin\\Debug\\UJMW.DemoCommandLineExe.exe"
+          )
+        );
+      });
+
       services.AddDynamicUjmwControllers(r => {
 
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
@@ -177,6 +199,12 @@ namespace Security {
 
         r.AddControllerFor<IFooStore>();
         r.AddControllerFor<IBarStore>();
+
+        r.AddControllerFor<IDemoCliService>(new DynamicUjmwControllerOptions {
+          ControllerRoute = "CliService",
+          EnableAuthHeaderEvaluatorHook = false,
+          EnableInfoSite = true,
+        });
 
         r.AddAnnouncementTriggerEndpoint();
 
@@ -247,7 +275,7 @@ namespace Security {
       });
 
     }
-    
+
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
     public void Configure(
       IApplicationBuilder app, IWebHostEnvironment env,
@@ -304,7 +332,7 @@ namespace Security {
       }
 
       app.UseHttpsRedirection();
-      
+
       app.UseRouting();
 
       //CORS: muss zwischen 'UseRouting' und 'UseEndpoints' liegen!
@@ -325,7 +353,7 @@ namespace Security {
         lifetimeEvents, app.ServerFeatures,
         (string[] baseUrls, EndpointInfo[] endpoints, bool act, ref string info) => {
 
-          var sb = new StringBuilder(); 
+          var sb = new StringBuilder();
           string timestamp = DateTime.Now.ToLongTimeString();
 
           Console.WriteLine("--------------------------------------");
@@ -366,7 +394,7 @@ namespace Security {
 
   }
 
-  public interface IFooStore : IGenericInterface<Foo, int> { 
+  public interface IFooStore : IGenericInterface<Foo, int> {
   }
   public interface IBarStore : IGenericInterface<Bar, string> {
   }

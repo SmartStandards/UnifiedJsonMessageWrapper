@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>UJMW.CommandLineFacade</AssemblyName>
+    <RootNamespace>System</RootNamespace>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>UJMW.CommandLineFacade</PackageId>
+    <Description>A dynamic web api client, using the 'Unified JSON Message Wrapper' standard</Description>
+    <Product>UJMW</Product>
+    <Company>(public domain)</Company>
+    <Copyright>SmartStandards</Copyright>
+    <Version>5.0.1</Version>
+    <AssemblyVersion>5.0.1</AssemblyVersion>
+    <Authors>SmartStandards</Authors>
+    <FileVersion>5.0.1</FileVersion>
+    <PackageTags></PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>..\..\dist\bin-net8.0\UJMW.CommandLineFacade.xml</DocumentationFile>
+    <OutputPath>..\..\dist\bin-net8.0\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;DEBUG;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>..\..\dist\bin-net8.0\</OutputPath>
+    <DocumentationFile>..\..\dist\bin-net8.0\UJMW.CommandLineFacade.xml</DocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <Import Project="..\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems" Label="Shared" />
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+</Project>

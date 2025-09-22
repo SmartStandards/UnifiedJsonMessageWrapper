@@ -17,7 +17,7 @@ namespace System.Web.UJMW {
   public abstract class DynamicClientFactory {
 
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-    private IAbstractWebcallInvoker _Invoker;
+    private IAbstractCallInvoker _Invoker;
 
     #region " CreateInstance - Convenience overloads " 
 
@@ -160,12 +160,12 @@ namespace System.Web.UJMW {
 
     #endregion
 
-    private static TApplicable CreateInstance<TApplicable>(IAbstractWebcallInvoker invoker, params object[] constructorArgs) {
+    public static TApplicable CreateInstance<TApplicable>(IAbstractCallInvoker invoker, params object[] constructorArgs) {
       return (TApplicable)CreateInstance(typeof(TApplicable), invoker, constructorArgs);
     }
 
     private static ModuleBuilder _CombinedBuilder = null;
-    private static object CreateInstance(Type applicableType, IAbstractWebcallInvoker invoker, params object[] constructorArgs) {
+    private static object CreateInstance(Type applicableType, IAbstractCallInvoker invoker, params object[] constructorArgs) {
       Type dynamicType;
       if (UjmwClientConfiguration.UseCombinedDynamicAssembly) {
         if(_CombinedBuilder == null) {
@@ -226,8 +226,8 @@ namespace System.Web.UJMW {
 
       lock (moduleBuilder) {
 
-        Type iDynamicProxyInvokerType = typeof(IAbstractWebcallInvoker);
-        MethodInfo iDynamicProxyInvokerTypeInvokeMethod = iDynamicProxyInvokerType.GetMethod(nameof(IAbstractWebcallInvoker.InvokeWebCall));
+        Type iDynamicProxyInvokerType = typeof(IAbstractCallInvoker);
+        MethodInfo iDynamicProxyInvokerTypeInvokeMethod = iDynamicProxyInvokerType.GetMethod(nameof(IAbstractCallInvoker.InvokeCall));
 
         Type baseType = null;
         if ((applicableType.IsClass)) {
@@ -262,7 +262,7 @@ namespace System.Web.UJMW {
             var constructorArgs = new List<Type>();
             foreach (var p in constructorOnBase.GetParameters())
               constructorArgs.Add(p.ParameterType);
-            constructorArgs.Add(typeof(IAbstractWebcallInvoker));
+            constructorArgs.Add(typeof(IAbstractCallInvoker));
             var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, CallingConventions.Standard, constructorArgs.ToArray());
             // CODE: Public Sub New([...],dynamicProxyInvoker As IDynamicProxyInvoker)
 
@@ -292,7 +292,7 @@ namespace System.Web.UJMW {
           var constructorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
             CallingConventions.HasThis,
-            new[] { typeof(IAbstractWebcallInvoker) }
+            new[] { typeof(IAbstractCallInvoker) }
           );
 
           // CODE: Public Sub New(dynamicProxyInvoker As IDynamicProxyInvoker)

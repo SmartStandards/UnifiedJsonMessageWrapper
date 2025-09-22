@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4130D21C-FE8F-4925-93E7-217B4AF1B7D9}"
 	ProjectSection(SolutionItems) = preProject
 		..\doc\changelog.md = ..\doc\changelog.md
+		UJMW.CommandLineFacade.nuspec = UJMW.CommandLineFacade.nuspec
 		UJMW.DynamicClient.nuspec = UJMW.DynamicClient.nuspec
 		UJMW.DynamicController.nuspec = UJMW.DynamicController.nuspec
 		UJMW.DynamicWcfHost.nuspec = UJMW.DynamicWcfHost.nuspec
@@ -57,6 +58,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "js", "js", "{02EA681E-C7D8-
 		..\js\src\ujmwClient.ts = ..\js\src\ujmwClient.ts
 	EndProjectSection
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "UJMW.CommandLineFacade", "src\UJMW.CommandLineFacade\UJMW.CommandLineFacade.shproj", "{1DC2A237-D9B8-42AA-B0D0-C7AA895294A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.CommandLineFacade.net6.0", "src\UJMW.CommandLineFacade.net6.0\UJMW.CommandLineFacade.net6.0.csproj", "{8A3989A7-693C-7231-F613-406C59182612}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.CommandLineFacade.net8.0", "src\UJMW.CommandLineFacade.net8.0\UJMW.CommandLineFacade.net8.0.csproj", "{CAAE36CC-A459-5227-A353-E26DD1D0CD70}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.CommandLineFacade.net48", "src\UJMW.CommandLineFacade.net48\UJMW.CommandLineFacade.net48.csproj", "{933B1D64-322B-4E35-ACC7-FF6011648AD0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UJMW.DemoCommandLineExe", "test\UJMW.DemoCommandLineExe\UJMW.DemoCommandLineExe.csproj", "{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -107,6 +118,22 @@ Global
 		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A3989A7-693C-7231-F613-406C59182612}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A3989A7-693C-7231-F613-406C59182612}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A3989A7-693C-7231-F613-406C59182612}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A3989A7-693C-7231-F613-406C59182612}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAAE36CC-A459-5227-A353-E26DD1D0CD70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAAE36CC-A459-5227-A353-E26DD1D0CD70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAAE36CC-A459-5227-A353-E26DD1D0CD70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAAE36CC-A459-5227-A353-E26DD1D0CD70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{933B1D64-322B-4E35-ACC7-FF6011648AD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{933B1D64-322B-4E35-ACC7-FF6011648AD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{933B1D64-322B-4E35-ACC7-FF6011648AD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{933B1D64-322B-4E35-ACC7-FF6011648AD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -130,18 +157,27 @@ Global
 		{EDE39C43-201D-4E87-A3EE-F4747E5CB409} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
 		{D0B8734C-340F-4B2A-80EE-C00AFDD59E13} = {5EFC1751-7CFC-47C3-A462-7316FF3AF497}
 		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {4130D21C-FE8F-4925-93E7-217B4AF1B7D9}
+		{1DC2A237-D9B8-42AA-B0D0-C7AA895294A9} = {EFB5135D-039A-4D92-8FDD-9EA5D070F991}
+		{8A3989A7-693C-7231-F613-406C59182612} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{CAAE36CC-A459-5227-A353-E26DD1D0CD70} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{933B1D64-322B-4E35-ACC7-FF6011648AD0} = {ADA576B9-92C4-4C75-9605-06023D1026B2}
+		{58FCA2F3-089E-4C5A-9B58-B3C7389E2A33} = {62CD1572-17CA-448D-8742-8287E7DC46ED}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D2F37C1D-32F0-4BF2-AAEB-46B9D8C07D23}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		src\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems*{1dc2a237-d9b8-42aa-b0d0-c7aa895294a9}*SharedItemsImports = 13
 		src\UJMW.DynamicWcfHost\UJMW.DynamicWcfHost.projitems*{4237c0f2-10db-431f-bf52-1f85df08cd2b}*SharedItemsImports = 13
 		src\UJMW.DynamicController\UJMW.DynamicController.projitems*{4af041bf-8d36-46d6-9e83-737231cfcb26}*SharedItemsImports = 5
 		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{51b4b2ec-583d-4236-8e72-6517fcdeefe8}*SharedItemsImports = 4
 		test\UJMW.Tests\UJMW.Tests.projitems*{5e17c8e8-0bc8-4f7c-a022-c8104a415628}*SharedItemsImports = 13
 		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{7b5baea8-7e79-4a30-b6c1-4da4831af970}*SharedItemsImports = 5
+		src\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems*{8a3989a7-693c-7231-f613-406c59182612}*SharedItemsImports = 5
+		src\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems*{933b1d64-322b-4e35-acc7-ff6011648ad0}*SharedItemsImports = 4
 		test\UJMW.Tests\UJMW.Tests.projitems*{a6925214-f00d-4f5b-8c3a-60343769a83e}*SharedItemsImports = 5
 		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{a8299845-16f4-601e-e136-c010baac2cea}*SharedItemsImports = 5
+		src\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems*{caae36cc-a459-5227-a353-e26dd1d0cd70}*SharedItemsImports = 5
 		src\UJMW.DynamicController\UJMW.DynamicController.projitems*{cacfb05c-fff9-f43a-bfac-683fef52ba20}*SharedItemsImports = 5
 		src\UJMW.DynamicClient\UJMW.DynamicClient.projitems*{cf0a161a-99ba-4f01-af5e-16c6fcbc85ae}*SharedItemsImports = 13
 		src\UJMW.DynamicController\UJMW.DynamicController.projitems*{cf0a161a-99ba-4f01-af5e-16c6fcbc95ae}*SharedItemsImports = 13
