@@ -7,7 +7,7 @@
     <authors>SmartStandards</authors>
     <owners>(public domain)</owners>
     <copyright>SmartStandards</copyright>
-    <description></description>
+    <description>A dynamic Service-Facade for Command Line programs, using the 'Unified JSON Message Wrapper' standard</description>
     <tags>UJMW REST JSON RPC WebService WCF</tags>
     <!-- https://spdx.org/licenses/ -->
     <license type="expression">GPL-3.0-only</license>
