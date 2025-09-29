@@ -101,7 +101,7 @@ namespace UJMW.CommandLineFacade {
                 ? kvp.Value.GetString()
                 : kvp.Value.ToString()
             );
-          }          
+          }
         }
         catch {
           paramDict = new Dictionary<string, JsonElement>();
@@ -148,7 +148,24 @@ namespace UJMW.CommandLineFacade {
 
         var factory = _ServiceFactories[serviceType];
         var serviceInstance = factory.DynamicInvoke();
-        var result = method.Invoke(serviceInstance, orderedParams);
+        object result = null;
+        try {
+          result = method.Invoke(serviceInstance, orderedParams);
+        }
+        catch (Exception ex) {
+          var resultDictError = new Dictionary<string, object> {
+            { "return", null },
+            { "fault", $"{ex.Message}" + ex.InnerException == null ? "" : ex.InnerException.Message }
+          };
+
+          for (int i = 0; i < paramInfos.Length; i++) {
+            var paramInfo = paramInfos[i];
+            if (paramInfo.IsOut || paramInfo.ParameterType.IsByRef) {
+              resultDictError[paramInfo.Name] = paramInfo.DefaultValue;
+            }
+          }
+          return resultDictError;
+        }
 
         // Collect out/ref parameter values
         var outParams = new Dictionary<string, object>();
@@ -160,7 +177,10 @@ namespace UJMW.CommandLineFacade {
         }
 
         // If there are out/ref parameters, return both result and out values
-        var resultDict = new Dictionary<string, object> { { "return", result } };
+        var resultDict = new Dictionary<string, object> {
+          { "return", result },
+          { "fault", null },
+        };
 
         // Dynamically create an object with a property for Result and one for each out/ref parameter
         foreach (var kvp in outParams)
@@ -220,7 +240,8 @@ namespace UJMW.CommandLineFacade {
             var output = result != null ? JsonSerializer.Serialize(result) : string.Empty;
             if (!string.IsNullOrEmpty(taskId)) {
               Console.WriteLine($"{taskId} {output}");
-            } else {
+            }
+            else {
               Console.WriteLine(output);
             }
           }
@@ -228,7 +249,8 @@ namespace UJMW.CommandLineFacade {
             var errorMsg = $"Error: {ex.Message}";
             if (!string.IsNullOrEmpty(taskId)) {
               Console.WriteLine($"{taskId} {errorMsg}");
-            } else {
+            }
+            else {
               Console.WriteLine(errorMsg);
             }
           }

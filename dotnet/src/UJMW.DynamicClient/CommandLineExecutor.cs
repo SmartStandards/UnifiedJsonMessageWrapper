@@ -144,7 +144,7 @@ namespace System {
                     else if (currentPropName.Equals("fault", StringComparison.InvariantCultureIgnoreCase)) {
                       string faultMessage = jr.ReadAsString();
                       if (!String.IsNullOrWhiteSpace(faultMessage)) {
-                        //UjmwClientConfiguration.FaultRepsonseHandler.Invoke(fullUrl, method, faultMessage);
+                        UjmwClientConfiguration.FaultRepsonseHandler.Invoke(_ExePath, method, faultMessage);
                       }
                     }
                     else {
@@ -199,6 +199,9 @@ namespace System {
               }
             }
             return returnValue;
+          }
+          catch (UjmwFaultException) {
+            throw;
           }
           catch {
             // If output is not valid JSON, return as string
