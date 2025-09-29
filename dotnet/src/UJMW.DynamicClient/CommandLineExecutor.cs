@@ -97,16 +97,32 @@ namespace System {
             throw new Exception($"Process exited with code {process.ExitCode}: {error}");
           }
 
+          // Find the line that matches the expected JSON format
+          string jsonLine = null;
+          using (var reader = new StringReader(rawJsonResponse)) {
+            string line;
+            while ((line = reader.ReadLine()) != null) {
+              line = line.Trim();
+              if (line.StartsWith("{") && line.Contains("\"return\"")) {
+                jsonLine = line;
+                break;
+              }
+            }
+          }
+
+          if (jsonLine == null) {
+            throw new Exception("No valid JSON response with 'return' property found: " + rawJsonResponse);
+          }
+
           // Try to deserialize the output as JSON
           try {
-
             var objectDeserializer = new JsonSerializer();
             object returnValue = null;
-            using (StringReader sr = new StringReader(rawJsonResponse)) {
+            using (StringReader sr = new StringReader(jsonLine)) {
               using (JsonTextReader jr = new JsonTextReader(sr)) {
                 jr.Read();
                 if (jr.TokenType != JsonToken.StartObject) {
-                  throw new Exception("Response is no valid JSON: " + rawJsonResponse);
+                  throw new Exception("Response is no valid JSON: " + jsonLine);
                 }
 
                 IDictionary<string, string> backChannelContent = null;
@@ -146,7 +162,6 @@ namespace System {
                   }
                   else if (jr.TokenType == JsonToken.StartObject) {
                     string rawJson = jr.ReadAsString();
-
                   }
                   else {
                   }
@@ -164,28 +179,13 @@ namespace System {
                         break;
                       }
                     }
-                    //else if (responseHeaders != null) {
-                    //  var hdr = responseHeaders.Where((h) => h.Key == channelName);
-                    //  if (hdr.Any()) {
-                    //    //will be done once, if we need in as json
-                    //    string sideChannelFromHeader = hdr.First().Value.ToString();
-                    //    backChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(sideChannelFromHeader);
-                    //    ////// PROCESS //////
-                    //    _ResponseSidechannelCfg.ProcessingMethod.Invoke(method, backChannelContent);
-                    //    backChannelreceived = true;
-                    //    break;
-                    //  }
-                    //}
                   }
 
                   if (!backChannelreceived) {
                     if (_ResponseSidechannelCfg.SkipAllowed) {
-                      //if the whole getter is null, then (and only in this case) it will be a 'silent skip'
                       if (_ResponseSidechannelCfg.DefaultsGetterOnSkip != null) {
                         backChannelContent = new Dictionary<string, string>();
                         _ResponseSidechannelCfg.DefaultsGetterOnSkip.Invoke(ref backChannelContent);
-                        //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
-                        //passed to the processing method...
                         _ResponseSidechannelCfg.ProcessingMethod.Invoke(method, backChannelContent);
                       }
                     }
@@ -194,17 +194,15 @@ namespace System {
                       throw new Exception("Response has no SideChannel");
                     }
                   }
-
                 }
                 ///// (end) RESTORE INCOMMING BACKCHANNEL /////
               }
             }
             return returnValue;
-            //return JsonSerializer.Deserialize<object>(rawJsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
           }
           catch {
             // If output is not valid JSON, return as string
-            return rawJsonResponse;
+            return jsonLine ?? rawJsonResponse;
           }
         }
       }

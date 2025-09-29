@@ -8,6 +8,7 @@ namespace UJMW.DemoCommandLineExe {
     void Run2(string message, bool uppercase = false);
     void Run3(double value, out string result);
     int Add(int a, int b);
+    string[] GetArray();
   }
 
   public class DemoCliService : IDemoCliService {
@@ -38,5 +39,9 @@ namespace UJMW.DemoCommandLineExe {
       return a + b;
     }
 
+    public string[] GetArray() {
+      Console.WriteLine("Kauderwelsch");
+      return new string[] { "Hi", "there!" };
+    }
   }
 }
