@@ -41,7 +41,7 @@ namespace UJMW.DemoCommandLineExe {
 
     public string[] GetArray() {
       Console.WriteLine("Kauderwelsch");
-      throw new Exception("Kauderwelsch");
+      //throw new Exception("Kauderwelsch");
       return new string[] { "Hi", "there!" };
     }
   }

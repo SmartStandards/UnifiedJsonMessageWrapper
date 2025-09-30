@@ -39,7 +39,7 @@
   <Import Project="..\UJMW.CommandLineFacade\UJMW.CommandLineFacade.projitems" Label="Shared" />
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

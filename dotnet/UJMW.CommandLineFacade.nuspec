@@ -16,10 +16,13 @@
     <projectUrl>https://github.com/SmartStandards/UnifiedJsonMessageWrapper</projectUrl>
     <dependencies>
       <group targetFramework=".NETFramework4.8">
+        <dependency id="Newtonsoft.Json" version="[13.0.4,13.9999]" />
       </group>
       <group targetFramework=".NETFramework6.0">
+        <dependency id="Newtonsoft.Json" version="[13.0.4,13.9999]" />
       </group>
       <group targetFramework=".NETFramework8.0">
+        <dependency id="Newtonsoft.Json" version="[13.0.4,13.9999]" />
       </group>
     </dependencies>
   </metadata>

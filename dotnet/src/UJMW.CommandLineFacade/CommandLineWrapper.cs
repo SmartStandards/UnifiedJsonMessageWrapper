@@ -3,8 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace UJMW.CommandLineFacade {
 
@@ -82,29 +83,26 @@ namespace UJMW.CommandLineFacade {
         throw new MissingMethodException($"Method '{methodName}' not found.");
 
       // Parse JSON to dictionary
-      Dictionary<string, JsonElement> paramDict = null;
+      JObject paramObj = null;
       Dictionary<string, string> underscoreDict = null;
 
       if (string.IsNullOrWhiteSpace(paramsJson)) {
-        paramDict = new Dictionary<string, JsonElement>();
+        paramObj = new JObject();
       }
       else {
         try {
-          paramDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(paramsJson)
-                     ?? new Dictionary<string, JsonElement>();
+          paramObj = JObject.Parse(paramsJson);
           // Extract special property "_" if present and is an object
-          if (paramDict.TryGetValue("_", out var underscoreValue) && underscoreValue.ValueKind == JsonValueKind.Object) {
-            var tempDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(underscoreValue.GetRawText());
-            underscoreDict = tempDict?.ToDictionary(
-              kvp => kvp.Key,
-              kvp => kvp.Value.ValueKind == JsonValueKind.String
-                ? kvp.Value.GetString()
-                : kvp.Value.ToString()
+          if (paramObj.TryGetValue("_", out var underscoreValue) && underscoreValue.Type == JTokenType.Object) {
+            var tempDict = (JObject)underscoreValue;
+            underscoreDict = tempDict.Properties().ToDictionary(
+              p => p.Name,
+              p => p.Value.Type == JTokenType.String ? p.Value.ToString() : p.Value.ToString(Formatting.None)
             );
           }
         }
         catch {
-          paramDict = new Dictionary<string, JsonElement>();
+          paramObj = new JObject();
         }
       }
 
@@ -120,7 +118,7 @@ namespace UJMW.CommandLineFacade {
             orderedParams[i] = GetDefault(paramInfo.ParameterType);
             continue;
           }
-          if (!paramDict.TryGetValue(paramInfo.Name, out var jsonValue)) {
+          if (!paramObj.TryGetValue(paramInfo.Name, StringComparison.OrdinalIgnoreCase, out var jsonValue)) {
             // Parameter missing in JSON
             if (paramInfo.HasDefaultValue) {
               orderedParams[i] = paramInfo.DefaultValue;
@@ -130,7 +128,7 @@ namespace UJMW.CommandLineFacade {
             break;
           }
           try {
-            orderedParams[i] = jsonValue.Deserialize(paramInfo.ParameterType, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            orderedParams[i] = jsonValue.ToObject(paramInfo.ParameterType);
           }
           catch {
             conversionFailed = true;
@@ -155,7 +153,7 @@ namespace UJMW.CommandLineFacade {
         catch (Exception ex) {
           var resultDictError = new Dictionary<string, object> {
             { "return", null },
-            { "fault", $"{ex.Message}" + ex.InnerException == null ? "" : ex.InnerException.Message }
+            { "fault", $"{ex.Message}" + (ex.InnerException == null ? "" : ex.InnerException.Message) }
           };
 
           for (int i = 0; i < paramInfos.Length; i++) {
@@ -206,7 +204,7 @@ namespace UJMW.CommandLineFacade {
       try {
         var result = InvokeServiceMethod(methodName, paramsJson);
         if (result != null) {
-          Console.WriteLine(JsonSerializer.Serialize(result));
+          Console.WriteLine(JsonConvert.SerializeObject(result));
         }
       }
       catch (Exception ex) {
@@ -237,7 +235,7 @@ namespace UJMW.CommandLineFacade {
         var task = Task.Run(() => {
           try {
             var result = InvokeServiceMethod(methodName, paramsJson);
-            var output = result != null ? JsonSerializer.Serialize(result) : string.Empty;
+            var output = result != null ? JsonConvert.SerializeObject(result) : string.Empty;
             if (!string.IsNullOrEmpty(taskId)) {
               Console.WriteLine($"{taskId} {output}");
             }
