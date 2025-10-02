@@ -11,5 +11,6 @@ namespace UJMW.DemoCommandLineExe {
     void Run3(double value, out string result);
     int Add(int a, int b);
     string[] GetArray();
+    string GetUmlaute();
   } 
 }

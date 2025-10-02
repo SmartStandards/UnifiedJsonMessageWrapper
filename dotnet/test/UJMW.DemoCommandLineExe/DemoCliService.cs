@@ -9,6 +9,7 @@ namespace UJMW.DemoCommandLineExe {
     void Run3(double value, out string result);
     int Add(int a, int b);
     string[] GetArray();
+    string GetUmlaute();
   }
 
   public class DemoCliService : IDemoCliService {
@@ -43,6 +44,9 @@ namespace UJMW.DemoCommandLineExe {
       Console.WriteLine("Kauderwelsch");
       //throw new Exception("Kauderwelsch");
       return new string[] { "Hi", "there!" };
+    }
+    public string GetUmlaute() {
+      return "ÄÖÜäöüß";
     }
   }
 }

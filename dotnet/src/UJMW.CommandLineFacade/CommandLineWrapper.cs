@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace UJMW.CommandLineFacade {
 
@@ -195,6 +196,7 @@ namespace UJMW.CommandLineFacade {
     /// </summary>
     /// <param name="args"></param>
     public static void InvokeFromCommandLine(string[] args) {
+      Console.OutputEncoding = Encoding.UTF8;
       if (args.Length < 1) {
         ProcessStdIn();
         return;
@@ -217,6 +219,7 @@ namespace UJMW.CommandLineFacade {
     /// Processes multiple method invocations from standard input concurrently.
     /// </summary>
     public static void ProcessStdIn() {
+      Console.OutputEncoding = Encoding.UTF8;
       string line;
       var tasks = new List<Task>();
       while ((line = Console.ReadLine()) != null) {
