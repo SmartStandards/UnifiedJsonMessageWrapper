@@ -34,12 +34,46 @@ namespace System.Web.UJMW {
     public class DynamicControllerBase<TServiceInterface> : Controller {
 
       private TServiceInterface _ServiceInstance;
+      private DynamicUjmwControllerOptions _Options;
+
+      private delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames);
+      private ContextualArgumentCollectorDelegate _ContextualArgumentCollector;
 
       public DynamicControllerBase(TServiceInterface serviceInstance) {
         if (serviceInstance == null) {
           throw new Exception($"The dynamic asp controller base requires to get an '{typeof(TServiceInterface)}' injected - but got null!");
         }
+
         _ServiceInstance = serviceInstance;
+
+        _Options = DynamicUjmwControllerFactory.GetDynamicUjmwControllerOptions(this.GetType());
+
+        KeyValuePair<string, Func<string>>[] contextualArgumentGetters = _Options.GetUniformedContextualArgumentGetters(
+          (headerName) => this.HttpContext.Request.Headers[headerName].FirstOrDefault(),
+          (routeSegmentAlias) => this.RouteData.Values[routeSegmentAlias]?.ToString()
+        ).ToArray(); //NOTE: ToArray in combination with KVP ist used to freeze the collection and avoid threading issues!
+
+        _ContextualArgumentCollector = (ref IDictionary<string, string> targetDict, string[] includedArgNames) => {
+          if(includedArgNames == null) {
+            return;
+          }
+          if(targetDict == null) {
+            targetDict = new Dictionary<string, string>();
+          }
+          //invoke all getters and fill the target dict
+          foreach (KeyValuePair<string, Func<string>> nameAndGetter in contextualArgumentGetters) {
+            if (includedArgNames.Length > 0 && !includedArgNames.Contains(nameAndGetter.Key)) {
+              continue;
+            }
+            try {
+              targetDict[nameAndGetter.Key] = nameAndGetter.Value?.Invoke();
+            }
+            catch (Exception ex) {
+              throw new ApplicationException($"Contextual Argument Getter for '{nameAndGetter.Key}' has thrown an Exception: " + ex.Message, ex);
+            }
+          }
+        };
+
       }
 
       /// <summary>
@@ -61,14 +95,15 @@ namespace System.Web.UJMW {
       protected object InvokeMethod(string methodName, object requestDto) {
         try {
 
-          Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> redirector =
-            GetOrCreateRedirectorMethod(methodName, this);
+          RedirectorMethodDelegate redirector = GetOrCreateRedirectorMethod(methodName, this);
 
           object responseDto = redirector.Invoke(
             _ServiceInstance,
             requestDto,
             this.HttpContext.Request.Headers,
-            this.HttpContext.Response.Headers
+            this.HttpContext.Response.Headers,
+            _Options,
+            _ContextualArgumentCollector
           );        
 
           return responseDto;
@@ -81,10 +116,19 @@ namespace System.Web.UJMW {
         }
       }
 
-      private static Dictionary<string, Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object>> _RedirectorMethods =
-        new Dictionary<string, Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object>>();
+      private delegate object RedirectorMethodDelegate(
+        TServiceInterface serviceInstance,
+        object requestDto,
+        IHeaderDictionary requestHeaders,
+        IHeaderDictionary responseHeaders,
+        DynamicUjmwControllerOptions options,
+        ContextualArgumentCollectorDelegate contextualArgumentCollector
+      );
 
-      private static Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> GetOrCreateRedirectorMethod(string methodName, DynamicControllerBase<TServiceInterface> controller) {
+      /// A Cache for the redirector methods
+      private static Dictionary<string, RedirectorMethodDelegate> _RedirectorMethods = new Dictionary<string, RedirectorMethodDelegate>();
+
+      private static RedirectorMethodDelegate GetOrCreateRedirectorMethod(string methodName, DynamicControllerBase<TServiceInterface> controller) {
         lock (_RedirectorMethods) {
 
           if (_RedirectorMethods.ContainsKey(methodName)) {
@@ -132,8 +176,8 @@ namespace System.Web.UJMW {
           OutgoingResponseSideChannelConfiguration outboundSideChannelCfg = UjmwHostConfiguration.GetResponseSideChannelConfiguration(typeof(TServiceInterface));
 
           /////////// lambda (mth) ////////////////////////////////////////////
-          Func<TServiceInterface, object, IHeaderDictionary, IHeaderDictionary, object> mth = (
-            (svc, requestDto, requestHeaders, responseHeaders) => {
+          RedirectorMethodDelegate mth = (
+            (svc, requestDto, requestHeaders, responseHeaders, options, contextualArgumentCollector) => {
               object responseDto = Activator.CreateInstance(responseDtoType);
               object[] serviceMethodParams = new object[paramCount];
 
@@ -155,9 +199,12 @@ namespace System.Web.UJMW {
                 foreach (string acceptedChannel in inboundSideChannelCfg.AcceptedChannels) {
                   if (acceptedChannel == "_") {
                     if (requestSidechannelProp != null) {
-                      var container = (Dictionary<string, string>)requestSidechannelProp.GetValue(requestDto);
+                      var container = (IDictionary<string, string>)requestSidechannelProp.GetValue(requestDto);
                       if (container != null) {
                         sideChannelReceived = true;
+                        //overlay the endpoint-individual 'contextualArgument's
+                        contextualArgumentCollector.Invoke(ref container, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                        //now invoke the propagation into the ambience-room
                         inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, container);
                         break;
                       }
@@ -168,6 +215,9 @@ namespace System.Web.UJMW {
                       var serializer = new Newtonsoft.Json.JsonSerializer();
                       sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
                       sideChannelReceived = true;
+                      //overlay the endpoint-individual 'contextualArgument's
+                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                      //now invoke the propagation into the ambience-room
                       inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                       break;
                     }
@@ -179,9 +229,11 @@ namespace System.Web.UJMW {
                     //if the whole getter is null, then (and only in this case) it will be a 'silent skip'
                     if (inboundSideChannelCfg.DefaultsGetterOnSkip != null) {
                       sideChannelContent = new Dictionary<string, string>();
+                      //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be passed to the processing method...
                       inboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
-                      //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be
-                      //passed to the processing method...
+                      //overlay the endpoint-individual 'contextualArgument's
+                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                      //now invoke the propagation into the ambience-room
                       inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                     }
                   }
@@ -196,40 +248,60 @@ namespace System.Web.UJMW {
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 
-                if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
+                bool innerInvokeWasCalled = false;
+
+                //this encapsulation is only to support contextualization hooks exactly arround this closure... 
+                Action innerInvokeContextual = ()=> {
+                  innerInvokeWasCalled = true;
+
+                  if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
+                    try {
+                      UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
+                        contractType, contractMethod, serviceMethodParams
+                      );
+                    }
+                    catch (TargetInvocationException ex) {
+                      throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72001", ex.InnerException);
+                    }
+                    catch (Exception ex) {
+                      throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72001", ex);
+                    }
+                  }
+
+                  //invoke the service method
+                  object returnVal;
                   try {
-                    UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
-                      contractType, contractMethod, serviceMethodParams
-                    );
+                    returnVal = contractMethod.Invoke(svc, serviceMethodParams);
                   }
                   catch (TargetInvocationException ex) {
-                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72001", ex.InnerException);
+                    throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72000", ex.InnerException);
                   }
                   catch (Exception ex) {
-                    throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72001", ex);
+                    throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72000", ex);
                   }
-                }
 
-                //invoke the service method
-                object returnVal;
-                try {
-                  returnVal = contractMethod.Invoke(svc, serviceMethodParams);
-                }
-                catch (TargetInvocationException ex) {
-                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72000", ex.InnerException);
-                }
-                catch (Exception ex) {
-                  throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72000", ex);
-                }
+                  //map the return value
+                  foreach (DtoValueMapper responseDtoValueMapper in responseDtoValueMappers) {
+                    responseDtoValueMapper.MapParamToResponseDto(serviceMethodParams, responseDto);
+                  }
 
-                //map the return value
-                foreach (DtoValueMapper responseDtoValueMapper in responseDtoValueMappers) {
-                  responseDtoValueMapper.MapParamToResponseDto(serviceMethodParams, responseDto);
-                }
+                  //map the out-/ref-args
+                  if (returnProp != null) {
+                    returnProp.SetValue(responseDto, returnVal);
+                  }
 
-                //map the out-/ref-args
-                if (returnProp != null) {
-                  returnProp.SetValue(responseDto, returnVal);
+                };
+
+                //routing over contextualization hook around the internal invoke...
+                if (options.ContextualizationHook != null) {
+                  IDictionary<string, string> contextualArguments = new Dictionary<string, string>();
+                  contextualArgumentCollector.Invoke(ref contextualArguments, Array.Empty<string>());
+                  options.ContextualizationHook.Invoke(contextualArguments, innerInvokeContextual);
+                  if (!innerInvokeWasCalled) {
+                    throw new Exception("The UJMW ContextualizationHook MUST NOT skip invoking the given inner action!");
+                  }
+                } else {
+                  innerInvokeContextual.Invoke();
                 }
 
               }

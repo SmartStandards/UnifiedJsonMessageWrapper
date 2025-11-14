@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: the 'DynamicUjmwControllerOptions' now offering a 'ContextualizationHook' which is individual for a single controller. It comes with the opportunity to call 'BindContextualArgument'-sources like Header-Values, Controller-Route-Placeholders or just custom-getters for collecting contextual identifiers and passing them into this new hook and/or the global sidechannel-processing (UjmwHostConfiguration.ConfigureRequestSidechannel) by calling 'AcceptContextualArguments(...)' .
 
 
 

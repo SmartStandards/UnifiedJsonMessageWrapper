@@ -59,6 +59,38 @@ namespace System.Web.UJMW {
       _AcceptedChannels.Add(headerName);
     }
 
+    private string[] _ContextualArgumentsToOverlay = null;
+
+    /// <summary>
+    /// Enables, that some ambient data can be provided individually from endpoint-specific contextual sources
+    /// (like for example certain url/route segments etc.).
+    /// NOTE: if you combine this with the global side-channels 'AcceptUjmwUnderlineProperty()' or AcceptHttpHeader(...), 
+    /// this more individual arguments will override them, so this one is NOT reliieing on the order of setup!
+    /// </summary>
+    /// <param name="explicitArgumentNames">Cherry-pick only certain arguments OR leave this empty to include all</param>
+    /// <exception cref="ArgumentException"></exception>
+    public void AcceptContextualArguments(params string[] explicitArgumentNames) {
+      this.ImmutableGuard();
+      if(explicitArgumentNames == null){
+        //if this methosd is called with null, we treat this as empty-array,
+        //because the caller intendet to enable the contextual arguments!
+        _ContextualArgumentsToOverlay = Array.Empty<string>();
+      }
+      else {
+        _ContextualArgumentsToOverlay = explicitArgumentNames;
+      }
+    }
+
+    /// <summary>
+    /// null: accept no contextual arguments /
+    /// empty-array: accept all contextual arguments
+    /// </summary>
+    internal string[] ContextualArgumentsToOverlay {
+      get {
+        return _ContextualArgumentsToOverlay;
+      }
+    }
+
     /// <summary>
     /// NOTE: this Overload is compatible to the signature of
     /// 'AmbienceHub.RestoreValuesFrom' (from the 'SmartAmbience' Nuget Package).

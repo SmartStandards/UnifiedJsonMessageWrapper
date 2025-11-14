@@ -118,6 +118,10 @@ namespace System.Web.UJMW {
       }
       string controllerName = controllerNamePattern.Replace("[Controller]", originalTypeName);
       for (int i = 0; i < genArgs.Length; i++) {
+        //new (better) syntax support, because < > is common for generic args and
+        //wont collide with the asp.net core route-placehoder syntax { }
+        controllerName = controllerName.Replace($"<{i}>", genArgs[i]);
+        //backward compatibility
         controllerName = controllerName.Replace($"{{{i}}}", genArgs[i]);
       }
 
@@ -137,6 +141,10 @@ namespace System.Web.UJMW {
       wrapperNamePattern = wrapperNamePattern.Replace("[Controller]", originalTypeName);
       wrapperNamePattern = wrapperNamePattern.Replace("{Controller}", controllerName);
       for (int i = 0; i < genArgs.Length; i++) {
+        //new (better) syntax support, because < > is common for generic args and
+        //wont collide with the asp.net core route-placehoder syntax { }
+        wrapperNamePattern = wrapperNamePattern.Replace($"<{i}>", genArgs[i]);
+        //backward compatibility
         wrapperNamePattern = wrapperNamePattern.Replace($"{{{i}}}", genArgs[i]);
       }
 
@@ -154,6 +162,10 @@ namespace System.Web.UJMW {
       controllerTitle = controllerTitle.Replace("[Controller]", originalTypeName);
       controllerTitle = controllerTitle.Replace("{Controller}", controllerName);
       for (int i = 0; i < genArgs.Length; i++) {
+        //new (better) syntax support, because < > is common for generic args and
+        //wont collide with the asp.net core route-placehoder syntax { }
+        controllerTitle = controllerTitle.Replace($"<{i}>", genArgs[i]);
+        //backward compatibility
         controllerTitle = controllerTitle.Replace($"{{{i}}}", genArgs[i]);
       }
 
@@ -171,7 +183,22 @@ namespace System.Web.UJMW {
       controllerRoute = controllerRoute.Replace("[Controller]", originalTypeName);
       controllerRoute = controllerRoute.Replace("{Controller}", controllerName);
       for (int i = 0; i < genArgs.Length; i++) {
+        //new (better) syntax support, because < > is common for generic args and
+        //wont collide with the asp.net core route-placehoder syntax { }
+        controllerRoute = controllerRoute.Replace($"<{i}>", genArgs[i]);
+        //backward compatibility
         controllerRoute = controllerRoute.Replace($"{{{i}}}", genArgs[i]);
+      }
+
+      if(options._ContextualRouteSegmentArguments != null) {
+        foreach(KeyValuePair<string, string> kvp in options._ContextualRouteSegmentArguments) {
+          if(!controllerRoute.Contains("{" + kvp.Value + "}")) {
+            throw new ArgumentException(
+              $"There is a route-based ContextualArgument named '{kvp.Value}', which is registered for this controller " +
+              $"but the ControllerRoute ('{controllerRoute}') does not contain a corresponding '{{...}}' placeholder!."
+            );
+          }
+        }
       }
 
       ///////////////////////////////////////////////////////////////////////
@@ -398,7 +425,18 @@ namespace System.Web.UJMW {
       }
 
       var dynamicType = typeBuilder.CreateType();
+      lock (_OptionsPerDynamicControllerType) {
+        _OptionsPerDynamicControllerType[dynamicType] = options;
+      }
       return dynamicType;
+    }
+
+    private static Dictionary<Type, DynamicUjmwControllerOptions> _OptionsPerDynamicControllerType = new Dictionary<Type, DynamicUjmwControllerOptions>();
+
+    private static DynamicUjmwControllerOptions GetDynamicUjmwControllerOptions(Type controllerType) {
+      lock (_OptionsPerDynamicControllerType) {
+        return _OptionsPerDynamicControllerType[controllerType];
+      }
     }
 
     private static Dictionary<string, Type> _DtoTypeCache = new Dictionary<string, Type>();

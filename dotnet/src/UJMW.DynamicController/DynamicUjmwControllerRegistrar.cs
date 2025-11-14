@@ -44,12 +44,23 @@ namespace System.Web.UJMW {
       this.AddControllerFor(typeof(TService), new DynamicUjmwControllerOptions { ControllerRoute = controllerRoute });
     }
 
+    public void AddControllerFor<TService>(Action<DynamicUjmwControllerOptions> optionsConfigurator) {
+      DynamicUjmwControllerOptions opt = new DynamicUjmwControllerOptions();
+      optionsConfigurator.Invoke(opt);
+      AddControllerFor<TService>(opt);
+    }
     public void AddControllerFor<TService>(DynamicUjmwControllerOptions options = null) {
       this.AddControllerFor(typeof(TService), options);
     }
 
     public void AddControllerFor(Type serviceType, string controllerRoute) {
       this.AddControllerFor(serviceType, new DynamicUjmwControllerOptions { ControllerRoute = controllerRoute });
+    }
+
+    public void AddControllerFor(Type serviceType, Action<DynamicUjmwControllerOptions> optionsConfigurator) {
+      DynamicUjmwControllerOptions opt = new DynamicUjmwControllerOptions();
+      optionsConfigurator.Invoke(opt);
+      AddControllerFor(serviceType, opt);
     }
 
     public void AddControllerFor(Type serviceType, DynamicUjmwControllerOptions options = null) {

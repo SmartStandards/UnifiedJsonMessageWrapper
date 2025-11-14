@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace System.Web.UJMW {
@@ -70,10 +71,126 @@ namespace System.Web.UJMW {
     /// <summary>
     /// If enabled, any user can access the controller via http-GET (without authentication) and will see an info-site.
     /// </summary>
-    public bool EnableInfoSite { get; set; } = false;
+    public bool EnableInfoSite { get; set; } = true;
 
     public Type AuthAttribute { get; set; } = null;
     public object[] AuthAttributeConstructorParams { get; set; } = new object[] { };
+
+    #region " Contextualization "
+
+    /// <summary>
+    ///  Registers an argument, which will be provided contextually during each call of this endpoint.
+    ///  The value (provided by the given valueGetter) will be served to
+    ///   the IncommingRequestSideChannel-Hooks (UjmwHostConfiguration)
+    ///   and to the ContextualizationHook (DynamicUjmwControllerOptions) individually for this endpoint.
+    /// </summary>
+    /// <param name="name">Internal addressable name of the argument to be registerd.</param>
+    /// <param name="valueGetter">A method which provides the value on-demand.</param>
+    public void BindContextualArgument(string name, Func<string> valueGetter) {
+      this.ContextualArgumentNameCollissionGuard(name);
+      _ContextualGetterBasedArguments[name] = valueGetter;
+    }
+    private Dictionary<string, Func<string>> _ContextualGetterBasedArguments = new Dictionary<string, Func<string>>();
+
+    /// <summary>
+    ///  Registers an argument, which will be provided contextually during each call of this endpoint.
+    ///  The value (dynamically picked from the controllers url/route) will be served to
+    ///   the IncommingRequestSideChannel-Hooks (UjmwHostConfiguration)
+    ///   and to the ContextualizationHook (DynamicUjmwControllerOptions) individually for this endpoint.
+    /// </summary>
+    /// <param name="name">Internal addressable name of the argument to be registerd.</param>
+    /// <param name="routeSegmentAlias">
+    ///   An optional alias for the route segment, wich is more relevant for documentation (Swagger, etc.).
+    /// </param>
+    public void BindContextualArgumentToRouteSegment(string name, string routeSegmentAlias = null) {
+      this.ContextualArgumentNameCollissionGuard(name);
+      _ContextualRouteSegmentArguments[name] = routeSegmentAlias ?? name;
+    }
+    internal Dictionary<string, string> _ContextualRouteSegmentArguments = new Dictionary<string, string>();
+
+    /// <summary>
+    ///  Registers an argument, which will be provided contextually during each call of this endpoint.
+    ///  The value (dynamically picked from the incomming request-header) will be served to
+    ///   the IncommingRequestSideChannel-Hooks (UjmwHostConfiguration)
+    ///   and to the ContextualizationHook (DynamicUjmwControllerOptions) individually for this endpoint.
+    /// </summary>
+    /// <param name="name">Internal addressable name of the argument to be registerd.</param>
+    /// <param name="headerName">Name/Key of the request-header to pick the value from.</param>
+    public void BindContextualArgumentToHeaderValue(string name, string headerName) {
+      this.ContextualArgumentNameCollissionGuard(name);
+      _ContextualHeaderValueArguments[name] = headerName;
+    }
+    private Dictionary<string,string> _ContextualHeaderValueArguments = new Dictionary<string, string>();
+
+    private void ContextualArgumentNameCollissionGuard(string name) {
+      if (_ContextualGetterBasedArguments.ContainsKey(name)) {
+        throw new ArgumentException($"The contextual argument with name '{name}' was already registered as Getter-Based Argument!");
+      }
+      if (_ContextualRouteSegmentArguments.ContainsKey(name)) {
+        throw new ArgumentException($"The contextual argument with name '{name}' was already registered as Route-Segment-Based Argument!");
+      }
+      if (_ContextualHeaderValueArguments.ContainsKey(name)) {
+        throw new ArgumentException($"The contextual argument with name '{name}' was already registered as Header-Value-Based Argument!");
+      }
+    }
+
+    internal IDictionary<string,Func<string>> GetUniformedContextualArgumentGetters(
+      Func<string,string> headerValueGetter,
+      Func<string,string> routeValueGetter
+    ) {
+      Dictionary<string, Func<string>> combined = new Dictionary<string, Func<string>>();
+      lock (_ContextualGetterBasedArguments) {
+        foreach (var kvp in _ContextualGetterBasedArguments) {
+          combined[kvp.Key] = kvp.Value;
+        }
+      }
+      lock (_ContextualHeaderValueArguments) {
+        foreach (var kvp in _ContextualHeaderValueArguments) {
+          string headerName = kvp.Value;
+          combined[kvp.Key] = () => headerValueGetter(headerName);
+        }
+      }
+      lock (_ContextualRouteSegmentArguments) {
+        foreach (var kvp in _ContextualRouteSegmentArguments) {
+          string routeSegmentName = kvp.Value;
+          combined[kvp.Key] = () => routeValueGetter(routeSegmentName);
+        }
+      }
+      return combined;
+    }
+
+    /// <summary>
+    /// A Method, which will be invoked around each call of this endpoint,
+    /// to enrich the contextual information available during the call, like entering a logical call-context / 
+    /// transaction-/tenancy-scopes.
+    /// The hook will be able to access the individual contextual arguments as registered by using the
+    /// BindContextualArgument... -Methods (also provided by this class).
+    /// NOTE: Please see also the 'IncommingRequestSideChannel'-Hooks (UjmwHostConfiguration)
+    /// which globally (not dedicated to a single endpoint) providing similar functionality.
+    /// This Hook might be prefferred before doing this indivudually here.
+    /// </summary>
+    public ContextualizationHookDelegate ContextualizationHook { get; set; } = null;
+
+    /// <summary>
+    /// A Method, which will be invoked around each call of this endpoint,
+    /// to enrich the contextual information available during the call, like entering a logical call-context / 
+    /// transaction-/tenancy-scopes.
+    /// The hook will be able to access the individual contextual arguments as registered by using the
+    /// BindContextualArgument... -Methods (also provided by this class).
+    /// NOTE: Please see also the 'IncommingRequestSideChannel'-Hooks (UjmwHostConfiguration)
+    /// which globally (not dedicated to a single endpoint) providing similar functionality.
+    /// This Hook might be prefferred before doing this indivudually here.
+    /// </summary>
+    /// <param name="endpointContextualArguments"></param>
+    /// <param name="innerInvokeContextual">
+    ///   The 'vanilla' method of the service which MUST be invoked while the current call is running contextualized.
+    /// </param>
+    public delegate void ContextualizationHookDelegate(
+      IDictionary<string, string> endpointContextualArguments,
+      Action innerInvokeContextual
+    );
+
+    #endregion
 
   }
 

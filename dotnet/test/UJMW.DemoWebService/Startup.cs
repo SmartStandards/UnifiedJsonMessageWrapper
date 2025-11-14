@@ -93,6 +93,7 @@ namespace Security {
 
             sideChannel.AcceptHttpHeader("my-ambient-data");
             sideChannel.AcceptUjmwUnderlineProperty();
+            sideChannel.AcceptContextualArguments();
 
             sideChannel.ProcessDataVia(
               (incommingData) => AmbienceHub.RestoreValuesFrom(incommingData, contractName)
@@ -179,10 +180,22 @@ namespace Security {
 
       services.AddDynamicUjmwControllers(r => {
 
+
+
+
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
-        r.AddControllerFor<IDemoService>(new DynamicUjmwControllerOptions {
-          ControllerRoute = "v1/[Controller].svc",
-          EnableInfoSite = true,
+        r.AddControllerFor<IDemoService>((c)=> {
+          c.ControllerRoute = "{tnt}/v1/[Controller].svc";
+          c.BindContextualArgument("skyfall", () => "007");
+          c.BindContextualArgumentToHeaderValue("huhu", "hu-hu");
+          c.BindContextualArgumentToRouteSegment("MandantAusRoute", "tnt");
+
+          c.ContextualizationHook = (endpointContextualArguments, innerInvokeContextual) => {
+
+
+            innerInvokeContextual.Invoke();
+
+          };
         });
 
         r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {
