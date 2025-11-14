@@ -173,7 +173,8 @@ namespace Security {
         return DynamicClientFactory.CreateInstance<IDemoCliService>(
           new CommandLineExecutor(
             typeof(IDemoCliService),
-            "..\\UJMW.DemoCommandLineExe\\bin\\Debug\\UJMW.DemoCommandLineExe.exe"
+            "..\\UJMW.DemoCommandLineExe\\bin\\Debug\\UJMW.DemoCommandLineExe.exe",
+            CommandLineCallMode.Persistent
           )
         );
       });
