@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>UJMW.DynamicController</id>
-    <version>5.0.8</version>
+    <version>5.1.0</version>
     <title>UJMW.DynamicController (for ASP core WebApi)</title>
     <authors>SmartStandards</authors>
     <owners>(public domain)</owners>

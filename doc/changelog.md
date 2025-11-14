@@ -7,8 +7,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* **new Feature**: the 'DynamicUjmwControllerOptions' now offering a 'ContextualizationHook' which is individual for a single controller. It comes with the opportunity to call 'BindContextualArgument'-sources like Header-Values, Controller-Route-Placeholders or just custom-getters for collecting contextual identifiers and passing them into this new hook and/or the global sidechannel-processing (UjmwHostConfiguration.ConfigureRequestSidechannel) by calling 'AcceptContextualArguments(...)' .
-* **new Feature**: Contract-Interfaces can now declare Properties which will result in sub-controllers that will be automatically registered for each Property.
+*(none)*
+
+
+
+## v 5.1.0
+released **2025-11-14**, including:
+ - **new Feature**: Contract-Interfaces can now declare Properties which will result in sub-controllers that will be automatically registered for each Property.
+ - **new Feature**: the 'DynamicUjmwControllerOptions' now offering a 'ContextualizationHook' which is individual for a single controller. It comes with the opportunity to call 'BindContextualArgument'-sources like Header-Values, Controller-Route-Placeholders or just custom-getters for collecting contextual identifiers and passing them into this new hook and/or the global sidechannel-processing (UjmwHostConfiguration.ConfigureRequestSidechannel) by calling 'AcceptContextualArguments(...)' .
 
 
 

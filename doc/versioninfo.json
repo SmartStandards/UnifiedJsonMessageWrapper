@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.0.8",
-  "currentVersionWithSuffix": "5.0.8",
+  "currentVersion": "5.1.0",
+  "currentVersionWithSuffix": "5.1.0",
   "releaseType": "",
-  "previousVersion": "5.0.7",
-  "changeGrade": "fix",
+  "previousVersion": "5.0.8",
+  "changeGrade": "minor",
   "currentMajor": 5,
-  "currentMinor": 0,
-  "currentPatch": 8,
+  "currentMinor": 1,
+  "currentPatch": 0,
   "versionDateInfo": "2025-11-14",
-  "versionTimeInfo": "10:19:38",
-  "versionNotes": "- new revision without significant changes\n"
+  "versionTimeInfo": "16:55:20",
+  "versionNotes": "- new Feature: Contract-Interfaces can now declare Properties which will result in sub-controllers that will be automatically registered for each Property.\n- new Feature: the 'DynamicUjmwControllerOptions' now offering a 'ContextualizationHook' which is individual for a single controller. It comes with the opportunity to call 'BindContextualArgument'-sources like Header-Values, Controller-Route-Placeholders or just custom-getters for collecting contextual identifiers and passing them into this new hook and/or the global sidechannel-processing (UjmwHostConfiguration.ConfigureRequestSidechannel) by calling 'AcceptContextualArguments(...)' .\n"
 }
