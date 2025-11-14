@@ -52,7 +52,7 @@ namespace System.Web.UJMW {
 
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute, out string controllerTitle) {
       ModuleBuilder moduleBuilder = CreateAssemblyModuleBuilder("UJMW.InMemoryControllers." + serviceType.Name);
-      return BuildDynamicControllerType(serviceType, options, out controllerRoute, out controllerTitle, moduleBuilder);
+      return BuildDynamicControllerType(serviceType, options, out controllerRoute, out controllerTitle, out string resolvedControllerName, moduleBuilder, serviceType);
     }
 
     internal static ModuleBuilder CreateAssemblyModuleBuilder(string assemblyName) {
@@ -68,8 +68,9 @@ namespace System.Web.UJMW {
 
     internal static Type BuildDynamicControllerType(
       Type serviceType, DynamicUjmwControllerOptions options,
-      out string controllerRoute, out string controllerTitle,
-      ModuleBuilder moduleBuilder
+      out string controllerRoute, out string controllerTitle, out string controllerName,
+      ModuleBuilder moduleBuilder,
+      Type rootServiceTypeRequiredByConstructor
     ) {
 
       if(options == null) {
@@ -116,7 +117,7 @@ namespace System.Web.UJMW {
           controllerNamePattern = $"[Controller]_{string.Join("_", genArgs)}";
         }
       }
-      string controllerName = controllerNamePattern.Replace("[Controller]", originalTypeName);
+      controllerName = controllerNamePattern.Replace("[Controller]", originalTypeName); 
       for (int i = 0; i < genArgs.Length; i++) {
         //new (better) syntax support, because < > is common for generic args and
         //wont collide with the asp.net core route-placehoder syntax { }
@@ -240,7 +241,7 @@ namespace System.Web.UJMW {
         var constructorBuilder = typeBuilder.DefineConstructor(
           MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
           CallingConventions.Standard,
-          new[] { serviceType }
+          new[] { rootServiceTypeRequiredByConstructor }
         );
 
         var constructorIL = constructorBuilder.GetILGenerator();

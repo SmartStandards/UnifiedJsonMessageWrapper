@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace System.Web.UJMW {
 
@@ -191,6 +192,52 @@ namespace System.Web.UJMW {
     );
 
     #endregion
+
+    /// <summary>
+    /// This is a purely internal property to transport a navigation path for sub-services.
+    /// Whe a regular service-interface defines a property, the this will activate a special recursion-feature,
+    /// which will automatically create child-controllers registerred to child-routes. But to avoid that also for these
+    /// controllers each sub-service instance needs to be injectable via DI, were preserving the root-instance as 
+    /// constructor-param to be injected und navigating down over the properties internally which is even more agnostic!
+    /// </summary>
+    internal PropertyInfo[] SubServiceNavPath { get; set; } = Array.Empty<PropertyInfo>();
+
+    internal DynamicUjmwControllerOptions Clone() {
+
+      DynamicUjmwControllerOptions clone = new DynamicUjmwControllerOptions();
+
+      clone.ControllerRoute = this.ControllerRoute;
+      clone.ControllerTitle = this.ControllerTitle;
+      clone.ClassNameDiscriminator = this.ClassNameDiscriminator;
+      clone.ControllerNamePattern = this.ControllerNamePattern;
+      clone.WrapperNamePattern = this.WrapperNamePattern;
+      clone.EnableRequestSidechannel = this.EnableRequestSidechannel;
+      clone.EnableResponseSidechannel = this.EnableResponseSidechannel;
+      clone.EnableAuthHeaderEvaluatorHook = this.EnableAuthHeaderEvaluatorHook;
+      clone.EnableInfoSite = this.EnableInfoSite;
+      clone.AuthAttribute = this.AuthAttribute;
+      clone.AuthAttributeConstructorParams = this.AuthAttributeConstructorParams;
+      clone.ContextualizationHook = this.ContextualizationHook;
+      clone.SubServiceNavPath = this.SubServiceNavPath.ToArray();
+
+      lock (this._ContextualGetterBasedArguments) {
+        foreach (var kvp in this._ContextualGetterBasedArguments) {
+          clone._ContextualGetterBasedArguments[kvp.Key] = kvp.Value;
+        }
+      }
+      lock (this._ContextualRouteSegmentArguments) {
+        foreach (var kvp in this._ContextualRouteSegmentArguments) {
+          clone._ContextualRouteSegmentArguments[kvp.Key] = kvp.Value;
+        }
+      }
+      lock (this._ContextualHeaderValueArguments) {
+        foreach (var kvp in this._ContextualHeaderValueArguments) {
+          clone._ContextualHeaderValueArguments[kvp.Key] = kvp.Value;
+        }
+      }
+
+      return clone;
+    }
 
   }
 

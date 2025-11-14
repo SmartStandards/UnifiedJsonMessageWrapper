@@ -33,21 +33,43 @@ namespace System.Web.UJMW {
 
     public class DynamicControllerBase<TServiceInterface> : Controller {
 
-      private TServiceInterface _ServiceInstance;
+      private Func<TServiceInterface> _ServiceInstanceGetter;
+
       private DynamicUjmwControllerOptions _Options;
 
       private delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames);
       private ContextualArgumentCollectorDelegate _ContextualArgumentCollector;
 
-      public DynamicControllerBase(TServiceInterface serviceInstance) {
-        if (serviceInstance == null) {
-          throw new Exception($"The dynamic asp controller base requires to get an '{typeof(TServiceInterface)}' injected - but got null!");
-        }
-
-        _ServiceInstance = serviceInstance;
+      public DynamicControllerBase(object injectedRootServiceInstance) {
 
         _Options = DynamicUjmwControllerFactory.GetDynamicUjmwControllerOptions(this.GetType());
+        PropertyInfo[] navPath = _Options.SubServiceNavPath;
 
+        Type rootType = typeof(TServiceInterface);
+        if (navPath.Length > 0) {
+          rootType = _Options.SubServiceNavPath[0].DeclaringType;
+        }
+
+        if (injectedRootServiceInstance == null) {
+          throw new Exception($"The dynamic asp controller base requires to get an '{rootType.Name}' injected - but got null!");
+        }
+
+        if (navPath.Length == 0) {
+          _ServiceInstanceGetter = () => (TServiceInterface)injectedRootServiceInstance;
+        }
+        else {
+          _ServiceInstanceGetter = () => {
+            object downNavigatedInstance = injectedRootServiceInstance;
+            foreach (PropertyInfo navProp in navPath) {
+              downNavigatedInstance = navProp.GetValue(downNavigatedInstance);
+              if (downNavigatedInstance == null) {
+                throw new NullReferenceException($"The dynamic asp controller got a null-reference during the 'sub-service' instance navigation when getting property value from '{navProp.DeclaringType}.{navProp.Name}'!");
+              }
+            }
+            return (TServiceInterface)downNavigatedInstance;
+          };
+        }
+    
         KeyValuePair<string, Func<string>>[] contextualArgumentGetters = _Options.GetUniformedContextualArgumentGetters(
           (headerName) => this.HttpContext.Request.Headers[headerName].FirstOrDefault(),
           (routeSegmentAlias) => this.RouteData.Values[routeSegmentAlias]?.ToString()
@@ -88,7 +110,14 @@ namespace System.Web.UJMW {
 
       //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
       protected IActionResult RenderInfoSite() {
-        return Content($"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {_ServiceInstance.GetType().FullName}\n  </body>\n</html>", "text/html");    
+        string concreteServiceInstanceTypeName;
+        try {
+          concreteServiceInstanceTypeName = _ServiceInstanceGetter.Invoke().GetType().FullName;
+        }
+        catch (Exception ex) {
+          concreteServiceInstanceTypeName = $"[ERROR: not resolvable within this context ({ex.Message})]";
+        }
+        return Content($"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {concreteServiceInstanceTypeName}\n  </body>\n</html>", "text/html");    
       }
 
       //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
@@ -98,7 +127,7 @@ namespace System.Web.UJMW {
           RedirectorMethodDelegate redirector = GetOrCreateRedirectorMethod(methodName, this);
 
           object responseDto = redirector.Invoke(
-            _ServiceInstance,
+            _ServiceInstanceGetter,
             requestDto,
             this.HttpContext.Request.Headers,
             this.HttpContext.Response.Headers,
@@ -117,7 +146,7 @@ namespace System.Web.UJMW {
       }
 
       private delegate object RedirectorMethodDelegate(
-        TServiceInterface serviceInstance,
+        Func<TServiceInterface> svcInstanceGetter,
         object requestDto,
         IHeaderDictionary requestHeaders,
         IHeaderDictionary responseHeaders,
@@ -131,8 +160,10 @@ namespace System.Web.UJMW {
       private static RedirectorMethodDelegate GetOrCreateRedirectorMethod(string methodName, DynamicControllerBase<TServiceInterface> controller) {
         lock (_RedirectorMethods) {
 
-          if (_RedirectorMethods.ContainsKey(methodName)) {
-            return _RedirectorMethods[methodName];
+          string uniqueMethodName = controller.GetType().FullName + "." + methodName;
+
+          if (_RedirectorMethods.ContainsKey(uniqueMethodName)) {
+            return _RedirectorMethods[uniqueMethodName];
           } //doing the expensive creaction of mapping code only once (on demand) and give the handles into a lambda:
 
           Type contractType = typeof(TServiceInterface);
@@ -177,7 +208,8 @@ namespace System.Web.UJMW {
 
           /////////// lambda (mth) ////////////////////////////////////////////
           RedirectorMethodDelegate mth = (
-            (svc, requestDto, requestHeaders, responseHeaders, options, contextualArgumentCollector) => {
+            (svcInstanceGetter, requestDto, requestHeaders, responseHeaders, options, contextualArgumentCollector) => {
+
               object responseDto = Activator.CreateInstance(responseDtoType);
               object[] serviceMethodParams = new object[paramCount];
 
@@ -253,6 +285,8 @@ namespace System.Web.UJMW {
                 //this encapsulation is only to support contextualization hooks exactly arround this closure... 
                 Action innerInvokeContextual = ()=> {
                   innerInvokeWasCalled = true;
+
+                  TServiceInterface svc = svcInstanceGetter.Invoke();
 
                   if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
                     try {
@@ -350,7 +384,7 @@ namespace System.Web.UJMW {
             }
           );/////// end of lambda (mth) ////////////////////////////////////////
 
-          _RedirectorMethods[methodName] = mth;
+          _RedirectorMethods[uniqueMethodName] = mth;
           return mth;
         }
       }

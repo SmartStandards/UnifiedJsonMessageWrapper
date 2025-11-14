@@ -27,6 +27,19 @@ namespace UJMW.DemoWcfService {
 
     private static AmbientField currentTenant = new AmbientField("currentTenant", true);
 
+    public IChildService Child1 {
+     get {
+        return new ChildService($"Always a new reason why-not: {currentTenant.Value}+{DateTime.Now.ToLongTimeString()}");
+      }
+    }
+
+    private IChildService _Child2 = new ChildService("I'm very constant!");
+    public IChildService Child2 {
+      get {
+        return _Child2;
+      }
+    }
+
     /*
      *  To test the demo send a HTTP-POST to
      *  http://localhost:55202/DemoService.svc/GetData
@@ -141,6 +154,23 @@ namespace UJMW.DemoWcfService {
 
 
 #endif
+
+
+    public class ChildService : IChildService {
+
+      private string _Message;
+
+      public ChildService(string message) {
+        _Message = message;
+      } 
+
+      public string GoToScool() {
+        return _Message;
+      }
+
+
+    }
+
   }
 
 }

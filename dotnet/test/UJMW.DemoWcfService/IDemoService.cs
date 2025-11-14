@@ -32,11 +32,29 @@ namespace UJMW.DemoWcfService {
 
 #if NET5_0_OR_GREATER
 #else
+  [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("BaseContract", "v1")]
+#endif
+  [HasDataFlowSideChannel("tenant-identifiers")]
+  public interface IChildService {
+
+#if NET5_0_OR_GREATER
+#else
+    [OperationContract, WebInvoke(Method = "POST")]
+#endif
+    string GoToScool();
+
+  }
+
+#if NET5_0_OR_GREATER
+#else
     [ServiceContract, SwaggerWcf("DemoService.svc"), SwaggerWcfServiceInfo("DemoService", "v1")]
 #endif
   [HasDataFlowSideChannel("tenant-identifiers"), HasDataFlowBackChannel("tenant-identifiers")]
   public interface IDemoService : IDisposable, IBaseContract {
-    
+
+    IChildService Child1 { get; }
+
+    IChildService Child2 { get; }
 
 #if NET5_0_OR_GREATER
 #else

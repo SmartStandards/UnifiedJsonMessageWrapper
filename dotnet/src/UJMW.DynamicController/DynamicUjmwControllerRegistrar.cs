@@ -76,7 +76,7 @@ namespace System.Web.UJMW {
     }
 
     private static ModuleBuilder _CombinedBuilder = null;
-
+    
     private static void CreateAndRegisterController(ControllerFeature feature, Type serviceType, DynamicUjmwControllerOptions options) {
 
       ModuleBuilder builder;
@@ -88,18 +88,66 @@ namespace System.Web.UJMW {
       }
       else {
         builder = DynamicUjmwControllerFactory.CreateAssemblyModuleBuilder("UJMW.InMemoryControllers." + serviceType.Name);
-      }
+      } 
+
+      CreateAndRegisterController(feature, serviceType, serviceType, options, builder);
+    }
+
+    private static void CreateAndRegisterController(
+      ControllerFeature feature, Type serviceTypeForCurrentController, Type serviceTypeForRootController, DynamicUjmwControllerOptions options, ModuleBuilder builder
+    ) {
 
       Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(
-        serviceType, options, out string controllerRoute, out string controllerTitle, builder
+        serviceTypeForCurrentController, options, 
+        out string resolvedControllerRoute, out string controllerTitle, out string resolvedControllerName,
+        builder, serviceTypeForRootController
       );
 
       feature.Controllers.Add(dynamicController.GetTypeInfo());
 
       SelfAnnouncementHelper.RegisterEndpoint(
-        serviceType, controllerTitle, controllerRoute, EndpointCategory.DynamicUjmwFacade, options
+        serviceTypeForCurrentController, controllerTitle, resolvedControllerRoute, EndpointCategory.DynamicUjmwFacade, options
       );
 
+
+      List<PropertyInfo> allProperties = new List<PropertyInfo>();
+      CollectAllPropertiesForType(serviceTypeForCurrentController, allProperties);
+      foreach (PropertyInfo subServiceProperty in allProperties) {
+      
+        if(subServiceProperty.CanRead && !subServiceProperty.PropertyType.IsValueType) {
+
+          DynamicUjmwControllerOptions dedicatedOptions = options.Clone();
+
+          //to risky to duplicate... reset to default automatic!
+          dedicatedOptions.ControllerTitle = null;
+          dedicatedOptions.ControllerNamePattern = $"{resolvedControllerName}.{subServiceProperty.Name}";
+           
+          //let the route step-down
+          dedicatedOptions.ControllerRoute = $"{resolvedControllerRoute}/{subServiceProperty.Name}";
+          dedicatedOptions.WrapperNamePattern = $"{resolvedControllerName}_{subServiceProperty.Name}_[Method]";
+
+          //let the navigation path (to request the service instance) step-down
+          var dedicatedPath  = dedicatedOptions.SubServiceNavPath.ToList();
+          dedicatedPath.Add(subServiceProperty);
+          dedicatedOptions.SubServiceNavPath = dedicatedPath.ToArray();
+
+          //recurse!
+          CreateAndRegisterController(feature, subServiceProperty.PropertyType, serviceTypeForRootController, dedicatedOptions, builder);  
+        }
+      }
+
+    }
+
+    internal static void CollectAllPropertiesForType(Type t, List<PropertyInfo> target) {
+      foreach (PropertyInfo pi in t.GetProperties()) {
+        target.Add(pi);
+      }
+      if (t.BaseType != null) {
+        CollectAllPropertiesForType(t.BaseType, target);
+      }
+      foreach (Type intf in t.GetInterfaces()) {
+        CollectAllPropertiesForType(intf, target);
+      }
     }
 
   }
