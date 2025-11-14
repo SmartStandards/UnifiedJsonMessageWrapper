@@ -12,8 +12,21 @@ namespace UJMW.DemoCommandLineExe {
     string GetUmlaute();
   }
 
+  
+
+
   public class DemoCliService : IDemoCliService {
+    private static string _ExpensiveCache = null;
+    private string GetExpensiveCache() {
+      if (_ExpensiveCache == null) {
+        // Simulate expensive operation
+        System.Threading.Thread.Sleep(10000);
+        _ExpensiveCache = "Expensive Data";
+      }
+      return _ExpensiveCache;
+    }
     public void Run() {
+      Console.WriteLine(GetExpensiveCache());
       //Console.WriteLine("DemoService is running.");
     }
 
@@ -29,7 +42,7 @@ namespace UJMW.DemoCommandLineExe {
     }
 
     public void Run3(double value, out string result) {
-      result = $"Value is {value}";
+      result = $"Value is {value}. {GetExpensiveCache()}";
       //Console.WriteLine(result);
     }
 
