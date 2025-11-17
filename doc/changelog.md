@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: as extension to the ContextualArgument's-Feature from 5.1 its now possible to to add shadow-properties to request-DTOs to use also the json-body for transportation of contextual information (regardless to the interface signature)
 
 
 

@@ -37,7 +37,7 @@ namespace System.Web.UJMW {
 
       private DynamicUjmwControllerOptions _Options;
 
-      private delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames);
+      private delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames, object requestDto);
       private ContextualArgumentCollectorDelegate _ContextualArgumentCollector;
 
       public DynamicControllerBase(object injectedRootServiceInstance) {
@@ -70,12 +70,13 @@ namespace System.Web.UJMW {
           };
         }
     
-        KeyValuePair<string, Func<string>>[] contextualArgumentGetters = _Options.GetUniformedContextualArgumentGetters(
-          (headerName) => this.HttpContext.Request.Headers[headerName].FirstOrDefault(),
-          (routeSegmentAlias) => this.RouteData.Values[routeSegmentAlias]?.ToString()
+        KeyValuePair<string, Func<object, string>>[] contextualArgumentGetters = _Options.GetUniformedContextualArgumentGetters(
+          (headerName, requestDto) => this.HttpContext.Request.Headers[headerName].FirstOrDefault(),
+          (routeSegmentAlias, requestDto) => this.RouteData.Values[routeSegmentAlias]?.ToString(),
+          (dtoPropertyName, requestDto) => requestDto.GetType().GetProperty(dtoPropertyName)?.GetValue(requestDto)?.ToString()
         ).ToArray(); //NOTE: ToArray in combination with KVP ist used to freeze the collection and avoid threading issues!
 
-        _ContextualArgumentCollector = (ref IDictionary<string, string> targetDict, string[] includedArgNames) => {
+        _ContextualArgumentCollector = (ref IDictionary<string, string> targetDict, string[] includedArgNames, object requestDto) => {
           if(includedArgNames == null) {
             return;
           }
@@ -83,12 +84,12 @@ namespace System.Web.UJMW {
             targetDict = new Dictionary<string, string>();
           }
           //invoke all getters and fill the target dict
-          foreach (KeyValuePair<string, Func<string>> nameAndGetter in contextualArgumentGetters) {
+          foreach (KeyValuePair<string, Func<object, string>> nameAndGetter in contextualArgumentGetters) {
             if (includedArgNames.Length > 0 && !includedArgNames.Contains(nameAndGetter.Key)) {
               continue;
             }
             try {
-              targetDict[nameAndGetter.Key] = nameAndGetter.Value?.Invoke();
+              targetDict[nameAndGetter.Key] = nameAndGetter.Value?.Invoke(requestDto);
             }
             catch (Exception ex) {
               throw new ApplicationException($"Contextual Argument Getter for '{nameAndGetter.Key}' has thrown an Exception: " + ex.Message, ex);
@@ -235,7 +236,7 @@ namespace System.Web.UJMW {
                       if (container != null) {
                         sideChannelReceived = true;
                         //overlay the endpoint-individual 'contextualArgument's
-                        contextualArgumentCollector.Invoke(ref container, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                        contextualArgumentCollector.Invoke(ref container, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
                         //now invoke the propagation into the ambience-room
                         inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, container);
                         break;
@@ -248,7 +249,7 @@ namespace System.Web.UJMW {
                       sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
                       sideChannelReceived = true;
                       //overlay the endpoint-individual 'contextualArgument's
-                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
                       //now invoke the propagation into the ambience-room
                       inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                       break;
@@ -264,7 +265,7 @@ namespace System.Web.UJMW {
                       //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be passed to the processing method...
                       inboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
                       //overlay the endpoint-individual 'contextualArgument's
-                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay);
+                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
                       //now invoke the propagation into the ambience-room
                       inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
                     }
@@ -329,7 +330,7 @@ namespace System.Web.UJMW {
                 //routing over contextualization hook around the internal invoke...
                 if (options.ContextualizationHook != null) {
                   IDictionary<string, string> contextualArguments = new Dictionary<string, string>();
-                  contextualArgumentCollector.Invoke(ref contextualArguments, Array.Empty<string>());
+                  contextualArgumentCollector.Invoke(ref contextualArguments, Array.Empty<string>(), requestDto);
                   options.ContextualizationHook.Invoke(contextualArguments, innerInvokeContextual);
                   if (!innerInvokeWasCalled) {
                     throw new Exception("The UJMW ContextualizationHook MUST NOT skip invoking the given inner action!");

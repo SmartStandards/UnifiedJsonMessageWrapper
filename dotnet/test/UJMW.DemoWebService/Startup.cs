@@ -82,6 +82,7 @@ namespace Security {
         "tenant-identifiers",
         (contract) => {
           contract.IncludeExposedAmbientFieldInstances("currentTenant");
+          contract.IncludeExposedAmbientFieldInstances("dtHandle");
         }
       );
 
@@ -165,9 +166,19 @@ namespace Security {
         contractType.ToString();
       };
 
+
+
+
+
       var svc = new DemoService();
       services.AddSingleton<IDemoService>(svc);
       services.AddSingleton<IDemoFileService>(svc);
+
+      services.AddSingleton<IContextualizationDemo>(new ContextualizationDemo());
+
+
+
+
 
       services.AddSingleton<IDemoCliService>((sc) => {
         return DynamicClientFactory.CreateInstance<IDemoCliService>(
@@ -182,21 +193,33 @@ namespace Security {
       services.AddDynamicUjmwControllers(r => {
 
 
+        r.AddControllerFor<IContextualizationDemo>((c) => {
 
+          c.BindContextualArgumentToRequestDto("dtHandle", propTypeIfGenerating: typeof(int));
+
+          c.ContextualizationHook = (endpointContextualArguments, innerInvokeContextual) => {
+            //ENTER THE CONTEXT
+            innerInvokeContextual.Invoke();
+            //LEAVE THE CONTEXT
+          };
+
+        });
 
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>((c)=> {
+
           c.ControllerRoute = "{tnt}/v1/[Controller].svc";
-          c.BindContextualArgument("skyfall", () => "007");
-          c.BindContextualArgumentToHeaderValue("huhu", "hu-hu");
           c.BindContextualArgumentToRouteSegment("MandantAusRoute", "tnt");
 
+          c.BindContextualArgument("skyfall", () => "007");
+          c.BindContextualArgumentToHeaderValue("huhu", "hu-hu");
+
           c.ContextualizationHook = (endpointContextualArguments, innerInvokeContextual) => {
-
-
+            //ENTER THE CONTEXT
             innerInvokeContextual.Invoke();
-
+            //LEAVE THE CONTEXT
           };
+
         });
 
         r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {

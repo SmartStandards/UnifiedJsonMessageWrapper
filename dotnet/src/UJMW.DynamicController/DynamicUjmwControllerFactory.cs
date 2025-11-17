@@ -191,8 +191,8 @@ namespace System.Web.UJMW {
         controllerRoute = controllerRoute.Replace($"{{{i}}}", genArgs[i]);
       }
 
-      if(options._ContextualRouteSegmentArguments != null) {
-        foreach(KeyValuePair<string, string> kvp in options._ContextualRouteSegmentArguments) {
+      if(options.ContextualRouteSegmentArguments != null) {
+        foreach(KeyValuePair<string, string> kvp in options.ContextualRouteSegmentArguments) {
           if(!controllerRoute.Contains("{" + kvp.Value + "}")) {
             throw new ArgumentException(
               $"There is a route-based ContextualArgument named '{kvp.Value}', which is registered for this controller " +
@@ -450,14 +450,20 @@ namespace System.Web.UJMW {
     /// <param name="response"></param>
     /// <param name="options"></param>
     /// <returns></returns>
-    private static Type GetOrCreateDto(Type serviceType, string wrapperNamePattern, MethodInfo methodInfo, ModuleBuilder moduleBuilder, bool response, DynamicUjmwControllerOptions options) {
+    private static Type GetOrCreateDto(
+      Type serviceType, string wrapperNamePattern, MethodInfo methodInfo, ModuleBuilder moduleBuilder,
+      bool response, DynamicUjmwControllerOptions options
+    ) {
+      
       string wrapperTypeFullName = serviceType.Namespace + ".MessageWrappers." + wrapperNamePattern.Replace("[Method]", methodInfo.Name);
+      
       if (response) {
         wrapperTypeFullName = wrapperTypeFullName + UjmwResponseDtoSuffix;
       }
       else {
         wrapperTypeFullName = wrapperTypeFullName + UjmwRequestDtoSuffix;
       }
+
       lock (_DtoTypeCache ) {
         if (_DtoTypeCache.ContainsKey(wrapperTypeFullName)) {
           return _DtoTypeCache[wrapperTypeFullName];
@@ -479,29 +485,55 @@ namespace System.Web.UJMW {
           if ((!response && options.EnableRequestSidechannel) || (response && options.EnableResponseSidechannel)) {
             DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwSideChannelPropertyName, typeof(Dictionary<string, string>), "Used to flow additional ambient data (see UJMW standard)");
           }
-
+        
+          List<string> createdPropertyNames = new List<string>();
           var parameters = methodInfo.GetParameters();
           foreach (var param in parameters) {
             if ((response && param.IsOut) || (!response && !param.IsOut) || (param.ParameterType.IsByRef && !param.IsOut)) {
               string doc = param.GetDocumentation();
               if (param.ParameterType.IsByRef) {
-                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType.GetElementType(), doc);
+                DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType.GetElementType(), doc);  
               }
               else {
                 DynamicUjmwControllerFactory.BuildProp(typeBuilder, param.Name, param.ParameterType,doc);
-              }         
+              }
+              createdPropertyNames.Add(param.Name);
             }
           }
 
           if (response) {
+            //only relevant for the response DTO
+
             if (methodInfo.ReturnType != null && methodInfo.ReturnType != typeof(void)) {
               DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwReturnPropertyName, methodInfo.ReturnType, methodInfo.GetDocumentationForReturn(true));
             }
+
             DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwFaultPropertyName, typeof(string),"Optional field, which can be used to transport an error-message.");
+         
+          }
+          else {
+            //only relevant for the request DTO
+
+            foreach (KeyValuePair<string, Tuple<string, Type>> requiredArgument in options.ContextualDtoArguments) { 
+          
+              //for each required argument, check if the property is already exisits (by normal method-args)
+              string dtoPropertyName = requiredArgument.Value.Item1;
+              if (!createdPropertyNames.Contains(dtoPropertyName)) {
+
+                //otherwise, create it as 'shadow' property for this DTO (which will not be accessable within the BL, but contextual as well)
+                Type dtoPropertyTypeIfCreating = requiredArgument.Value.Item2;
+                DynamicUjmwControllerFactory.BuildProp(typeBuilder, dtoPropertyName, dtoPropertyTypeIfCreating);
+              
+              }
+            }
+
           }
 
           Type dtoType = typeBuilder.CreateType();
+
+          //caching...
           _DtoTypeCache[wrapperTypeFullName] = dtoType;
+
           return dtoType;
         }
       }

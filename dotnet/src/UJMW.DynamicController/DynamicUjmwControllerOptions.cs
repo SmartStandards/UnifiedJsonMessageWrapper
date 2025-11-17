@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -91,6 +92,7 @@ namespace System.Web.UJMW {
       this.ContextualArgumentNameCollissionGuard(name);
       _ContextualGetterBasedArguments[name] = valueGetter;
     }
+
     private Dictionary<string, Func<string>> _ContextualGetterBasedArguments = new Dictionary<string, Func<string>>();
 
     /// <summary>
@@ -105,9 +107,53 @@ namespace System.Web.UJMW {
     /// </param>
     public void BindContextualArgumentToRouteSegment(string name, string routeSegmentAlias = null) {
       this.ContextualArgumentNameCollissionGuard(name);
-      _ContextualRouteSegmentArguments[name] = routeSegmentAlias ?? name;
+      lock (_ContextualRouteSegmentArguments) { 
+        _ContextualRouteSegmentArguments[name] = routeSegmentAlias ?? name;
+      }
     }
-    internal Dictionary<string, string> _ContextualRouteSegmentArguments = new Dictionary<string, string>();
+    private Dictionary<string, string> _ContextualRouteSegmentArguments = new Dictionary<string, string>();
+
+    internal KeyValuePair<string, string>[] ContextualRouteSegmentArguments {
+      get { 
+        lock (_ContextualRouteSegmentArguments) {
+          return _ContextualRouteSegmentArguments.ToArray();
+        }   
+      }
+    }
+
+    /// <summary>
+    ///  Registers an argument, which will be provided contextually during each call of this endpoint.
+    ///  The value (dynamically picked from the request-DTO) will be served to
+    ///   the IncommingRequestSideChannel-Hooks (UjmwHostConfiguration)
+    ///   and to the ContextualizationHook (DynamicUjmwControllerOptions) individually for this endpoint.
+    /// </summary>
+    /// <param name="name">Internal addressable name of the argument to be registerd.</param>
+    /// <param name="dtoPropertyName">
+    ///   The name of the property within the request-DTO to pick the value from. If the property is not daclared
+    ///   by the interface-method, it will automatically be added to the request-DTO.
+    /// </param>
+    /// <param name="propTypeIfGenerating">
+    ///   If the property is not daclared by the interface-method, this type will be used to generate the property.
+    /// </param>
+    public void BindContextualArgumentToRequestDto(string name, string dtoPropertyName = null, Type propTypeIfGenerating = null) {
+      this.ContextualArgumentNameCollissionGuard(name); 
+      lock (_ContextualDtoArguments) {
+        _ContextualDtoArguments[name] = Tuple.Create(
+          dtoPropertyName ?? name,
+          propTypeIfGenerating ?? typeof(string)
+        );
+      }  
+    }
+
+    private Dictionary<string, Tuple<string, Type>> _ContextualDtoArguments = new Dictionary<string, Tuple<string,Type>>();
+
+    internal KeyValuePair<string, Tuple<string, Type>>[] ContextualDtoArguments {
+      get {
+        lock (_ContextualDtoArguments) {
+          return _ContextualDtoArguments.ToArray();
+        }
+      }
+    }
 
     /// <summary>
     ///  Registers an argument, which will be provided contextually during each call of this endpoint.
@@ -135,28 +181,43 @@ namespace System.Web.UJMW {
       }
     }
 
-    internal IDictionary<string,Func<string>> GetUniformedContextualArgumentGetters(
-      Func<string,string> headerValueGetter,
-      Func<string,string> routeValueGetter
+    //HACK: this needs to be refactored, as the combination with its callers leads to too much callback cascading
+    //and is conceptually broken since the dto instance is included as an argument just because of one variation
+    internal IDictionary<string, Func<object, string>> GetUniformedContextualArgumentGetters(
+      Func<string, object, string> headerValueGetter,
+      Func<string, object, string> routeValueGetter,
+      Func<string, object, string> dtoPropValueGetter
     ) {
-      Dictionary<string, Func<string>> combined = new Dictionary<string, Func<string>>();
+
+      Dictionary<string, Func<object, string>> combined = new Dictionary<string, Func<object,string>>();
+
       lock (_ContextualGetterBasedArguments) {
         foreach (var kvp in _ContextualGetterBasedArguments) {
-          combined[kvp.Key] = kvp.Value;
+          combined[kvp.Key] = (dto) => kvp.Value.Invoke();
         }
       }
+
       lock (_ContextualHeaderValueArguments) {
         foreach (var kvp in _ContextualHeaderValueArguments) {
           string headerName = kvp.Value;
-          combined[kvp.Key] = () => headerValueGetter(headerName);
+          combined[kvp.Key] = (dto) => headerValueGetter(headerName, dto);
         }
       }
+
       lock (_ContextualRouteSegmentArguments) {
         foreach (var kvp in _ContextualRouteSegmentArguments) {
           string routeSegmentName = kvp.Value;
-          combined[kvp.Key] = () => routeValueGetter(routeSegmentName);
+          combined[kvp.Key] = (dto) => routeValueGetter(routeSegmentName, dto);
         }
       }
+
+      lock (_ContextualDtoArguments) {
+        foreach (var kvp in _ContextualDtoArguments) {
+          string propertyName = kvp.Value.Item1;
+          combined[kvp.Key] = (dto) => dtoPropValueGetter(propertyName, dto);
+        }
+      }
+
       return combined;
     }
 
@@ -233,6 +294,11 @@ namespace System.Web.UJMW {
       lock (this._ContextualHeaderValueArguments) {
         foreach (var kvp in this._ContextualHeaderValueArguments) {
           clone._ContextualHeaderValueArguments[kvp.Key] = kvp.Value;
+        }
+      }
+      lock (this._ContextualDtoArguments) {
+        foreach (var kvp in this._ContextualDtoArguments) {
+          clone._ContextualDtoArguments[kvp.Key] = kvp.Value;
         }
       }
 
