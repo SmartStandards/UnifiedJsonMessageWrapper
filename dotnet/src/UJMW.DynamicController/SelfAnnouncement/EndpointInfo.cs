@@ -11,13 +11,19 @@ namespace System.Web.UJMW.SelfAnnouncement {
       string title,
       string relativeRoute,
       EndpointCategory endpointCategory,
-      DynamicUjmwControllerOptions ujmwOptions = null
+      DynamicUjmwControllerOptions ujmwOptions = null,
+      string apiGroupName = null
     ) {
+
+      if(apiGroupName == null && ujmwOptions != null) {
+        apiGroupName = ujmwOptions.ApiGroupName;
+      }
 
       this.ContractType = contractType;
       this.ContractIdentifyingName = contractIdentifyingName;
       this.Title = title;
       this.EndpointCategory = endpointCategory;
+      this.ApiGroupName = apiGroupName;
 
       if (relativeRoute.StartsWith("http", StringComparison.InvariantCultureIgnoreCase)) {
         throw new ArgumentException("RelativeRoute must not start with http-prefix)");
@@ -37,6 +43,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
     public string ContractIdentifyingName { get; private set; }
 
     public string Title { get; private set; }
+
+    public string ApiGroupName { get; private set; }
 
     public EndpointCategory EndpointCategory { get; private set; }
 

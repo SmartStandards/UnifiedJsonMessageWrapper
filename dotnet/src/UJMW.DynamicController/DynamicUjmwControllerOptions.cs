@@ -263,6 +263,11 @@ namespace System.Web.UJMW {
     /// </summary>
     internal PropertyInfo[] SubServiceNavPath { get; set; } = Array.Empty<PropertyInfo>();
 
+    /// <summary>
+    /// Relevant for documentation (Swagger, etc.):
+    /// </summary>
+    public string ApiGroupName { get; set; } = null;
+
     internal DynamicUjmwControllerOptions Clone() {
 
       DynamicUjmwControllerOptions clone = new DynamicUjmwControllerOptions();

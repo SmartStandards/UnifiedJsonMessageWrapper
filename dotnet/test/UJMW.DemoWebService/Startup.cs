@@ -194,6 +194,7 @@ namespace Security {
 
 
         r.AddControllerFor<IContextualizationDemo>((c) => {
+          c.ApiGroupName = "Contextualization-Demo";
 
           c.BindContextualArgumentToRequestDto("dtHandle", propTypeIfGenerating: typeof(int));
 
@@ -207,6 +208,7 @@ namespace Security {
 
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>((c)=> {
+          c.ApiGroupName = "Contextualization-Demo";
 
           c.ControllerRoute = "{tnt}/v1/[Controller].svc";
           c.BindContextualArgumentToRouteSegment("MandantAusRoute", "tnt");
@@ -223,13 +225,16 @@ namespace Security {
         });
 
         r.AddControllerFor<IDemoFileService>(new DynamicUjmwControllerOptions {
-          ControllerRoute = "FileStore"
+          ControllerRoute = "FileStore",
+          ApiGroupName = "Fileaccess-Demo"
         });
 
         var repoControllerOptions = new DynamicUjmwControllerOptions {
           ControllerRoute = "Repo/{0}",
           ControllerTitle = "Gen ({0})",
-          ControllerNamePattern = "{0}Repository"
+          ControllerNamePattern = "{0}Repository",
+          ApiGroupName = "GenericRepo-Demo"
+          
         };
         r.AddControllerFor<IGenericInterface<Foo, int>>(repoControllerOptions);
         r.AddControllerFor<IGenericInterface<Bar, string>>(repoControllerOptions);
@@ -240,76 +245,14 @@ namespace Security {
         r.AddControllerFor<IDemoCliService>(new DynamicUjmwControllerOptions {
           ControllerRoute = "CliService",
           EnableAuthHeaderEvaluatorHook = false,
-          EnableInfoSite = true,
+          ApiGroupName = "CLI-Demo"
         });
 
         r.AddAnnouncementTriggerEndpoint();
 
       });
 
-      services.AddSwaggerGen(c => {
-
-        c.ResolveConflictingActions(apiDescriptions => {
-          return apiDescriptions.First();
-        });
-        c.EnableAnnotations(true, true);
-
-        //c.IncludeXmlComments(outDir + ".......Contract.xml", true);
-        //c.IncludeXmlComments(outDir + "........Service.xml", true);
-        //c.IncludeXmlComments(outDir + "........WebAPI.xml", true);
-
-        #region bearer
-
-        string getLinkMd = "";
-        //if (!string.IsNullOrWhiteSpace(masterApiClientSecret)) {
-        //  getLinkMd = " [get one...](../oauth?state=myState&client_id=master&login_hint=API-CLIENT&redirect_uri=/oauth/display)";
-        //}
-
-        //https://www.thecodebuzz.com/jwt-authorization-token-swagger-open-api-asp-net-core-3-0/
-        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
-          Name = "Authorization",
-          Type = SecuritySchemeType.ApiKey,
-          Scheme = "Bearer",
-          BearerFormat = "JWT",
-          In = ParameterLocation.Header,
-          Description = "API-TOKEN" + getLinkMd
-        });
-
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
-          {
-              {
-                    new OpenApiSecurityScheme
-                      {
-                          Reference = new OpenApiReference
-                          {
-                              Type = ReferenceType.SecurityScheme,
-                              Id = "Bearer"
-                          }
-                      },
-                      new string[] {}
-
-              }
-          });
-
-        #endregion
-
-        c.UseInlineDefinitionsForEnums();
-
-        c.SwaggerDoc(
-          "ApiV3",
-          new OpenApiInfo {
-            Title = _ApiTitle + " - API",
-            Version = _ApiVersion.ToString(3),
-            Description = "NOTE: This is not intended be a 'RESTful' api, as it is NOT located on the persistence layer and is therefore NOT focused on doing CRUD operations! This HTTP-based API uses a 'call-based' approach to known BL operations. IN-, OUT- and return-arguments are transmitted using request-/response- wrappers (see [UJMW](https://github.com/SmartStandards/UnifiedJsonMessageWrapper)), which are very lightweight and are a compromise for broad support and adaptability in REST-inspired technologies as well as soap-inspired technologies!",
-            //Contact = new OpenApiContact {
-            //  Name = "",
-            //  Email = "",
-            //  Url = new Uri("")
-            //},
-          }
-        );
-
-      });
+      services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");
 
     }
 
@@ -339,35 +282,8 @@ namespace Security {
       }
 
       var baseUrl = _Configuration.GetValue<string>("BaseUrl");
-      if (_Configuration.GetValue<bool>("EnableSwaggerUi")) {
 
-        app.UseSwagger(o => {
-          //warning: needs subfolder! jsons cant be within same dir as swaggerui (below)
-          o.RouteTemplate = "docs/schema/{documentName}.{json|yaml}";
-          //o.SerializeAsV2 = true;
-        });
-
-        app.UseSwaggerUI(c => {
-
-          c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-          c.DefaultModelExpandDepth(2);
-          c.DefaultModelsExpandDepth(2);
-          //c.ConfigObject.DefaultModelExpandDepth = 2;
-
-          c.DocumentTitle = _ApiTitle + " - OpenAPI Definition(s)";
-
-          //represents the sorting in SwaggerUI combo-box
-          c.SwaggerEndpoint("schema/ApiV3.json", _ApiTitle + " - API v" + _ApiVersion.ToString(3));
-
-          c.RoutePrefix = "docs";
-
-          //requires MVC app.UseStaticFiles();
-          c.InjectStylesheet(baseUrl + "swagger-ui/custom.css");
-
-        });
-
-      }
-
+      
       app.UseHttpsRedirection();
 
       app.UseRouting();
@@ -385,6 +301,9 @@ namespace Security {
       app.UseEndpoints(endpoints => {
         endpoints.MapControllers();
       });
+
+      //MUST BE AFTER 'UseEndpoints'/'MapControllers'
+      app.UseUjmwStandardSwagger(_Configuration, "Fileaccess-Demo");
 
       SelfAnnouncementHelper.Configure(
         lifetimeEvents, app.ServerFeatures,

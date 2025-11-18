@@ -9,7 +9,10 @@ using System.Threading.Tasks;
 namespace System.Web.UJMW.SelfAnnouncement {
 
   [Route(Route)]
+  [ApiExplorerSettings(GroupName = AnnouncementTriggerEndpointController.ApiGroupName )]
   internal class AnnouncementTriggerEndpointController : Controller {
+
+    public const string ApiGroupName = "SelfAnnouncement";
 
     public const string Route = "Announcement.svc";
 

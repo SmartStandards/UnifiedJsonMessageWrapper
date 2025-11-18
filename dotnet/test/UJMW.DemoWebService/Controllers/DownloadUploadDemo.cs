@@ -53,6 +53,7 @@ namespace Security.Controllers {
 
 
   [Route("afs"),Tags("UIUIUI")]
+  [ApiExplorerSettings(GroupName = "Fileaccess-Demo")]
   public class DownloadUploadDemo : Controller {
 
 

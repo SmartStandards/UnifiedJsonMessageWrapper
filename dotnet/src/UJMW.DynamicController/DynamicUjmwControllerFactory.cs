@@ -34,7 +34,10 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _ConsumesAttributeConstructor = typeof(ConsumesAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
-    
+
+    private static ConstructorInfo _ApiExplorerSettingsAttributeConstructor = typeof(ApiExplorerSettingsAttribute).GetConstructors().Single();
+    private static PropertyInfo _ApiExplorerSettingsGroupNameProp = typeof(ApiExplorerSettingsAttribute).GetProperty(nameof(ApiExplorerSettingsAttribute.GroupName));
+
     private static ConstructorInfo _AuthHeaderInterceptorAttributeConstructor = typeof(AuthHeaderInterceptorAttribute).GetConstructors().Single();
 
     private static ConstructorInfo _TagsAttributeContructor = Type.GetType("Microsoft.AspNetCore.Http.TagsAttribute, Microsoft.AspNetCore.Http.Extensions", false)?.GetConstructors()?.FirstOrDefault();
@@ -46,13 +49,13 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _SwaggerResponseAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerResponseAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();//Skip(1)?.
     private static ConstructorInfo _SwaggerSchemaAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerSchemaAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
     
-    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null) {
-      return BuildDynamicControllerType(serviceType, options, out string dummyRoute, out string dummyTitle);
+    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null, string apiGroupName = null) {
+      return BuildDynamicControllerType(serviceType, options, out string dummyRoute, out string dummyTitle, apiGroupName);
     }
 
-    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute, out string controllerTitle) {
+    public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options, out string controllerRoute, out string controllerTitle, string apiGroupName = null) {
       ModuleBuilder moduleBuilder = CreateAssemblyModuleBuilder("UJMW.InMemoryControllers." + serviceType.Name);
-      return BuildDynamicControllerType(serviceType, options, out controllerRoute, out controllerTitle, out string resolvedControllerName, moduleBuilder, serviceType);
+      return BuildDynamicControllerType(serviceType, options, out controllerRoute, out controllerTitle, out string resolvedControllerName, moduleBuilder, serviceType, apiGroupName);
     }
 
     internal static ModuleBuilder CreateAssemblyModuleBuilder(string assemblyName) {
@@ -70,11 +73,15 @@ namespace System.Web.UJMW {
       Type serviceType, DynamicUjmwControllerOptions options,
       out string controllerRoute, out string controllerTitle, out string controllerName,
       ModuleBuilder moduleBuilder,
-      Type rootServiceTypeRequiredByConstructor
+      Type rootServiceTypeRequiredByConstructor, string apiGroupName = null
     ) {
 
-      if(options == null) {
+      if (options == null) {
         options = new DynamicUjmwControllerOptions();
+        options.ApiGroupName = apiGroupName;
+      }
+      else if (string.IsNullOrEmpty(apiGroupName)) {
+        apiGroupName = options.ApiGroupName;
       }
 
       ConstructorInfo authAttributeConstructor = null;
@@ -215,6 +222,15 @@ namespace System.Web.UJMW {
       );
       typeBuilder.SetCustomAttribute(RouteAttribBuilder);
 
+      if (!String.IsNullOrWhiteSpace(apiGroupName)) {
+        CustomAttributeBuilder apiExplorerSettingsAttribBuilder = new CustomAttributeBuilder(
+         _ApiExplorerSettingsAttributeConstructor, new object[0],
+         //sonderlocken-überladung zum setzen von names-arguments (=properties):
+         new[] { _ApiExplorerSettingsGroupNameProp }, new object[] { apiGroupName }
+        );
+        typeBuilder.SetCustomAttribute(apiExplorerSettingsAttribBuilder);
+      }   
+
       if (_TagsAttributeContructor != null) {
         CustomAttributeBuilder tagsAttribBuilder = new CustomAttributeBuilder(
          _TagsAttributeContructor, new object[] { new string[] { controllerTitle } }
@@ -278,6 +294,16 @@ namespace System.Web.UJMW {
           _HttpGetAttributeConstructor, new object[] {}
         );
         rootMethodBuilder.SetCustomAttribute(httpGetAttribBuilder);
+
+
+        CustomAttributeBuilder apiExplorerSettingsAttribBuilderForGet = new CustomAttributeBuilder(
+          _ApiExplorerSettingsAttributeConstructor, new object[0],
+          //sonderlocken-überladung zum setzen von names-arguments (=properties):
+          new[] { _ApiExplorerSettingsGroupNameProp }, new object[] { "hidden" }
+        );
+        rootMethodBuilder.SetCustomAttribute(apiExplorerSettingsAttribBuilderForGet);
+
+
         CustomAttributeBuilder producesAttribBuilder = new CustomAttributeBuilder(
           _ProducesAttributeConstructor, new object[] { "text/html", Array.Empty<string>() }
         );

@@ -257,7 +257,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
       string contractIdentifyingName,
       string controllerTitle,
       string relativeRoute,
-      EndpointCategory endpointCategory
+      EndpointCategory endpointCategory,
+      string apiGroupName = null
     ) {
 
       lock (_RegisteredEndpoints) {
@@ -265,7 +266,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _RegisteredEndpoints.Add(
           new EndpointInfo(
              null, contractIdentifyingName,
-             controllerTitle, relativeRoute, endpointCategory, null
+             controllerTitle, relativeRoute, endpointCategory, null, apiGroupName
           )
         );
 
@@ -277,7 +278,8 @@ namespace System.Web.UJMW.SelfAnnouncement {
       string controllerTitle,
       string relativeRoute,
       EndpointCategory endpointCategory,
-      DynamicUjmwControllerOptions ujmwOptions = null
+      DynamicUjmwControllerOptions ujmwOptions = null,
+      string apiGroupName = null
     ) {
 
       lock (_RegisteredEndpoints) {
@@ -285,7 +287,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         _RegisteredEndpoints.Add(
           new EndpointInfo(
              contractType, SelfAnnouncementHelper.BuildContractidentifyingName(contractType),
-             controllerTitle, relativeRoute, endpointCategory, ujmwOptions
+             controllerTitle, relativeRoute, endpointCategory, ujmwOptions, apiGroupName
           )
         );
 

@@ -33,7 +33,8 @@ namespace System.Web.UJMW {
           "UJMW.AnnouncementTriggerEndpoint",
           "UJMW AnnouncementTriggerEndpoint",
           AnnouncementTriggerEndpointController.Route,
-           EndpointCategory.AnnouncementTriggerEndpoint
+          EndpointCategory.AnnouncementTriggerEndpoint,
+          AnnouncementTriggerEndpointController.ApiGroupName
         );
       }
 
@@ -94,21 +95,25 @@ namespace System.Web.UJMW {
     }
 
     private static void CreateAndRegisterController(
-      ControllerFeature feature, Type serviceTypeForCurrentController, Type serviceTypeForRootController, DynamicUjmwControllerOptions options, ModuleBuilder builder
+      ControllerFeature feature, Type serviceTypeForCurrentController, Type serviceTypeForRootController,
+      DynamicUjmwControllerOptions options, ModuleBuilder builder
     ) {
+
+      //string apiGroupNameWithFallback = options?.ApiGroupName ?? serviceTypeForRootController.Name;
+      string apiGroupNameWithFallback = options?.ApiGroupName ?? serviceTypeForRootController.Assembly.GetName().Name;
 
       Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(
         serviceTypeForCurrentController, options, 
         out string resolvedControllerRoute, out string controllerTitle, out string resolvedControllerName,
-        builder, serviceTypeForRootController
+        builder, serviceTypeForRootController, apiGroupNameWithFallback  
       );
 
       feature.Controllers.Add(dynamicController.GetTypeInfo());
 
       SelfAnnouncementHelper.RegisterEndpoint(
-        serviceTypeForCurrentController, controllerTitle, resolvedControllerRoute, EndpointCategory.DynamicUjmwFacade, options
+        serviceTypeForCurrentController, controllerTitle, resolvedControllerRoute,
+        EndpointCategory.DynamicUjmwFacade, options, apiGroupNameWithFallback
       );
-
 
       List<PropertyInfo> allProperties = new List<PropertyInfo>();
       CollectAllPropertiesForType(serviceTypeForCurrentController, allProperties);
