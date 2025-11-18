@@ -7,7 +7,15 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-**new Feature**: the  'DynamicUjmwControllerOptions' class now offers a 'ApiGroupName'-Property
+*(none)*
+
+
+
+## v 5.3.0
+released **2025-11-18**, including:
+ - **new Feature**: the  'DynamicUjmwControllerOptions' class now offers a 'ApiGroupName'-Property
+
+
 
 ## v 5.2.0
 released **2025-11-17**, including:
