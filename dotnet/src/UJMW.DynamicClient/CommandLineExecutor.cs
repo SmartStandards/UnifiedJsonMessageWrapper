@@ -71,6 +71,7 @@ namespace System {
         };
 
         _PersistentProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        _PersistentProcess.Exited += (s, e) => OnPersistentProcessExited();
         _PersistentProcess.Start();
         _PersistentWriter = _PersistentProcess.StandardInput;
         _PersistentReader = _PersistentProcess.StandardOutput;
@@ -78,6 +79,25 @@ namespace System {
 
         // Start background task to read output lines and dispatch to waiting tasks
         Task.Run(() => PersistentProcessOutputLoop(_PersistentCts.Token));
+      }
+    }
+
+    private void OnPersistentProcessExited() {
+      lock (_PersistentLock) {
+        // Fail all pending tasks
+        foreach (var tcs in _PendingTasks.Values)
+          tcs.TrySetException(new Exception("Persistent process exited unexpectedly."));
+        _PendingTasks.Clear();
+
+        // Optionally, restart the process after a short delay
+        Task.Run(async () => {
+          await Task.Delay(500); // Small delay to avoid rapid restart loops
+          try {
+            StartPersistentProcess();
+          } catch (Exception ex) {
+            // Log or handle restart failure
+          }
+        });
       }
     }
 
