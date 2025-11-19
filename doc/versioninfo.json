@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.0",
-  "currentVersionWithSuffix": "5.3.0",
+  "currentVersion": "5.3.1",
+  "currentVersionWithSuffix": "5.3.1",
   "releaseType": "",
-  "previousVersion": "5.2.0",
-  "changeGrade": "minor",
+  "previousVersion": "5.3.0",
+  "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 0,
-  "versionDateInfo": "2025-11-18",
-  "versionTimeInfo": "14:26:01",
-  "versionNotes": "- new Feature: the  'DynamicUjmwControllerOptions' class now offers a 'ApiGroupName'-Property\n"
+  "currentPatch": 1,
+  "versionDateInfo": "2025-11-19",
+  "versionTimeInfo": "10:44:17",
+  "versionNotes": "- new revision without significant changes\n"
 }
