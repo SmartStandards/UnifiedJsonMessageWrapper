@@ -7,6 +7,12 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
+*(none)*
+
+
+
+## v 5.3.2
+released **2025-11-19**, including:
  - CommandLineExecutor: Handle unexpected process exits and improve robustness
 
 

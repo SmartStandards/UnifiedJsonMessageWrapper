@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.1",
-  "currentVersionWithSuffix": "5.3.1",
+  "currentVersion": "5.3.2",
+  "currentVersionWithSuffix": "5.3.2",
   "releaseType": "",
-  "previousVersion": "5.3.0",
+  "previousVersion": "5.3.1",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 1,
+  "currentPatch": 2,
   "versionDateInfo": "2025-11-19",
-  "versionTimeInfo": "10:44:17",
-  "versionNotes": "- new revision without significant changes\n"
+  "versionTimeInfo": "13:40:44",
+  "versionNotes": "- CommandLineExecutor: Handle unexpected process exits and improve robustness\n"
 }
