@@ -43,6 +43,8 @@ namespace System {
     private readonly Dictionary<string, TaskCompletionSource<string>> _PendingTasks = new Dictionary<string, TaskCompletionSource<string>>();
     private CancellationTokenSource _PersistentCts;
 
+    private bool _IsDisposing = false;
+
     public CommandLineExecutor(Type applicableType, string exePath, CommandLineCallMode callMode) {
       _ContractType = applicableType;
       _ExePath = exePath;
@@ -84,6 +86,10 @@ namespace System {
 
     private void OnPersistentProcessExited() {
       lock (_PersistentLock) {
+        // Only restart if not disposing
+        if (_IsDisposing)
+          return;
+
         // Fail all pending tasks
         foreach (var tcs in _PendingTasks.Values)
           tcs.TrySetException(new Exception("Persistent process exited unexpectedly."));
@@ -485,19 +491,22 @@ namespace System {
     }
 
     public void Dispose() {
-      if (_PersistentProcess != null) {
-        try {
-          if (!_PersistentProcess.HasExited) {
-            _PersistentWriter.WriteLine("STOP");
-            _PersistentWriter.Flush();
-            _PersistentProcess.WaitForExit(2000);
-          }
-        } catch { }
-        try { _PersistentWriter?.Dispose(); } catch { }
-        try { _PersistentReader?.Dispose(); } catch { }
-        try { _PersistentProcess?.Dispose(); } catch { }
-        _PersistentCts?.Cancel();
-        _PersistentCts?.Dispose();
+      lock (_PersistentLock) {
+        _IsDisposing = true;
+        if (_PersistentProcess != null) {
+          try {
+            if (!_PersistentProcess.HasExited) {
+              _PersistentWriter.WriteLine("STOP");
+              _PersistentWriter.Flush();
+              _PersistentProcess.WaitForExit(2000);
+            }
+          } catch { }
+          try { _PersistentWriter?.Dispose(); } catch { }
+          try { _PersistentReader?.Dispose(); } catch { }
+          try { _PersistentProcess?.Dispose(); } catch { }
+          _PersistentCts?.Cancel();
+          _PersistentCts?.Dispose();
+        }
       }
     }
   }
