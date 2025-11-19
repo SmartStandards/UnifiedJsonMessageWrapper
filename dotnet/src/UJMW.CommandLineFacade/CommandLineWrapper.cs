@@ -228,11 +228,30 @@ namespace UJMW.CommandLineFacade {
         if (line.Trim().Equals("STOP", StringComparison.OrdinalIgnoreCase))
           break;
 
-        // Split line into up to 3 parts: methodName, paramsJson, taskId
-        var parts = line.Split(new[] { ' ' }, 3);
-        var methodName = parts[0];
-        var paramsJson = parts.Length > 1 ? parts[1] : "{}";
-        var taskId = parts.Length > 2 ? parts[2] : null;
+        // Parse: methodName [paramsJson] [#taskId]
+        string methodName = null;
+        string paramsJson = "{}";
+        string taskId = null;
+
+        // Find first space (method name ends), and last space before #taskId (if present)
+        int firstSpace = line.IndexOf(' ');
+        int lastHash = line.LastIndexOf('#');
+
+        if (firstSpace < 0) {
+          // Only method name
+          methodName = line.Trim();
+        } else {
+          methodName = line.Substring(0, firstSpace).Trim();
+          if (lastHash > firstSpace) {
+            // There is a taskId at the end
+            taskId = line.Substring(lastHash).Trim();
+            paramsJson = line.Substring(firstSpace + 1, lastHash - firstSpace - 1).Trim();
+          } else {
+            // No taskId, everything after first space is paramsJson
+            paramsJson = line.Substring(firstSpace + 1).Trim();
+          }
+          if (string.IsNullOrEmpty(paramsJson)) paramsJson = "{}";
+        }
 
         // Start each invocation in a separate task
         var task = Task.Run(() => {
