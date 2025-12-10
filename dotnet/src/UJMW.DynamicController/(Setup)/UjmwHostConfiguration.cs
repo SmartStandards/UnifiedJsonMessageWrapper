@@ -54,6 +54,11 @@ namespace System.Web.UJMW {
     public static bool ForceHttps { get; set; } = false;
 
     /// <summary>
+    /// Will use the AssemblyName of the service contract interface to declare the API-Group name
+    /// </summary>
+    public static bool EnableApiGroupNameFallback { get; set; } = false;
+
+    /// <summary>
     /// this is just a convenience method for calling 'ConfigureRequestSidechannel' and setting up only the UJMW '_'-property
     /// </summary>
     /// <param name="processingMethod"></param>

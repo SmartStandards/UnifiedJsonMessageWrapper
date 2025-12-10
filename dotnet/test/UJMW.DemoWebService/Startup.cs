@@ -190,12 +190,12 @@ namespace Security {
         );
       });
 
-      services.AddDynamicUjmwControllers(r => {
+      UjmwHostConfiguration.EnableApiGroupNameFallback = true;
 
+      services.AddDynamicUjmwControllers(r => {
 
         r.AddControllerFor<IContextualizationDemo>((c) => {
           c.ApiGroupName = "Contextualization-Demo";
-
           c.BindContextualArgumentToRequestDto("dtHandle", propTypeIfGenerating: typeof(int));
 
           c.ContextualizationHook = (endpointContextualArguments, innerInvokeContextual) => {
@@ -206,10 +206,10 @@ namespace Security {
 
         });
 
+
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>((c)=> {
           c.ApiGroupName = "Contextualization-Demo";
-
           c.ControllerRoute = "{tnt}/v1/[Controller].svc";
           c.BindContextualArgumentToRouteSegment("MandantAusRoute", "tnt");
 

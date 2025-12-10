@@ -67,31 +67,29 @@ namespace Microsoft.AspNetCore.Builder {
         foreach (string knownApiGroupName in knownApiGroupNames) {
 
           string apiName = knownApiGroupName;
-          if (String.IsNullOrWhiteSpace(apiName)) {
-            apiName = defaultApiGroupName;
-          }
+          if (!String.IsNullOrWhiteSpace(apiName)) {
+       
+            string version = "0.0.0";
+            Type firstContractType = SelfAnnouncementHelper.RegisteredEndpoints.Where(ep => ep.ApiGroupName == knownApiGroupName && ep.ContractType != null).Select(ep => ep.ContractType).FirstOrDefault();
+            if(firstContractType != null) {
 
-          string version = "0.0.0";
-          Type firstContractType = SelfAnnouncementHelper.RegisteredEndpoints.Where(ep => ep.ApiGroupName == knownApiGroupName && ep.ContractType != null).Select(ep => ep.ContractType).FirstOrDefault();
-          if(firstContractType != null) {
+              version = firstContractType.Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
-            version = firstContractType.Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+              string contractAssemblyDocumentationFile = Path.GetFileNameWithoutExtension(firstContractType.Assembly.Location) + ".xml";
+              c.IncludeXmlComments(Path.Combine(outDir, contractAssemblyDocumentationFile), false);
 
-            string contractAssemblyDocumentationFile = Path.GetFileNameWithoutExtension(firstContractType.Assembly.Location) + ".xml";
-            c.IncludeXmlComments(Path.Combine(outDir, contractAssemblyDocumentationFile), false);
-
-          }
-
-          registeredApiNames.Add(apiName);
-          c.SwaggerDoc(
-            apiName,
-            new OpenApiInfo {
-              Title = apiName,
-              Version = version,
-              Description = "" //UjmwDefaultApiInfo
             }
-          );
 
+            registeredApiNames.Add(apiName);
+            c.SwaggerDoc(
+              apiName,
+              new OpenApiInfo {
+                Title = apiName,
+                Version = version,
+                Description = "" //UjmwDefaultApiInfo
+              }
+            );
+           }
         }
 
         if (additionalApiGroupNames != null) {
@@ -156,26 +154,26 @@ namespace Microsoft.AspNetCore.Builder {
         foreach (string knownApiGroupName in knownApiGroupNames) {
 
           string apiName = knownApiGroupName;
-          if (String.IsNullOrWhiteSpace(apiName)) {
-            apiName = defaultApiGroupName;
-          }
+          if (!String.IsNullOrWhiteSpace(apiName)) {
 
-          string version = "0.0.0";
-          Type firstContractType = SelfAnnouncementHelper.RegisteredEndpoints.Where(ep => ep.ApiGroupName == knownApiGroupName && ep.ContractType != null).Select(ep => ep.ContractType).FirstOrDefault();
-          if (firstContractType != null) {
-            version = firstContractType.Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
-          }
+            string version = "0.0.0";
+            Type firstContractType = SelfAnnouncementHelper.RegisteredEndpoints.Where(ep => ep.ApiGroupName == knownApiGroupName && ep.ContractType != null).Select(ep => ep.ContractType).FirstOrDefault();
+            if (firstContractType != null) {
+              version = firstContractType.Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+            }
 
-          string apiNameAndVersion = apiName;
-          if(version != "0.0.0") {
-            apiNameAndVersion += " - v" + version;
-          }
+            string apiNameAndVersion = apiName;
+            if(version != "0.0.0") {
+              apiNameAndVersion += " - v" + version;
+            }
 
-          //just the combo-box entries...
-          c.SwaggerEndpoint(
-            "schema/" + apiName + ".json",
-            apiNameAndVersion
-          );
+            //just the combo-box entries...
+            c.SwaggerEndpoint(
+              "schema/" + apiName + ".json",
+              apiNameAndVersion
+            );
+
+          }
 
         }
 

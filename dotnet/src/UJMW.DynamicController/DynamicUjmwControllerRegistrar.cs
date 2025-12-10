@@ -99,8 +99,10 @@ namespace System.Web.UJMW {
       DynamicUjmwControllerOptions options, ModuleBuilder builder
     ) {
 
-      //string apiGroupNameWithFallback = options?.ApiGroupName ?? serviceTypeForRootController.Name;
-      string apiGroupNameWithFallback = options?.ApiGroupName ?? serviceTypeForRootController.Assembly.GetName().Name;
+      string apiGroupNameWithFallback = options?.ApiGroupName;
+      if(apiGroupNameWithFallback == null && UjmwHostConfiguration.EnableApiGroupNameFallback) {
+        apiGroupNameWithFallback = serviceTypeForRootController.Assembly.GetName().Name;
+      }
 
       Type dynamicController = DynamicUjmwControllerFactory.BuildDynamicControllerType(
         serviceTypeForCurrentController, options, 
@@ -122,6 +124,7 @@ namespace System.Web.UJMW {
         if(subServiceProperty.CanRead && !subServiceProperty.PropertyType.IsValueType) {
 
           DynamicUjmwControllerOptions dedicatedOptions = options.Clone();
+          dedicatedOptions.ApiGroupName = apiGroupNameWithFallback;
 
           //to risky to duplicate... reset to default automatic!
           dedicatedOptions.ControllerTitle = null;
