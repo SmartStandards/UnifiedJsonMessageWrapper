@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix Swagger UI (default ApiGroupName)
+*(none)*
+
+
+
+## v 5.3.4
+released **2025-12-10**, including:
+ - Fix Swagger UI (default ApiGroupName)
 
 
 

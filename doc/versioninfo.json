@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.3",
-  "currentVersionWithSuffix": "5.3.3",
+  "currentVersion": "5.3.4",
+  "currentVersionWithSuffix": "5.3.4",
   "releaseType": "",
-  "previousVersion": "5.3.2",
+  "previousVersion": "5.3.3",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 3,
-  "versionDateInfo": "2025-11-19",
-  "versionTimeInfo": "14:15:44",
-  "versionNotes": "- new revision without significant changes\n"
+  "currentPatch": 4,
+  "versionDateInfo": "2025-12-10",
+  "versionTimeInfo": "15:00:14",
+  "versionNotes": "- Fix Swagger UI (default ApiGroupName)\n"
 }
