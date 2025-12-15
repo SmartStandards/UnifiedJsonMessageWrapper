@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.4",
-  "currentVersionWithSuffix": "5.3.4",
+  "currentVersion": "5.3.5",
+  "currentVersionWithSuffix": "5.3.5",
   "releaseType": "",
-  "previousVersion": "5.3.3",
+  "previousVersion": "5.3.4",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 4,
-  "versionDateInfo": "2025-12-10",
-  "versionTimeInfo": "15:00:14",
-  "versionNotes": "- Fix Swagger UI (default ApiGroupName)\n"
+  "currentPatch": 5,
+  "versionDateInfo": "2025-12-15",
+  "versionTimeInfo": "09:48:04",
+  "versionNotes": "- Uninstalled unnecessary packages in UJMW.Client\n"
 }
