@@ -186,7 +186,8 @@ namespace System {
 
       ///// (end) CAPTURE OUTGOING SIDECHANNEL /////
 
-      string paramsJson = System.Text.Json.JsonSerializer.Serialize(paramDict);
+      //string paramsJson = System.Text.Json.JsonSerializer.Serialize(paramDict);
+      string paramsJson = JsonConvert.SerializeObject(paramDict);
 
       // Prepare process start info
       var psi = new ProcessStartInfo {
@@ -361,7 +362,8 @@ namespace System {
 
       ///// (end) CAPTURE OUTGOING SIDECHANNEL /////
 
-      string paramsJson = System.Text.Json.JsonSerializer.Serialize(paramDict);
+      //string paramsJson = System.Text.Json.JsonSerializer.Serialize(paramDict);
+      string paramsJson = JsonConvert.SerializeObject(paramDict);
 
       // Generate a unique taskId for this call
       string taskId;
