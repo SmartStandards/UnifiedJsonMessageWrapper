@@ -59,6 +59,7 @@ namespace System.Web.UJMW {
       return null;
     }
 
+    private object _UrlReloadLock = new object();
     private string _CachedEndpointUrl = null;
     private DateTime _EndpointUrlCacheTime = DateTime.MinValue;
 
@@ -69,14 +70,13 @@ namespace System.Web.UJMW {
         return null;
       }
 
-      if (_EndpointUrlCacheTime < DateTime.Now) {
-        _CachedEndpointUrl = _UrlGetter.Invoke();
-        if (!_CachedEndpointUrl.EndsWith("/")) {
-          _CachedEndpointUrl += "/";
+      lock (_UrlReloadLock) {
+        if (_EndpointUrlCacheTime < DateTime.Now) {
+          _CachedEndpointUrl = _UrlGetter.Invoke();
+          _EndpointUrlCacheTime = DateTime.Now.AddSeconds(
+            UjmwClientConfiguration.UrlGetterCacheSec
+          );
         }
-        _EndpointUrlCacheTime = DateTime.Now.AddSeconds(
-          UjmwClientConfiguration.UrlGetterCacheSec
-        );
       }
 
       string endpointUrl = _CachedEndpointUrl;
@@ -95,9 +95,6 @@ namespace System.Web.UJMW {
           if (!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, httpCode, ref endpointUrl)) {
             throw;
           }
-          if (!endpointUrl.EndsWith("/")) {
-            endpointUrl += "/";
-          }
         }
 
         Threading.Thread.Sleep(100); //< security feature 1
@@ -110,7 +107,13 @@ namespace System.Web.UJMW {
       string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString, ref int httpReturnCode
     ) {
 
-      string fullUrl = rootUrl + methodName;
+      string fullUrl;
+      if (rootUrl.EndsWith("/")) {
+        fullUrl = rootUrl + methodName;
+      }
+      else {
+        fullUrl = rootUrl + "/" + methodName;
+      }
 
       MethodInfo method = FindMethod(_ContractType, methodName);
       var requestContent = new Dictionary<string, object>();
@@ -172,7 +175,7 @@ namespace System.Web.UJMW {
       string rawJsonRequest = JsonConvert.SerializeObject(requestContent, jss);
 
       // ############### HTTP POST #############################################
-       
+
       httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
         fullUrl,
         rawJsonRequest, requestHeaders,

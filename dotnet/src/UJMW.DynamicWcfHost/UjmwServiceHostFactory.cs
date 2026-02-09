@@ -168,14 +168,8 @@ namespace System.Web.UJMW {
       catch (Exception ex) {
         if (UjmwHostConfiguration.FactoryExceptionVisitor != null) {
           UjmwHostConfiguration.FactoryExceptionVisitor.Invoke(ex);
-
-          //HACK: wir wissen nicht, ob das gut ist -> WCF soll einfach den service skippen
-          return null;
-
         }
-        else {
-          throw;
-        }
+        throw;
       }
     }
 

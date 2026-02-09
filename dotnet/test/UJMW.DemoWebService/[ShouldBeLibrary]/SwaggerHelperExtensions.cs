@@ -112,6 +112,15 @@ namespace Microsoft.AspNetCore.Builder {
           }
         }
 
+        c.SwaggerDoc(
+          "(default)",
+          new OpenApiInfo {
+            Title = "API-Endpoints (default)",
+            Version = "",
+            Description = ""
+          }
+        );
+
       });
 
     }
@@ -190,6 +199,11 @@ namespace Microsoft.AspNetCore.Builder {
             );
           }
         }
+
+        c.SwaggerEndpoint(
+          "schema/(default).json",
+          "(default)"
+        );
 
         c.RoutePrefix = "docs";
 
