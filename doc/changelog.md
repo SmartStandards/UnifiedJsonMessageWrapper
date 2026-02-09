@@ -11,6 +11,12 @@ This files contains a version history including all changes relevant for semanti
 
 
 
+## v 5.3.6
+released **2026-02-09**, including:
+ - new revision without significant changes
+
+
+
 ## v 5.3.5
 released **2025-12-15**, including:
  - Uninstalled unnecessary packages in UJMW.Client

@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.5",
-  "currentVersionWithSuffix": "5.3.5",
+  "currentVersion": "5.3.6",
+  "currentVersionWithSuffix": "5.3.6",
   "releaseType": "",
-  "previousVersion": "5.3.4",
+  "previousVersion": "5.3.5",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 5,
-  "versionDateInfo": "2025-12-15",
-  "versionTimeInfo": "09:48:04",
-  "versionNotes": "- Uninstalled unnecessary packages in UJMW.Client\n"
+  "currentPatch": 6,
+  "versionDateInfo": "2026-02-09",
+  "versionTimeInfo": "06:47:28",
+  "versionNotes": "- new revision without significant changes\n"
 }
