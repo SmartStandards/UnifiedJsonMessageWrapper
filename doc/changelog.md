@@ -7,7 +7,8 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* **new Feature**: serializer will now add $type properties to json, id runtime-type does not match declarative type
+* Fix: Dictionary-Keys new wont be affected anymore when enforcing chamelCase for Property-Names
 
 
 

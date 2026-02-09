@@ -171,7 +171,12 @@ namespace System.Web.UJMW {
       var jss = new JsonSerializerSettings();
       jss.Formatting = Formatting.Indented;
       jss.DateFormatHandling = DateFormatHandling.IsoDateFormat;
-      jss.ContractResolver = new CamelCasePropertyNamesContractResolver();
+      jss.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple;
+      jss.TypeNameHandling = TypeNameHandling.Auto;
+      CamelCasePropertyNamesContractResolver resolver = new CamelCasePropertyNamesContractResolver();
+      resolver.NamingStrategy.ProcessDictionaryKeys = false;
+      jss.ContractResolver = resolver;
+
       string rawJsonRequest = JsonConvert.SerializeObject(requestContent, jss);
 
       // ############### HTTP POST #############################################

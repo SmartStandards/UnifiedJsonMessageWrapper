@@ -1,8 +1,8 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Text;
-using static System.Web.UJMW.DynamicClientFactory;
 
 namespace System.Web.UJMW {
 
@@ -137,6 +137,71 @@ namespace System.Web.UJMW {
     //  Assert.IsTrue(catchedEx.Message.Contains("timeout"));
 
     //}
+    [TestMethod]
+    public void JsonSerializerTest() {
+
+
+      MockPapa mock1 = new MockPapa();
+      mock1.MyDict.Add("chamelKey", "value1");
+      mock1.MyDict.Add("PascalKey", "value2");
+      mock1.MyDict.Add("Int32", 123);
+      mock1.MyDict.Add("Int64", 123L);
+      mock1.MyDict.Add("Date", DateTime.Now);
+      mock1.Nested.MyDict.Add("chamelKey", "value1");
+      mock1.Nested.MyDict.Add("PascalKey", "value2");
+      mock1.Nested.MyDict.Add("Object", new MockKind());
+
+
+      var jss = new JsonSerializerSettings();
+
+      jss.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple;
+      jss.TypeNameHandling = TypeNameHandling.Auto;
+
+
+      jss.Formatting = Formatting.Indented;
+      jss.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+
+      //var x = new PascalCasePropertyNamesContractResolver();
+
+      CamelCasePropertyNamesContractResolver resolver = new CamelCasePropertyNamesContractResolver();
+      resolver.NamingStrategy.ProcessDictionaryKeys = false;
+
+      jss.ContractResolver = resolver;
+
+      string rawJson = JsonConvert.SerializeObject(mock1, jss);
+      MockPapa deserialized = JsonConvert.DeserializeObject<MockPapa>(rawJson, jss);
+
+      deserialized.MyDict.TryGetValue("Int32", out object chamelValue);
+      string falschInt64 = chamelValue.GetType().FullName;
+
+      Assert.IsTrue(rawJson.Contains("PascalKey"));
+
+    }
+
+    private class MockPapa : MockBasis {
+
+      public int Bar { get; set; } = 123;
+      public MockKind Nested { get; set; } = new MockKind();
+      public Dictionary<string,object > MyDict { get; set; } = new Dictionary<string, object>();
+
+      public MockBasis[] EinArray { get; set; }= new MockBasis[] {
+        new MockBasis(),
+        new MockKind()
+      };
+
+  }
+    private class MockKind : MockBasis {
+      public bool Baz { get; set; } = true;
+
+      public Dictionary<string, object> MyDict { get; set; } = new Dictionary<string, object>();
+    }
+
+    private class MockBasis {
+
+      public string Foo { get; set; } = "Huhu";
+
+    }
+
 
   }
 

@@ -1,4 +1,5 @@
 ﻿using Logging.SmartStandards;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.IO;
@@ -95,9 +96,23 @@ namespace System.Web.UJMW {
       return this.DeserializeIncommingMessage(message, parameters, true);
     }
 
-    private static Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer() {
-      ContractResolver = new CamelCasePropertyNamesContractResolver()
-    };
+    private static Newtonsoft.Json.JsonSerializer _Serializer = null;
+
+    private static Newtonsoft.Json.JsonSerializer NewtonsoftSerializer {
+      get {
+        if (_Serializer == null) {
+          _Serializer = new Newtonsoft.Json.JsonSerializer();
+          _Serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
+          _Serializer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+          _Serializer.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple;
+          _Serializer.TypeNameHandling = TypeNameHandling.Auto;
+          CamelCasePropertyNamesContractResolver resolver = new CamelCasePropertyNamesContractResolver();
+          resolver.NamingStrategy.ProcessDictionaryKeys = false;
+          _Serializer.ContractResolver = resolver;
+        }
+        return _Serializer;
+      } 
+    }
 
     public Message SerializeOutgoingMessage(MessageVersion messageVersion, Object[] parameters, Object result, bool isReply) {
       Byte[] body;
@@ -106,7 +121,7 @@ namespace System.Web.UJMW {
         using (var sw = new StreamWriter(ms, Encoding.UTF8)) {
           using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw)) {
             //'writer.Formatting = Newtonsoft.Json.Formatting.Indented;
-
+      
             writer.WriteStartObject();
 
             if (_OutgoingResponseSideChannelConfig.UnderlinePropertyIsProvided) {
@@ -114,12 +129,12 @@ namespace System.Web.UJMW {
               var snapshotContainer = new Dictionary<string, string>();
               _OutgoingResponseSideChannelConfig.CaptureMethod.Invoke(calledContractMethod, snapshotContainer);
               writer.WritePropertyName("_");
-              serializer.Serialize(writer, snapshotContainer);
+              NewtonsoftSerializer.Serialize(writer, snapshotContainer);
             }
 
             if (!string.IsNullOrWhiteSpace(HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value)) {
               writer.WritePropertyName("fault");
-              serializer.Serialize(writer, HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value);
+              NewtonsoftSerializer.Serialize(writer, HookedOperationInvoker.CatchedExeptionFromCurrentOperation.Value);
             }
             else {
 
@@ -130,7 +145,7 @@ namespace System.Web.UJMW {
                   byRefPropName = Char.ToLower(byRefPropName[0]) + byRefPropName.Substring(1);
                 }
                 writer.WritePropertyName(byRefPropName);
-                serializer.Serialize(writer, byRefValue);
+                NewtonsoftSerializer.Serialize(writer, byRefValue);
               }
 
               if (_RelevantMessageDesc.Body.ReturnValue != null &&
@@ -138,7 +153,7 @@ namespace System.Web.UJMW {
                 !String.IsNullOrWhiteSpace(_RelevantMessageDesc.Body.ReturnValue.Name)) {
                 //should be "result" as customized on another place
                 writer.WritePropertyName(_RelevantMessageDesc.Body.ReturnValue.Name);
-                serializer.Serialize(writer, result);
+                NewtonsoftSerializer.Serialize(writer, result);
               }
 
             }
