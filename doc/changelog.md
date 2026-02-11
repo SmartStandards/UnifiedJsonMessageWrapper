@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: SelfAnnouncement: Hostname-Fallback removed slashes from http-scheme
+*(none)*
+
+
+
+## v 5.3.7
+released **2026-02-11**, including:
+ - Fix: SelfAnnouncement: Hostname-Fallback removed slashes from http-scheme
 
 
 

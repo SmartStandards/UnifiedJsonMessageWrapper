@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.6",
-  "currentVersionWithSuffix": "5.3.6",
+  "currentVersion": "5.3.7",
+  "currentVersionWithSuffix": "5.3.7",
   "releaseType": "",
-  "previousVersion": "5.3.5",
+  "previousVersion": "5.3.6",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 6,
-  "versionDateInfo": "2026-02-09",
-  "versionTimeInfo": "06:47:28",
-  "versionNotes": "- new revision without significant changes\n"
+  "currentPatch": 7,
+  "versionDateInfo": "2026-02-11",
+  "versionTimeInfo": "09:39:02",
+  "versionNotes": "- Fix: SelfAnnouncement: Hostname-Fallback removed slashes from http-scheme\n"
 }
