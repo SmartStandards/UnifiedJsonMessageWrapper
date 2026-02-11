@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* Fix: SelfAnnouncement: Hostname-Fallback removed slashes from http-scheme
 
 
 

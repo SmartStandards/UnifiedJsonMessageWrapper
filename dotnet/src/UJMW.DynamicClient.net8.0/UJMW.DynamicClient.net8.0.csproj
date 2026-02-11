@@ -66,6 +66,7 @@
     <None Update="SmartStandards.Logging.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>SmartStandards.Logging.cs</LastGenOutput>
+      <CustomToolNamespace>UJMW</CustomToolNamespace>
     </None>
   </ItemGroup>
 

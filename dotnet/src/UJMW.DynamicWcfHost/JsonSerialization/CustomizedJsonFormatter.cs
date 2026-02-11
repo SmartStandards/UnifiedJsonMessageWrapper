@@ -1,4 +1,5 @@
 ﻿using Logging.SmartStandards;
+using Logging.SmartStandards.CopyForUJMW;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.IO;

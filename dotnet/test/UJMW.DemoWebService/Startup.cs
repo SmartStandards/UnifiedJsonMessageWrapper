@@ -1,6 +1,7 @@
 using Demo;
 using DistributedDataFlow;
 using Logging.SmartStandards;
+using Logging.SmartStandards.AspSupport;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -37,6 +38,7 @@ namespace Security {
     public void ConfigureServices(IServiceCollection services) {
 
       services.AddLogging();
+      services.AddSmartStandardsLogging(_Configuration);
 
       _ApiVersion = typeof(IDemoService).Assembly.GetName().Version;
 
