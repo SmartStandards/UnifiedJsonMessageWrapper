@@ -1,10 +1,12 @@
 ﻿using Logging.SmartStandards;
+using Logging.SmartStandards.CopyForUJMW;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using static System.Collections.Specialized.BitVector32;
@@ -119,7 +121,23 @@ namespace System.Web.UJMW.SelfAnnouncement {
           ).Select(
             (uglyBaseUrlBindingPattern) => {
 
-              string baseUrl = uglyBaseUrlBindingPattern.Replace("//*", Environment.MachineName).Replace(":*", "");
+              string baseUrl;
+
+              if (uglyBaseUrlBindingPattern.Contains("//*")) {
+                string thisHostName = Environment.MachineName;
+                try {
+                  IPHostEntry entry = Dns.GetHostEntry(Dns.GetHostName());
+                  if (!string.IsNullOrWhiteSpace(entry?.HostName)) {
+                    thisHostName = entry.HostName;
+                  }
+                }
+                catch {
+                }
+                baseUrl = uglyBaseUrlBindingPattern.Replace("//*", "//" + thisHostName).Replace(":*", "");
+              }
+              else {
+                baseUrl = uglyBaseUrlBindingPattern.Replace(":*", "");
+              }
 
               if (baseUrl.StartsWith("http://", StringComparison.CurrentCultureIgnoreCase)) {
                 baseUrl = baseUrl.Replace(":80", ""); //remove unnecessary port specification for http
