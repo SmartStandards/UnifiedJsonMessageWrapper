@@ -461,12 +461,11 @@ namespace System.Web.UJMW {
                 //ByRef-/Out-Parameter aus transport-array "auspacken" und zurückschreiben!!!
                 for (int paramIndex = 0, loopTo2 = paramNames.Count - 1; paramIndex <= loopTo2; paramIndex++) {
                   bool paramIsValueType = paramEvalIsValueType[paramIndex];
-                  bool paramIsOut = paramEvalIsOut[paramIndex];
-                  bool paramIsRef = paramEvalIsByRef[paramIndex];
-                  var realParamType = realParamTypes[paramIndex];
-                  if (paramIsRef) {
+                  //bool paramIsOut = paramEvalIsOut[paramIndex];
+                  bool paramIsRefOrOut = paramEvalIsByRef[paramIndex];
+                  Type realParamType = realParamTypes[paramIndex];
+                  if (paramIsRefOrOut) {
 
-                    //methodIlGen.Emit(OpCodes.Ldarga_S, paramIndex + 1); // zuzuweisendes methoden-argument auf den stack holen
                     methodIlGen.Emit(OpCodes.Ldarg, paramIndex + 1); //argument-handle holen (als zuweisungs-ziel)
 
                     methodIlGen.Emit(OpCodes.Ldloc, argumentRedirectionArray); // transport-array laden
@@ -474,11 +473,33 @@ namespace System.Web.UJMW {
                   
                     methodIlGen.Emit(OpCodes.Ldelem_Ref); //array-inhalt (object-handle) auf den stack holen
 
+                    //VOR FIX <<<<<<<<<<<<<<<<
+
+                    //if (paramIsValueType) {
+                    //  methodIlGen.Emit(OpCodes.Unbox_Any, realParamType); //array-inhalt auf den stack holen
+                    //}
+
+                    //methodIlGen.Emit(OpCodes.Stind_Ref); //wert in die adresse des arguments schreiben
+
+                    //NACH FIX:
+
                     if (paramIsValueType) {
-                      methodIlGen.Emit(OpCodes.Unbox_Any, realParamType); //array-inhalt auf den stack holen
+
+                      // Convert object -> actual struct value
+                      methodIlGen.Emit(OpCodes.Unbox_Any, realParamType);
+
+                      // Store the value into the target address (T&)
+                      methodIlGen.Emit(OpCodes.Stobj, realParamType);
                     }
-   
-                    methodIlGen.Emit(OpCodes.Stind_Ref); //wert in die adresse des arguments schreiben
+                    else {
+
+                      // Ensure reference type compatibility
+                      methodIlGen.Emit(OpCodes.Castclass, realParamType);
+
+                      // Store object reference into the target address (T&)
+                      methodIlGen.Emit(OpCodes.Stind_Ref);
+                    }
+
                   }
                 }
 

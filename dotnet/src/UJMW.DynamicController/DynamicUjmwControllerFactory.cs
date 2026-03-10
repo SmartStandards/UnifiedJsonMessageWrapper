@@ -283,10 +283,12 @@ namespace System.Web.UJMW {
       #region " Endpoint-Info-Site (via HTTP-GET) "
       if (options.EnableInfoSite) {
 
+        Type infoSiteReturnType = typeof(IActionResult);
+
         var rootMethodBuilder = typeBuilder.DefineMethod(
             RenderInfoSiteMethodName,
             MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
-            typeof(string),
+            infoSiteReturnType,
             new Type[] {}
          );
 
@@ -314,7 +316,7 @@ namespace System.Web.UJMW {
           rootMethodIlGen.Emit(OpCodes.Ldarg_0); // < unsere klasseninstanz auf den stack
           rootMethodIlGen.Emit(OpCodes.Callvirt, renderInfoSite); // _DynamicProxyInvoker.RenderInfoSite()
                                                                   // jetzt liegt ein result auf dem stack...
-          rootMethodIlGen.Emit(OpCodes.Castclass, typeof(IActionResult)); // reference-types müssen gecastet werden, weil der retval in "object" ist
+          rootMethodIlGen.Emit(OpCodes.Castclass, infoSiteReturnType); // reference-types müssen gecastet werden, weil der retval in "object" ist
           rootMethodIlGen.Emit(OpCodes.Ret);
         }
 

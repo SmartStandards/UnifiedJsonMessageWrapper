@@ -52,6 +52,9 @@ namespace UJMW.DemoWcfService {
   [HasDataFlowSideChannel("tenant-identifiers"), HasDataFlowBackChannel("tenant-identifiers")]
   public interface IDemoService : IDisposable, IBaseContract {
 
+
+    void GetDateOfToday(out DateTime dt);
+
     IChildService Child1 { get; }
 
     IChildService Child2 { get; }

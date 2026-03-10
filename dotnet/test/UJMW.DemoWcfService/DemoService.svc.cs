@@ -152,9 +152,11 @@ namespace UJMW.DemoWcfService {
       return System.IO.File.OpenRead("C:\\Temp\\AFS-Demo\\FOO.txt");
     }
 
-
 #endif
 
+    public void GetDateOfToday(out DateTime dt) {
+      dt = DateTime.Now.Date;
+    }
 
     public class ChildService : IChildService {
 

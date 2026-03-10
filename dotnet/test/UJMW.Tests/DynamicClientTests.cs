@@ -42,6 +42,27 @@ namespace System.Web.UJMW {
         else if (methodName == nameof(IMyService.ProcessABag)) {
           responseContent = "{ \"return\": true}";
         }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.Foo)) {
+          responseContent = "{ \"dt\": \"2000-01-01T00:00:00Z\" }";
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.Bar)) {
+          responseContent = "{ \"count\": 123 }";;
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.GetStructViaOut)) {
+          responseContent = "{ \"res\": { \"Id\": 111, \"Name\": \"StructName\" } }";
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.GetClassViaOut)) {
+          responseContent = "{ \"res\": { \"Id\": 222, \"Name\": \"ClassName\" } }";
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.GetStructViaRef)) {
+          responseContent = "{ \"res\": { \"Id\": 333, \"Name\": \"StructName\" } }";
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.GetNullStructViaOut)) {
+          responseContent = "{ \"res\": null }";
+        }
+        else if (methodName == nameof(IHasMethodWithDataTimeAsOutParam.GetNullClassViaOut)) {
+          responseContent = "{ \"res\": null }";
+        }
         else {
           responseContent = "{ \"fault\":\"UNKNOWN-METHOD\"}";
         }
@@ -103,6 +124,66 @@ namespace System.Web.UJMW {
       Assert.IsNotNull(catchedEx);
       Assert.IsTrue(catchedEx.Message.Contains("timeout"));
 
+    }
+
+    [TestMethod]
+    public void Proxy_ShouldSupportStrcutsAsOutParam() {
+
+      IHasMethodWithDataTimeAsOutParam proxy = DynamicClientFactory.CreateInstance<IHasMethodWithDataTimeAsOutParam>(
+        new MockHttpPostSimulator(), () => dummyRootUrl
+      );
+
+      DateTime dt = new DateTime(2021,1,1);
+      int count = -1;
+
+      proxy.Bar(out count);
+
+      proxy.GetClassViaOut(out BeautifulClass classResult);
+
+      proxy.GetStructViaOut(out BeautifulStruct structResult);
+      
+      proxy.Foo(out dt);
+
+      Assert.AreEqual(123, count);
+
+      Assert.AreEqual(222, classResult.Id);
+      Assert.AreEqual("ClassName", classResult.Name);
+
+      Assert.AreEqual(111, structResult.Id);
+      Assert.AreEqual("StructName", structResult.Name);
+
+      Assert.AreEqual(new DateTime(2000, 1, 1), dt);
+
+      proxy.GetStructViaRef(ref structResult);
+      Assert.AreEqual(333, structResult.Id);
+      Assert.AreEqual("StructName", structResult.Name);
+
+      proxy.GetNullClassViaOut(out BeautifulClass nullClassResult);
+
+      //EX in JSON deserializer
+      //proxy.GetNullStructViaOut(out BeautifulStruct nullStructResult);
+
+    }
+    public interface IHasMethodWithDataTimeAsOutParam {  
+      void Foo(out DateTime dt);
+      void Bar(out int count);
+
+      void GetStructViaOut(out BeautifulStruct res);
+      void GetNullStructViaOut(out BeautifulStruct res);
+
+
+      void GetClassViaOut(out BeautifulClass res);
+      void GetNullClassViaOut(out BeautifulClass res);
+
+      void GetStructViaRef(ref BeautifulStruct res);
+    }
+    public struct BeautifulStruct {
+      public int Id { get; set; }
+      public string Name { get; set; }
+    }
+    public class BeautifulClass {
+      public int Id { get; set; }
+      public string Name { get; set; }
     }
 
     //public interface IMyService2 {

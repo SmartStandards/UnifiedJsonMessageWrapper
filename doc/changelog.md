@@ -7,9 +7,9 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* Fix: special constellation when returning struct's as out-param
 
-
+  
 
 ## v 5.3.7
 released **2026-02-11**, including:
