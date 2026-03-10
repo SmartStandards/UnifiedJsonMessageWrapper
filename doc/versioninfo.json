@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.7",
-  "currentVersionWithSuffix": "5.3.7",
+  "currentVersion": "5.3.8",
+  "currentVersionWithSuffix": "5.3.8",
   "releaseType": "",
-  "previousVersion": "5.3.6",
+  "previousVersion": "5.3.7",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 7,
-  "versionDateInfo": "2026-02-11",
-  "versionTimeInfo": "09:39:02",
-  "versionNotes": "- Fix: SelfAnnouncement: Hostname-Fallback removed slashes from http-scheme\n"
+  "currentPatch": 8,
+  "versionDateInfo": "2026-03-10",
+  "versionTimeInfo": "07:11:47",
+  "versionNotes": "- Fix: special constellation when returning struct's as out-param\n"
 }
