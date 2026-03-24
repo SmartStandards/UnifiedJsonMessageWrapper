@@ -125,6 +125,10 @@ namespace SmartStandards {
 
       //TODO: evtl wenn wir selbst eine oatuh-route haben!!!!!!!!
 
+      if (_OAuthUrlResolver != null) {
+        oAuthUrl = _OAuthUrlResolver(oAuthUrl);
+      }
+
       if (!string.IsNullOrWhiteSpace(oAuthClientId) && !string.IsNullOrWhiteSpace(oAuthUrl)) {
 
 
@@ -189,7 +193,7 @@ namespace SmartStandards {
         options.SwaggerDoc(
           group.GroupName!,
           new OpenApiInfo {
-            Title = $"{contractName} ({group.GroupName})",
+            Title = $"{group.GroupName}",
             Version = apiVersion
           }
         );
@@ -290,7 +294,8 @@ namespace SmartStandards {
               resolvableControllerTypes.FirstOrDefault(), out string contractName
             );
 
-            c.SwaggerEndpoint($"schema/{group.GroupName}.json", $"{contractName} ({group.GroupName})");
+            c.SwaggerEndpoint($"schema/{group.GroupName}.json", $"{group.GroupName}");
+            //c.SwaggerEndpoint($"schema/{group.GroupName}.json", $"{contractName} ({group.GroupName})");
           }
 
           c.RoutePrefix = "docs";
