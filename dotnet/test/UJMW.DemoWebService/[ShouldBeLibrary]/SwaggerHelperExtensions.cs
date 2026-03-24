@@ -11,6 +11,7 @@ using System.Web.UJMW.SelfAnnouncement;
 
 namespace Microsoft.AspNetCore.Builder {
 
+  [Obsolete("Use the 'UjmwSwaggerSetupExtensions' instead")]
   public static class SwaggerUjmwHelperExtensions {
 
     public static void AddUjmwStandardSwaggerGen(this IServiceCollection services, params string[] additionalApiGroupNames) {
