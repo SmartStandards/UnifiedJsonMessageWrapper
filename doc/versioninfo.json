@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.8",
-  "currentVersionWithSuffix": "5.3.8",
+  "currentVersion": "5.3.9",
+  "currentVersionWithSuffix": "5.3.9",
   "releaseType": "",
-  "previousVersion": "5.3.7",
+  "previousVersion": "5.3.8",
   "changeGrade": "fix",
   "currentMajor": 5,
   "currentMinor": 3,
-  "currentPatch": 8,
-  "versionDateInfo": "2026-03-10",
-  "versionTimeInfo": "07:11:47",
-  "versionNotes": "- Fix: special constellation when returning struct's as out-param\n"
+  "currentPatch": 9,
+  "versionDateInfo": "2026-03-24",
+  "versionTimeInfo": "17:17:25",
+  "versionNotes": "- Small Fix Swagger-Helper\n"
 }
