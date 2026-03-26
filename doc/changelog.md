@@ -7,8 +7,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix: multiple Controller registrations for same Interface
-* **new Feature**: Added json-based Endpoint-Info (http-GET on controller-route) and corresponding evaluation-features at client side to retrieve version-information
+*(none)*
+
+
+
+## v 5.4.0
+released **2026-03-26**, including:
+ - **new Feature**: Added json-based Endpoint-Info (http-GET on controller-route) and corresponding evaluation-features at client side to retrieve version-information
+ - Fix: multiple Controller registrations for same Interface
 
 
 

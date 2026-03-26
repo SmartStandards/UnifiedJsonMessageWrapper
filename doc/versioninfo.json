@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.3.9",
-  "currentVersionWithSuffix": "5.3.9",
+  "currentVersion": "5.4.0",
+  "currentVersionWithSuffix": "5.4.0",
   "releaseType": "",
-  "previousVersion": "5.3.8",
-  "changeGrade": "fix",
+  "previousVersion": "5.3.9",
+  "changeGrade": "minor",
   "currentMajor": 5,
-  "currentMinor": 3,
-  "currentPatch": 9,
-  "versionDateInfo": "2026-03-24",
-  "versionTimeInfo": "17:17:25",
-  "versionNotes": "- Small Fix Swagger-Helper\n"
+  "currentMinor": 4,
+  "currentPatch": 0,
+  "versionDateInfo": "2026-03-26",
+  "versionTimeInfo": "15:09:38",
+  "versionNotes": "- new Feature: Added json-based Endpoint-Info (http-GET on controller-route) and corresponding evaluation-features at client side to retrieve version-information\n- Fix: multiple Controller registrations for same Interface\n"
 }
