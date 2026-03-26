@@ -16,19 +16,23 @@ namespace System.Web.UJMW {
     internal DynamicUjmwControllerRegistrar() {
     }
 
-    private Dictionary<Type, DynamicUjmwControllerOptions> _Entries = new Dictionary<Type, DynamicUjmwControllerOptions>();
+    private List<Tuple<Type, DynamicUjmwControllerOptions>> _Entries = new();
+
     private ControllerFeature _GrabbedControllerFeature = null;
 
     void IApplicationFeatureProvider<ControllerFeature>.PopulateFeature(
       IEnumerable<ApplicationPart> parts, ControllerFeature feature
     ) {
-      foreach (var _Entry in _Entries) {
-        DynamicUjmwControllerRegistrar.CreateAndRegisterController(feature, _Entry.Key, _Entry.Value);
+
+      foreach (Tuple<Type, DynamicUjmwControllerOptions> _Entry in _Entries) {
+        DynamicUjmwControllerRegistrar.CreateAndRegisterController(feature, _Entry.Item1, _Entry.Item2);
       }
 
       if (_AnnouncementTriggerEndpointRequested) {
+
         Type controllerType = typeof(AnnouncementTriggerEndpointController);
         feature.Controllers.Add(controllerType.GetTypeInfo());
+
         SelfAnnouncementHelper.RegisterEndpoint(
           "UJMW.AnnouncementTriggerEndpoint",
           "UJMW AnnouncementTriggerEndpoint",
@@ -36,6 +40,7 @@ namespace System.Web.UJMW {
           EndpointCategory.AnnouncementTriggerEndpoint,
           AnnouncementTriggerEndpointController.ApiGroupName
         );
+
       }
 
       _GrabbedControllerFeature = feature;
@@ -65,7 +70,9 @@ namespace System.Web.UJMW {
     }
 
     public void AddControllerFor(Type serviceType, DynamicUjmwControllerOptions options = null) {
-      _Entries.Add(serviceType, options);
+
+      _Entries.Add(new Tuple<Type,DynamicUjmwControllerOptions>(serviceType, options));
+
       if (_GrabbedControllerFeature != null) {
         DynamicUjmwControllerRegistrar.CreateAndRegisterController(_GrabbedControllerFeature, serviceType, options);
       }
@@ -135,7 +142,7 @@ namespace System.Web.UJMW {
           dedicatedOptions.WrapperNamePattern = $"{resolvedControllerName}_{subServiceProperty.Name}_[Method]";
 
           //let the navigation path (to request the service instance) step-down
-          var dedicatedPath  = dedicatedOptions.SubServiceNavPath.ToList();
+          List<PropertyInfo> dedicatedPath  = dedicatedOptions.SubServiceNavPath.ToList();
           dedicatedPath.Add(subServiceProperty);
           dedicatedOptions.SubServiceNavPath = dedicatedPath.ToArray();
 
@@ -147,15 +154,19 @@ namespace System.Web.UJMW {
     }
 
     internal static void CollectAllPropertiesForType(Type t, List<PropertyInfo> target) {
+
       foreach (PropertyInfo pi in t.GetProperties()) {
         target.Add(pi);
       }
+
       if (t.BaseType != null) {
         CollectAllPropertiesForType(t.BaseType, target);
       }
+
       foreach (Type intf in t.GetInterfaces()) {
         CollectAllPropertiesForType(intf, target);
       }
+
     }
 
   }

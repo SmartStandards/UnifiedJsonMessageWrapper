@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Text;
 
 namespace System.Web.UJMW {
 
@@ -211,8 +212,10 @@ namespace System.Web.UJMW {
 
       ///////////////////////////////////////////////////////////////////////
 
+      string controllerNamespace = GetNamespaceFromApiGroupName(apiGroupName);
+
       TypeBuilder typeBuilder = moduleBuilder.DefineType(
-        controllerName + "Controller", //<< pattern by microsoft...
+        controllerNamespace + "." + controllerName + "Controller", //<< pattern by microsoft...
         TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.AutoLayout,
         baseType
       );
@@ -458,6 +461,32 @@ namespace System.Web.UJMW {
         _OptionsPerDynamicControllerType[dynamicType] = options;
       }
       return dynamicType;
+    }
+
+    private static string GetNamespaceFromApiGroupName(string apiGroupName) {
+      StringBuilder stringBuilder = new();
+      if (string.IsNullOrWhiteSpace(apiGroupName)) {
+        return "UJMW.Dyn";
+      }
+      foreach (char c in apiGroupName) {
+        if (char.IsLetterOrDigit(c)) {
+          stringBuilder.Append(c);
+        }
+        else {
+          stringBuilder.Append('_');
+        }
+      }
+      //ensure first char is upper:
+      if (char.IsLetter(stringBuilder[0]) ) {
+        if (char.IsLower(stringBuilder[0])) {
+          stringBuilder[0] = char.ToUpper(stringBuilder[0]);
+        }
+      }
+      else {
+        stringBuilder.Insert(0, "_");
+      }
+      stringBuilder.Insert(0, "UJMW.Dyn.");
+      return stringBuilder.ToString();
     }
 
     private static Dictionary<Type, DynamicUjmwControllerOptions> _OptionsPerDynamicControllerType = new Dictionary<Type, DynamicUjmwControllerOptions>();

@@ -208,6 +208,15 @@ namespace Security {
 
         });
 
+        r.AddControllerFor<IContextualizationDemo>((c) => {
+          c.ApiGroupName = "Aggregation-Demo";
+          c.ControllerRoute = "aggregated.svc";
+        });
+        r.AddControllerFor<IDemoService>((c) => {
+          c.ApiGroupName = "Aggregation-Demo";
+          c.ControllerRoute = "aggregated.svc";
+        });
+
 
         //NOTE: the '.svc' suffix is only to have the same url as in the WCF-Demo
         r.AddControllerFor<IDemoService>((c)=> {
@@ -254,8 +263,8 @@ namespace Security {
 
       });
 
-      services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");
-
+      //services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");
+      services.AddSwaggerGenSmartStandardsFlavored();
     }
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -305,7 +314,7 @@ namespace Security {
       });
 
       //MUST BE AFTER 'UseEndpoints'/'MapControllers'
-      app.UseUjmwStandardSwagger(_Configuration, "Fileaccess-Demo");
+      //app.UseUjmwStandardSwagger(_Configuration, "Fileaccess-Demo");
 
       SelfAnnouncementHelper.Configure(
         lifetimeEvents, app.ServerFeatures,
