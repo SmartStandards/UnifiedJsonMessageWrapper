@@ -10,6 +10,14 @@ namespace System.Web.UJMW {
 
   public interface IHttpPostExecutor {
 
+    /// <summary></summary>
+    /// <param name="url"></param>
+    /// <param name="requestContent">if requestContent==null, then a http-GET should be done!!! </param>
+    /// <param name="requestHeaders"></param>
+    /// <param name="responseContent"></param>
+    /// <param name="responseHeaders"></param>
+    /// <param name="reasonPhrase"></param>
+    /// <returns></returns>
     int ExecuteHttpPost(
       string url,
       string requestContent,
@@ -42,6 +50,10 @@ namespace System.Web.UJMW {
       out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
       out string reasonPhrase
     ) {
+      HttpMethod httpM = HttpMethod.Post;
+      if (requestContent == null) {
+        httpM = HttpMethod.Get;
+      }
 
       if (_AuthHeaderGetter != null) {
         if (_AuthHeaderCacheTime < DateTime.Now) {
@@ -52,16 +64,19 @@ namespace System.Web.UJMW {
         }
       }
 
-      HttpContent content = new StringContent(requestContent, Encoding.UTF8, "application/json");
-      if (requestHeaders != null) {
-        foreach (var kvp in requestHeaders) {
-          if (!kvp.Key.Equals("Authorization", StringComparison.CurrentCultureIgnoreCase)) {
-            content.Headers.Add(kvp.Key, kvp.Value);
+      HttpContent content = null;
+      if (requestContent != null) {
+        content = new StringContent(requestContent, Encoding.UTF8, "application/json");
+        if (requestHeaders != null) {
+          foreach (var kvp in requestHeaders) {
+            if (!kvp.Key.Equals("Authorization", StringComparison.CurrentCultureIgnoreCase)) {
+              content.Headers.Add(kvp.Key, kvp.Value);
+            }
           }
         }
       }
-     
-      using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
+   
+      using (HttpRequestMessage request = new HttpRequestMessage(httpM, url)) {
 
         request.Content = content;
 

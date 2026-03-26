@@ -30,7 +30,7 @@ using System.Web.UJMW;
   UJMW.DemoWcfService.IDemoService svc;
 
   /////////////////
-  bool wcf = true;
+  bool wcf = false;
   /////////////////
   
   if (wcf) {
@@ -43,6 +43,11 @@ using System.Web.UJMW;
       "http://localhost:55202/DemoService.svc" //MVC
     );
   }
+
+
+
+  bool success = DynamicClientFactory.TryResolveContractVersionOnServerSide(svc, out Version versionOnServerSide, out string[] knownMethodNames);
+
 
   //var svc = DynamicClientFactory.CreateInstance<UJMW.DemoWcfService.IDemoService>(
   //  ()=> "http://localhost:55202/DemoService.svc" , () => {

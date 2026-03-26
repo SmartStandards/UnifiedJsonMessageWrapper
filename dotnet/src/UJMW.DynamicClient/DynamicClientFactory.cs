@@ -1,8 +1,13 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -248,6 +253,7 @@ namespace System.Web.UJMW {
           // CODE: Public Class <MyApplicableType>_DyamicProxyClass
           // Implements <MyApplicableType>
         }
+        typeBuilder.AddInterfaceImplementation(typeof(IUjmwClient));
 
         // ##### FIELD DEFINITIONs #####
 
@@ -308,6 +314,42 @@ namespace System.Web.UJMW {
         }
 
         // ##### METHOD DEFINITIONs #####
+
+        #region " Impleml. of IUjmwClient "
+
+        //Function GetInvoker() As IDynamicProxyInvoker -> IL implementierung, die einfach nur das feld returnt:
+
+        MethodInfo getInvokerMethod = typeof(IUjmwClient).GetMethod(nameof(IUjmwClient.GetInvoker));
+
+        MethodBuilder getInvokerMethodBuilder = typeBuilder.DefineMethod(
+          getInvokerMethod.Name, MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+          getInvokerMethod.ReturnType, Array.Empty<Type>()
+        );
+        ILGenerator getInvokerMethodIlGen = getInvokerMethodBuilder.GetILGenerator();
+
+        getInvokerMethodIlGen.Emit(OpCodes.Ldarg_0);
+        getInvokerMethodIlGen.Emit(OpCodes.Ldfld, fieldBuilderDynamicProxyInvoker);
+        getInvokerMethodIlGen.Emit(OpCodes.Ret);
+
+        typeBuilder.DefineMethodOverride(getInvokerMethodBuilder, getInvokerMethod);
+
+        //Function GetContract() As Type -> IL implementierung, die einfach nur unseren applicableType in statischer form returnt:
+
+        MethodInfo getContractMethod = typeof(IUjmwClient).GetMethod(nameof(IUjmwClient.GetContract));
+
+        MethodBuilder getContractMethodBuilder = typeBuilder.DefineMethod(
+          getContractMethod.Name, MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+          getContractMethod.ReturnType, Array.Empty<Type>()
+        );
+        ILGenerator getContractMethodIlGen = getContractMethodBuilder.GetILGenerator();
+
+        getContractMethodIlGen.Emit(OpCodes.Ldtoken, applicableType);
+        getContractMethodIlGen.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle"));
+        getContractMethodIlGen.Emit(OpCodes.Ret);
+
+        typeBuilder.DefineMethodOverride(getContractMethodBuilder, getContractMethod);
+
+        #endregion
 
         var allMethods = new List<MethodInfo>();
         CollectAllMethodsForType(applicableType, allMethods);
@@ -574,6 +616,216 @@ namespace System.Web.UJMW {
         _HttpClientsPerCustomizing.Clear();
       }
     }
+
+    #region " Version-Checks and Info-Endpoint "
+
+    public static string BuildEndpointQualifyingName(Type contractType) {
+      string version = contractType.Assembly.GetName()?.Version?.ToString(3);
+      return $"UJMW:{contractType.FullName}/{version}";
+    }
+
+    public static string BuildEndpointQualifyingName<TContract>() {
+      return BuildEndpointQualifyingName(typeof(TContract));
+    }
+
+    public static string GetEndpointQualifyingNameRequriedByClient(object dynmicClientInstance) {
+      IUjmwClient ujmwClient = (dynmicClientInstance as IUjmwClient);
+      if(ujmwClient == null) return null;   
+      Type contractType = ujmwClient.GetContract();
+      return BuildEndpointQualifyingName(contractType);
+    }
+
+    public static Version ExtractVersionFromEndpointQualifyingName(string endpointQualifyingName) {
+      if (!endpointQualifyingName.StartsWith("UJMW")) {
+        throw new ArgumentException($"'{endpointQualifyingName}' is not an UJMW-Endpoint!");
+      }
+      int idx = endpointQualifyingName.IndexOf("/");
+      if(idx < 0 ) {
+        return new Version(0,0,0);
+      }
+      return Version.Parse(endpointQualifyingName.Substring(idx+1));
+    }
+
+    public static string GetEndpointQualifyingNameWithoutVersion(string endpointQualifyingName) {
+      int idxL = endpointQualifyingName.IndexOf("/");
+      if (idxL < 0) idxL = endpointQualifyingName.Length;
+      return endpointQualifyingName.Substring(0, idxL); 
+    }
+
+    public static bool MatchEndpointQualifyingNamesWithoutVersion(string leftEndpointQualifyingName, string rightEndpointQualifyingName) {
+
+      string leftPartToCompare = GetEndpointQualifyingNameWithoutVersion(leftEndpointQualifyingName);
+      string rightPartToCompare = GetEndpointQualifyingNameWithoutVersion(rightEndpointQualifyingName);
+
+      return (leftPartToCompare == rightPartToCompare);
+    }
+
+    public static bool CheckVersionCompatibilityOnServerSide(object dynamicClientInstance, Version minReqiredVersion = null, bool allowHigherMajor = false ) {      
+     
+      if(TryResolveContractVersionOnServerSide(dynamicClientInstance, out Version versionOnServerSide, out string[] knownMethodNames)) {
+
+        if(minReqiredVersion == null) {
+          string eqn = GetEndpointQualifyingNameRequriedByClient(dynamicClientInstance);
+          minReqiredVersion = ExtractVersionFromEndpointQualifyingName(eqn);
+        }
+
+        if (versionOnServerSide.Major < minReqiredVersion.Major) {
+          return false;
+        }
+        else if (versionOnServerSide.Major > minReqiredVersion.Major) {
+          return allowHigherMajor;
+        }
+
+        if (versionOnServerSide.Minor < minReqiredVersion.Minor) {
+          return false;
+        }
+        else if (versionOnServerSide.Minor > minReqiredVersion.Minor) {
+          return true;
+        }
+
+        if (versionOnServerSide.Build < minReqiredVersion.Build) {
+          return false;
+        }
+        else if (versionOnServerSide.Build > minReqiredVersion.Build) {
+          return true;
+        }
+
+        return true;
+      }
+      return false;
+    }
+
+    public static bool CheckVersionCompatibilityOnServerSide(Type contractType, string url, Version minReqiredVersion = null, bool allowHigherMajor = false) {
+
+      if (TryResolveContractVersionOnServerSide(contractType, url, out Version versionOnServerSide, out string[] knownMethodNames)) {
+
+        if (minReqiredVersion == null) {
+          string eqn = BuildEndpointQualifyingName(contractType);
+          minReqiredVersion = ExtractVersionFromEndpointQualifyingName(eqn);
+        }
+
+        if (versionOnServerSide.Major < minReqiredVersion.Major) {
+          return false;
+        }
+        else if (versionOnServerSide.Major > minReqiredVersion.Major) {
+          return allowHigherMajor;
+        }
+
+        if (versionOnServerSide.Minor < minReqiredVersion.Minor) {
+          return false;
+        }
+        else if (versionOnServerSide.Minor > minReqiredVersion.Minor) {
+          return true;
+        }
+
+        if (versionOnServerSide.Build < minReqiredVersion.Build) {
+          return false;
+        }
+        else if (versionOnServerSide.Build > minReqiredVersion.Build) {
+          return true;
+        }
+
+        return true;
+      }
+      return false;
+
+    }
+
+    public static bool CheckVersionCompatibilityOnServerSide<TContract>(string url, Version minReqiredVersion = null, bool allowHigherMajor = false) {
+      return CheckVersionCompatibilityOnServerSide(typeof(TContract), url, minReqiredVersion, allowHigherMajor);
+    }
+
+    public static bool TryResolveContractVersionOnServerSide(object dynamicClientInstance, out Version versionOnServerSide, out string[] knownMethodNames) {
+
+      IUjmwClient ujmwClient = (dynamicClientInstance as IUjmwClient);
+
+      if (ujmwClient == null) {
+        versionOnServerSide = null;
+        knownMethodNames = null;
+        return false;
+      }
+
+      try {
+
+        IAbstractCallInvoker invoker = ujmwClient.GetInvoker();
+        Type contractType = ujmwClient.GetContract();
+
+        string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
+        string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
+
+        string rawInfoResponse = invoker.InvokeCall(null, new object[0], new string[0], null)?.ToString();
+
+        if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
+          JObject json = JObject.Parse(rawInfoResponse);
+          JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
+          if (serviceEndpoints != null) {
+            foreach (JObject endpoint in serviceEndpoints) {
+              string eqn = endpoint["EndpointQualifyingName"]?.ToString();
+              if( GetEndpointQualifyingNameWithoutVersion(eqn) == nameOnlyToSearch) {
+                versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
+                JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
+                knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
+                return true;
+              }
+            }
+          }
+        }
+
+      }
+      catch {
+      }
+
+      versionOnServerSide = null;
+      knownMethodNames = null;
+      return false;
+    }
+
+    public static bool TryResolveContractVersionOnServerSide(Type contractType, string url, out Version versionOnServerSide, out string[] knownMethodNames) {
+      try {
+        using (HttpClient httpClient = UjmwClientConfiguration.HttpClientFactory.Invoke()) {
+
+          IAbstractCallInvoker invoker = new UjmwWebCallInvoker(
+            contractType,
+            new WebClientBasedHttpPostExecutor(httpClient, null),
+            () => url
+          );
+
+          string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
+          string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
+
+          string rawInfoResponse = invoker.InvokeCall(null, new object[0], new string[0], null)?.ToString();
+
+          if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
+            JObject json = JObject.Parse(rawInfoResponse);
+            JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
+            if (serviceEndpoints != null) {
+              foreach (JObject endpoint in serviceEndpoints) {
+                string eqn = endpoint["EndpointQualifyingName"]?.ToString();
+                if (GetEndpointQualifyingNameWithoutVersion(eqn) == nameOnlyToSearch) {
+                  versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
+                  JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
+                  knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
+                  return true;
+                }
+              }
+            }
+          }
+
+        }
+      }
+      catch {
+      }
+
+      versionOnServerSide = null;
+      knownMethodNames = null;
+      return false;
+    }
+
+    public static bool TryResolveContractVersionOnServerSide<TContract>(string url, out Version versionOnServerSide, out string[] knownMethodNames) {
+      return TryResolveContractVersionOnServerSide(typeof(TContract), url, out versionOnServerSide, out knownMethodNames);
+    }
+
+    #endregion
 
   }
 

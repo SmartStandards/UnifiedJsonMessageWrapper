@@ -65,7 +65,7 @@ namespace System.Web.UJMW {
 
     public object InvokeCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
          
-      if(methodName == nameof(IDisposable.Dispose)) {
+      if(methodName != null && methodName == nameof(IDisposable.Dispose)) {
         _OnDisposeInvoked.Invoke();
         return null;
       }
@@ -109,10 +109,26 @@ namespace System.Web.UJMW {
 
       string fullUrl;
       if (rootUrl.EndsWith("/")) {
-        fullUrl = rootUrl + methodName;
+        fullUrl = rootUrl;
       }
       else {
-        fullUrl = rootUrl + "/" + methodName;
+        fullUrl = rootUrl + "/";
+      }
+
+      if (methodName != null) {
+        fullUrl = fullUrl + methodName;
+      }
+      else {
+
+        //call the info-endpoint
+        _HttpPostExecutor.ExecuteHttpPost( //will become a HTTP-GET because of content==null
+          fullUrl,
+          null, new Dictionary<string, string>(),
+          out string infoRawResponse, out var infoResponseHeaders,
+          out string infoReasonPhrase
+        );
+
+        return infoRawResponse;
       }
 
       MethodInfo method = FindMethod(_ContractType, methodName);

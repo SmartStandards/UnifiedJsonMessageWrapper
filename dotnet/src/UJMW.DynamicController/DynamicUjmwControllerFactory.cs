@@ -224,6 +224,7 @@ namespace System.Web.UJMW {
        _RouteAttributeConstructor, new object[] { controllerRoute }
       );
       typeBuilder.SetCustomAttribute(RouteAttribBuilder);
+      bool routeAnnouncedfirstTime = DynamicControllerBase.AnnounceControllerRouteAppliedByFactory(controllerRoute, serviceType, options);
 
       if (!String.IsNullOrWhiteSpace(apiGroupName)) {
         CustomAttributeBuilder apiExplorerSettingsAttribBuilder = new CustomAttributeBuilder(
@@ -284,11 +285,11 @@ namespace System.Web.UJMW {
       CollectAllMethodsForType(serviceType, allMethods);
 
       #region " Endpoint-Info-Site (via HTTP-GET) "
-      if (options.EnableInfoSite) {
+      if (options.EnableInfoSite && routeAnnouncedfirstTime) {
 
         Type infoSiteReturnType = typeof(IActionResult);
 
-        var rootMethodBuilder = typeBuilder.DefineMethod(
+        MethodBuilder rootMethodBuilder = typeBuilder.DefineMethod(
             RenderInfoSiteMethodName,
             MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
             infoSiteReturnType,
@@ -456,7 +457,7 @@ namespace System.Web.UJMW {
 
       }
 
-      var dynamicType = typeBuilder.CreateType();
+      Type dynamicType = typeBuilder.CreateType();
       lock (_OptionsPerDynamicControllerType) {
         _OptionsPerDynamicControllerType[dynamicType] = options;
       }
@@ -465,8 +466,9 @@ namespace System.Web.UJMW {
 
     private static string GetNamespaceFromApiGroupName(string apiGroupName) {
       StringBuilder stringBuilder = new();
+      string ujmwNamespace = typeof(DynamicUjmwControllerFactory).Namespace;
       if (string.IsNullOrWhiteSpace(apiGroupName)) {
-        return "UJMW.Dyn";
+        return ujmwNamespace + ".DYN";
       }
       foreach (char c in apiGroupName) {
         if (char.IsLetterOrDigit(c)) {
@@ -485,7 +487,8 @@ namespace System.Web.UJMW {
       else {
         stringBuilder.Insert(0, "_");
       }
-      stringBuilder.Insert(0, "UJMW.Dyn.");
+      stringBuilder.Insert(0, ".DYN.");
+      stringBuilder.Insert(0, ujmwNamespace);
       return stringBuilder.ToString();
     }
 

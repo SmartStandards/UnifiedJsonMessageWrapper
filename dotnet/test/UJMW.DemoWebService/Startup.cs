@@ -208,7 +208,7 @@ namespace Security {
 
         });
 
-        r.AddControllerFor<IContextualizationDemo>((c) => {
+        r.AddControllerFor<IDemoFileService>((c) => {
           c.ApiGroupName = "Aggregation-Demo";
           c.ControllerRoute = "aggregated.svc";
         });

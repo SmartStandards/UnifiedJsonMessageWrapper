@@ -9,4 +9,12 @@ namespace System.Web.UJMW {
 
 	}
 
+  public interface IUjmwClient {
+
+    IAbstractCallInvoker GetInvoker();
+
+    Type GetContract();
+
+  }
+
 }

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -129,6 +130,16 @@ namespace System.Web.UJMW {
     /// EXPERIMENTAL: generate all proxy-classes in only one shared dynamic assembly to reduce memory footprint
     /// </summary>
     public static bool UseCombinedDynamicAssembly = false;
+
+    /// <summary>
+    /// A Hook to apply additional (public visible) information for a given route, which could affelct multiple controllers!
+    /// </summary>
+    public static Action<string, IDictionary<string,object>> RouteInfoEnricher { get; set; } = null;
+
+    /// <summary>
+    /// A Hook to apply additional (public visible) UJMW endpoint information for a given service contract interface type
+    /// </summary>
+    public static Action<Type, IDictionary<string, object>> EndpointInfoEnricher { get; set; } = null;
 
   }
 

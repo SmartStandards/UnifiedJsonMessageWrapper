@@ -32,18 +32,143 @@ namespace System.Web.UJMW {
 
   partial class DynamicUjmwControllerFactory {
 
-    public class DynamicControllerBase<TServiceInterface> : Controller {
+    public abstract class DynamicControllerBase : Controller {
 
-      private Func<TServiceInterface> _ServiceInstanceGetter;
+      protected DynamicUjmwControllerOptions _Options;
+      protected string[] _ControllerRoutesFromAttribute;
 
-      private DynamicUjmwControllerOptions _Options;
+      protected delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames, object requestDto);
 
-      private delegate void ContextualArgumentCollectorDelegate(ref IDictionary<string, string> targetDict, string[] includedArgNames, object requestDto);
-      private ContextualArgumentCollectorDelegate _ContextualArgumentCollector;
+      protected ContextualArgumentCollectorDelegate _ContextualArgumentCollector;
+
+      /// <summary>
+      /// Follows the convention to expose infomration about a related contract...
+      /// (this is also used by AuthTokenhandling to evaluate target methods)
+      /// </summary>
+      public abstract Type ContractType { get; }
+
+      public abstract Type ResolvedServiceImplementationType { get; }
+
+      #region " Static "
+
+      private static Dictionary<string, Dictionary<Type, DynamicUjmwControllerOptions>> _ControllerInstances = new();
+
+      /// <summary></summary>
+      /// <param name="controllerRoute"></param>
+      /// <param name="contractType"></param>
+      /// <param name="options"></param>
+      /// <returns>True if the controller route was announced the very first time by the factory, false otherwise.</returns>
+      internal static bool AnnounceControllerRouteAppliedByFactory(
+        string controllerRoute, Type contractType, DynamicUjmwControllerOptions options
+      ) {
+        bool createdNew = false;
+        Dictionary<Type, DynamicUjmwControllerOptions> controllersOnThisRoute = null;
+        lock (_ControllerInstances) {
+          if (!_ControllerInstances.TryGetValue(controllerRoute, out controllersOnThisRoute)) {
+            controllersOnThisRoute = new Dictionary<Type, DynamicUjmwControllerOptions>();
+            _ControllerInstances[controllerRoute] = controllersOnThisRoute;
+            createdNew = true;
+          }
+        }
+        lock (controllersOnThisRoute) {
+          controllersOnThisRoute[contractType] = options;
+        }
+        return createdNew;
+      }
+
+      internal static bool IsControllerRouteAlreadyAppliedByFactory(string controllerRoute) {
+        lock (_ControllerInstances) {
+          bool routeAlreadyApplied = _ControllerInstances.ContainsKey(controllerRoute);
+          return routeAlreadyApplied;
+        }
+      }
+
+      #endregion
+
+      protected static void GetRouteInfoResponse(string controllerRoute, out string content, out string mimeType) {
+        Dictionary<string, object> infoMetadata = new Dictionary<string, object>();
+
+        KeyValuePair<Type, DynamicUjmwControllerOptions>[] controllersOnThisRoute = null;
+
+        if (!string.IsNullOrWhiteSpace(controllerRoute)) {
+          lock (_ControllerInstances) {
+            if (_ControllerInstances.TryGetValue(controllerRoute, out Dictionary<Type, DynamicUjmwControllerOptions> controllers)) {
+              if (controllers != null) {
+                lock (controllers) {
+                  controllersOnThisRoute = controllers.ToArray();
+                }
+              }
+            }
+          }
+        }
+
+        List<Dictionary<string, object>> endpointMetadataEntries = new();
+        if (controllersOnThisRoute != null) {
+          foreach (KeyValuePair<Type, DynamicUjmwControllerOptions> controller in controllersOnThisRoute) {
+            Dictionary<string, object> endpointMetadata = new();
+
+            Type contract = controller.Key;
+            string version = contract.Assembly.GetName()?.Version?.ToString(3);
+
+            List<MethodInfo> allMethods = new();
+            CollectAllMethodsForType(contract, allMethods);
+
+            endpointMetadata["EndpointQualifyingName"] = $"UJMW:{contract.FullName}/{version}";
+            endpointMetadata["ApiGroupName"] = controller.Value.ApiGroupName;
+            //endpointMetadata["UJMW.ConcreteServiceInstanceTypeName"] = concreteServiceInstanceTypeName;
+            endpointMetadata["UJMW.KnownMethods"] = allMethods.Where((mi)=> !mi.IsSpecialName).Select((mi) => mi.Name);
+
+            if (UjmwHostConfiguration.EndpointInfoEnricher != null) {
+              try {
+                UjmwHostConfiguration.EndpointInfoEnricher.Invoke(contract, endpointMetadata);
+              }
+              catch (Exception ex) {
+                DevLogger.LogError(ex);
+              }
+            }
+
+            endpointMetadataEntries.Add(endpointMetadata);
+          }
+        }
+
+        infoMetadata["ServiceEndpoints"] = endpointMetadataEntries;
+        infoMetadata["EndpointIndexUrl"] = "";
+
+        infoMetadata["Swagger.DefinitionUrls"] = Array.Empty<string>();
+        infoMetadata["Swagger.UiEntryUrl"] = "";
+
+        if(UjmwHostConfiguration.RouteInfoEnricher != null) {
+          try {
+            UjmwHostConfiguration.RouteInfoEnricher.Invoke(controllerRoute, infoMetadata);
+          }
+          catch (Exception ex) {
+            DevLogger.LogError(ex);
+          }
+        }
+
+        content = JsonConvert.SerializeObject(infoMetadata, Formatting.Indented);
+        mimeType = "application/json";
+
+        //old...
+        //content = $"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {concreteServiceInstanceTypeName}\n  </body>\n</html>";
+        //mimeType = "text/html";
+
+      }
+
+    }
+
+    public class DynamicControllerBase<TServiceInterface> : DynamicControllerBase, IDisposable {
+
+      protected Func<TServiceInterface> _ServiceInstanceGetter = null;
 
       public DynamicControllerBase(object injectedRootServiceInstance) {
 
-        _Options = DynamicUjmwControllerFactory.GetDynamicUjmwControllerOptions(this.GetType());
+        Type myDynamicControllerType = this.GetType();
+
+        _Options = DynamicUjmwControllerFactory.GetDynamicUjmwControllerOptions(myDynamicControllerType);
+
+        _ControllerRoutesFromAttribute = myDynamicControllerType.GetCustomAttributes().OfType<RouteAttribute>().Select(attr => attr.Template).ToArray();
+
         PropertyInfo[] navPath = _Options.SubServiceNavPath;
 
         Type rootType = typeof(TServiceInterface);
@@ -104,22 +229,25 @@ namespace System.Web.UJMW {
       /// Follows the convention to expose infomration about a related contract...
       /// (this is also used by AuthTokenhandling to evaluate target methods)
       /// </summary>
-      public Type ContractType { 
+      public override Type ContractType { 
         get {
           return typeof(TServiceInterface);
         }
       }
 
+      public override Type ResolvedServiceImplementationType {
+        get {
+          return _ServiceInstanceGetter.Invoke()?.GetType();
+        }   
+      }
+
       //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
+      //NOTE: only the first controller on a route will be used to render the info-site -
+      //only this single one will provide a HTTP-GET method for a shared route. So will will have
+      //the need to but all controllers on the same route will be able to handle the method invocations (and should behave the same regarding the info-site content, because they share the same contract and service instance)
       protected IActionResult RenderInfoSite() {
-        string concreteServiceInstanceTypeName;
-        try {
-          concreteServiceInstanceTypeName = _ServiceInstanceGetter.Invoke().GetType().FullName;
-        }
-        catch (Exception ex) {
-          concreteServiceInstanceTypeName = $"[ERROR: not resolvable within this context ({ex.Message})]";
-        }
-        return Content($"<html>\n  <head>\n    <title>{this.ContractType.Name} (UJMW-Endpoint)</title>\n  </head>\n  <body style=\"font-family: system-ui;\r\n    font-size: 12px;\"><h1>UJMW-Endpoint</h1>\n    <b>Contract:</b> {this.ContractType.FullName}<br>\n    <b>Instance:</b> {concreteServiceInstanceTypeName}\n  </body>\n</html>", "text/html");    
+        GetRouteInfoResponse(_ControllerRoutesFromAttribute.FirstOrDefault(), out string content, out string mimeType);
+        return Content(content, mimeType);
       }
 
       //WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHIch IS INHERITING FROM US!
