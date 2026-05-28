@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.4.0",
-  "currentVersionWithSuffix": "5.4.0",
+  "currentVersion": "5.5.0",
+  "currentVersionWithSuffix": "5.5.0",
   "releaseType": "",
-  "previousVersion": "5.3.9",
+  "previousVersion": "5.4.0",
   "changeGrade": "minor",
   "currentMajor": 5,
-  "currentMinor": 4,
+  "currentMinor": 5,
   "currentPatch": 0,
-  "versionDateInfo": "2026-03-26",
-  "versionTimeInfo": "15:09:38",
-  "versionNotes": "- new Feature: Added json-based Endpoint-Info (http-GET on controller-route) and corresponding evaluation-features at client side to retrieve version-information\n- Fix: multiple Controller registrations for same Interface\n"
+  "versionDateInfo": "2026-05-28",
+  "versionTimeInfo": "14:25:50",
+  "versionNotes": "- new Feature: Moved targets from .net 6/8 to 8/10\n- Refactoring 'UjmwEndpointQualifyingName'\n"
 }

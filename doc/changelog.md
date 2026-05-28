@@ -7,8 +7,14 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Refactoring 'UjmwEndpointQualifyingName'
-* **new Feature**: Moved targets from .net 6/8 to 8/10
+*(none)*
+
+
+
+## v 5.5.0
+released **2026-05-28**, including:
+ - **new Feature**: Moved targets from .net 6/8 to 8/10
+ - Refactoring 'UjmwEndpointQualifyingName'
 
 
 
