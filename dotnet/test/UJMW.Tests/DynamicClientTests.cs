@@ -122,7 +122,10 @@ namespace System.Web.UJMW {
       }
 
       Assert.IsNotNull(catchedEx);
-      Assert.IsTrue(catchedEx.Message.Contains("timeout"));
+      Assert.IsTrue(
+        catchedEx.Message.Contains("timeout"),
+        $"Message of Catches Exception is '{catchedEx.Message}' and does not contain the required word 'timeout'"
+      );
 
     }
 
