@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>UJMW.Tests</AssemblyName>
+    <RootNamespace>System.Web.UJMW</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AssemblyVersion>5.4.0</AssemblyVersion>
+    <Version>5.4.0</Version>
+    <AssemblyName>UJMW.Tests</AssemblyName>
+    <PackageId>Tests</PackageId>
+    <Product>Tests</Product>
+    <Company />
+    <Authors>Tests</Authors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>..\..\dist\bin-net10.0\UJMW.Tests.xml</DocumentationFile>
+    <OutputPath>..\..\dist\bin-net10.0\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;DEBUG;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>..\..\dist\bin-net10.0\</OutputPath>
+    <DocumentationFile>..\..\dist\bin-net10.0\UJMW.Tests.xml</DocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.2" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.0.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.0.4" />
+    
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    
+    <PackageReference Include="System.Text.Encodings.Web" Version="10.0.0" />
+
+    <PackageReference Include="SmartStandards.Logging" Version="3.4.3" />
+    <PackageReference Include="SmartStandards.Logging.AspSupport" Version="3.4.3" />
+    <PackageReference Include="SmartStandards.Logging.Centralized" Version="3.4.3" />
+    
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net10.0\UJMW.DynamicClient.net10.0.csproj" />
+    <ProjectReference Include="..\..\src\UJMW.DynamicController.net10.0\UJMW.DynamicController.net10.0.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\UJMW.Tests\UJMW.Tests.projitems" Label="Shared" />
+
+</Project>

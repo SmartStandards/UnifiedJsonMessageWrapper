@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -12,14 +12,18 @@
   </ItemGroup>
 
   <ItemGroup>
+  
     <PackageReference Include="SmartAmbience" Version="2.4.7" />
     <PackageReference Include="SmartStandards.AuthTokenHandling" Version="5.0.5" />
     <PackageReference Include="SmartStandards.Logging" Version="3.3.1" />
-    <PackageReference Include="System.ServiceModel.Primitives" Version="4.6.0" />
+
+    <!-- WCF-Ballast -->
+    <PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
+
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net6.0\UJMW.DynamicClient.net6.0.csproj" />
+    <ProjectReference Include="..\..\src\UJMW.DynamicClient.net10.0\UJMW.DynamicClient.net10.0.csproj" />
   </ItemGroup>
 
 </Project>

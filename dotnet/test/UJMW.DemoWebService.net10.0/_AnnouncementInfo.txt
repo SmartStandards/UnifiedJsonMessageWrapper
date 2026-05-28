@@ -1,0 +1,15 @@
+http://localhost:55202/ContextualizationDemo (Demo.IContextualizationDemo) >> ONLINE @15:39:47
+http://localhost:55202/aggregated.svc (UJMW.DemoWcfService.IDemoFileService) >> ONLINE @15:39:47
+http://localhost:55202/aggregated.svc (UJMW.DemoWcfService.IDemoService) >> ONLINE @15:39:47
+http://localhost:55202/aggregated.svc/Child1 (UJMW.DemoWcfService.IChildService) >> ONLINE @15:39:47
+http://localhost:55202/aggregated.svc/Child2 (UJMW.DemoWcfService.IChildService) >> ONLINE @15:39:47
+http://localhost:55202/{tnt}/v1/DemoService.svc (UJMW.DemoWcfService.IDemoService) >> ONLINE @15:39:47
+http://localhost:55202/{tnt}/v1/DemoService.svc/Child1 (UJMW.DemoWcfService.IChildService) >> ONLINE @15:39:47
+http://localhost:55202/{tnt}/v1/DemoService.svc/Child2 (UJMW.DemoWcfService.IChildService) >> ONLINE @15:39:47
+http://localhost:55202/FileStore (UJMW.DemoWcfService.IDemoFileService) >> ONLINE @15:39:47
+http://localhost:55202/Repo/Foo (Demo.IGenericInterface_Demo.Foo_Int32) >> ONLINE @15:39:47
+http://localhost:55202/Repo/Bar (Demo.IGenericInterface_Demo.Bar_String) >> ONLINE @15:39:47
+http://localhost:55202/FooStore (Security.IFooStore) >> ONLINE @15:39:47
+http://localhost:55202/BarStore (Security.IBarStore) >> ONLINE @15:39:47
+http://localhost:55202/CliService (UJMW.DemoCommandLineExe.IDemoCliService) >> ONLINE @15:39:47
+http://localhost:55202/_ (UJMW.AnnouncementTriggerEndpoint) >> ONLINE @15:39:47

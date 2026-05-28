@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
+//using Microsoft.OpenApi.Models;
 using Security.AccessTokenHandling;
 using System;
 using System.IO;
@@ -37,7 +37,6 @@ namespace Security {
 
     public void ConfigureServices(IServiceCollection services) {
 
-      services.AddLogging();
       services.AddSmartStandardsLogging(_Configuration);
 
       _ApiVersion = typeof(IDemoService).Assembly.GetName().Version;
@@ -273,10 +272,7 @@ namespace Security {
       ILoggerFactory loggerfactory, IHostApplicationLifetime lifetimeEvents
     ) {
 
-      var logFileFullName = _Configuration.GetValue<string>("LogFileName");
-      var logDir = Path.GetFullPath(Path.GetDirectoryName(logFileFullName));
-      Directory.CreateDirectory(logDir);
-      loggerfactory.AddFile(logFileFullName);
+
 
 
 
