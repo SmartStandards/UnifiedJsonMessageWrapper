@@ -100,7 +100,7 @@ namespace System.Web.UJMW {
 
     }
 
-    [TestMethod]
+    [TestMethod, Ignore] //newly makes 404 on micorosoft build-agents
     public void DynamicClientTimeoutTest() {
 
       HttpClientHandler httpClientHandler = new HttpClientHandler();
