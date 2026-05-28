@@ -2,6 +2,7 @@
 using Logging.SmartStandards.CopyForUJMW;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.SmartStandards;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
@@ -116,39 +117,7 @@ namespace System.Web.UJMW.SelfAnnouncement {
         IServerAddressesFeature addressFeature = featureCollection.Get<IServerAddressesFeature>();
 
         if (overrideBaseUrls == null || overrideBaseUrls.Length == 0) {
-          overrideBaseUrls = addressFeature.Addresses.Where( //filter out non-http(s) bindings like 'net.tcp://...' or 'net.pipe://...'
-            (uglyBaseUrlBindingPattern)=> uglyBaseUrlBindingPattern.StartsWith("http", StringComparison.CurrentCultureIgnoreCase)
-          ).Select(
-            (uglyBaseUrlBindingPattern) => {
-
-              string baseUrl;
-
-              if (uglyBaseUrlBindingPattern.Contains("//*")) {
-                string thisHostName = Environment.MachineName;
-                try {
-                  IPHostEntry entry = Dns.GetHostEntry(Dns.GetHostName());
-                  if (!string.IsNullOrWhiteSpace(entry?.HostName)) {
-                    thisHostName = entry.HostName;
-                  }
-                }
-                catch {
-                }
-                baseUrl = uglyBaseUrlBindingPattern.Replace("//*", "//" + thisHostName).Replace(":*", "");
-              }
-              else {
-                baseUrl = uglyBaseUrlBindingPattern.Replace(":*", "");
-              }
-
-              if (baseUrl.StartsWith("http://", StringComparison.CurrentCultureIgnoreCase)) {
-                baseUrl = baseUrl.Replace(":80", ""); //remove unnecessary port specification for http
-              }
-              else if (baseUrl.StartsWith("https://", StringComparison.CurrentCultureIgnoreCase)) {
-                baseUrl = baseUrl.Replace(":443", ""); //remove unnecessary port specification for https
-              }
-
-              return baseUrl;
-            }
-          ).ToArray();
+          overrideBaseUrls = addressFeature.GetValidHttpAddresses();
         }
 
         //auto evaluate the current hosting address

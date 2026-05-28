@@ -620,8 +620,7 @@ namespace System.Web.UJMW {
     #region " Version-Checks and Info-Endpoint "
 
     public static string BuildEndpointQualifyingName(Type contractType) {
-      string version = contractType.Assembly.GetName()?.Version?.ToString(3);
-      return $"UJMW:{contractType.FullName}/{version}";
+      return contractType.BuildUjmwEndpointQualifyingName();
     }
 
     public static string BuildEndpointQualifyingName<TContract>() {

@@ -13,6 +13,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\OutgoingRequestSideChannelConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\IncommingResponseSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TypeAliasBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwFaultException.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\UjmwClientConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)HttpPostExecutor.cs" />

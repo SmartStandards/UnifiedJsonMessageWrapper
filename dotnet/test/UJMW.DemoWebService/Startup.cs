@@ -262,7 +262,7 @@ namespace Security {
         r.AddAnnouncementTriggerEndpoint();
 
       });
-
+      
       //services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");
       services.AddSwaggerGenSmartStandardsFlavored();
     }

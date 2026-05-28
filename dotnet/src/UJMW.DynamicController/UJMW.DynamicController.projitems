@@ -18,7 +18,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\AnnouncementTriggerEndpoint.cs" />
-    <Compile Include="..\UJMW.DynamicController\SelfAnnouncement\EndpointInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\EndpointInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\UJMW.DynamicClient\TypeAliasBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\AspNetCoreHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\SelfAnnouncementHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AuthHeaderInterceptorAttribute.cs" />
