@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>DemoWebService</AssemblyName>
     <RootNamespace>System.Web.UJMW</RootNamespace>
-    <Version>5.5.0</Version>
+    <Version>5.5.1</Version>
     <Nullable>disable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>

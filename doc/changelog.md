@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Small fix to avoid NullRefEx in AuthHeaderEvaluator
+*(none)*
+
+
+
+## v 5.5.1
+released **2026-05-28**, including:
+ - Small fix to avoid NullRefEx in AuthHeaderEvaluator
 
 
 
