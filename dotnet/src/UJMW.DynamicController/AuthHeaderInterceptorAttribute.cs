@@ -35,7 +35,10 @@ namespace System.Web.UJMW {
           }
         }
     
-        string apiCaller = context.HttpContext.Connection.RemoteIpAddress.ToString();
+        string apiCaller = context.HttpContext.Connection.RemoteIpAddress?.ToString();
+        if (apiCaller == null) {
+          apiCaller = string.Empty;
+        }
 
         Type contractType = GetContractTypeFromContext(context);
         MethodInfo calledContractMethod = null;
