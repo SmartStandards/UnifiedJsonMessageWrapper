@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -15,6 +15,6 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 [assembly: Guid("46adc8b8-2f14-4a31-87ca-95b71ee09ea9")]
 
-[assembly: AssemblyVersion("5.5.1")]
-[assembly: AssemblyInformationalVersion("5.5.1")]
-//DONT ADD: [assembly: AssemblyFileVersion("5.5.1")] !!!
+[assembly: AssemblyVersion("5.6.0")]
+[assembly: AssemblyInformationalVersion("5.6.0")]
+//DONT ADD: [assembly: AssemblyFileVersion("5.6.0")] !!!

@@ -1,13 +1,13 @@
 {
-  "currentVersion": "5.5.1",
-  "currentVersionWithSuffix": "5.5.1",
+  "currentVersionWithSuffix": "5.6.0",
   "releaseType": "",
-  "previousVersion": "5.5.0",
-  "changeGrade": "fix",
+  "currentVersion": "5.6.0",
   "currentMajor": 5,
-  "currentMinor": 5,
-  "currentPatch": 1,
-  "versionDateInfo": "2026-05-28",
-  "versionTimeInfo": "14:39:58",
-  "versionNotes": "- Small fix to avoid NullRefEx in AuthHeaderEvaluator\n"
+  "currentMinor": 6,
+  "currentFix": 0,
+  "previousVersion": "0.0.0",
+  "changeGrade": "initial",
+  "versionTimeInfo": "00:00:00",
+  "versionDateInfo": "1900-01-01",
+  "versionNotes": ""
 }
