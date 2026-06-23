@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.SmartStandards;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -327,9 +329,12 @@ namespace System.Web.UJMW {
       }
       #endregion
 
-      foreach (var serviceMethod in allMethods) {
-        var methodSignatureString = serviceMethod.ToString();
-        var methodNameBlacklist = new[] { "ToString", "GetHashCode", "GetType", "Equals"};
+      foreach (MethodInfo serviceMethod in allMethods) {
+
+        string methodSignatureString = serviceMethod.ToString();
+
+        string[] methodNameBlacklist = new[] { "ToString", "GetHashCode", "GetType", "Equals"};
+
         if (!serviceMethod.IsSpecialName && !methodNameBlacklist.Contains(serviceMethod.Name) && !serviceMethod.Name.EndsWith("Async")) {
           if (serviceMethod.IsPublic) {
 
@@ -341,15 +346,16 @@ namespace System.Web.UJMW {
               serviceType, wrapperNamePattern, serviceMethod, moduleBuilder, true, options
             );
 
-            var methodBuilder = typeBuilder.DefineMethod(
-              serviceMethod.Name,
+            MethodBuilder methodBuilder = typeBuilder.DefineMethod(
+              serviceMethod.GetNameOrOverride(true),
               MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
               responseType,
               new Type[] { requestType }
             );
 
+            string nameInUrl = serviceMethod.GetNameOrOverride(false);
             CustomAttributeBuilder httpPostAttribBuilder = new CustomAttributeBuilder(
-              _HttpPostAttributeConstructor, new object[] { serviceMethod.Name }
+              _HttpPostAttributeConstructor, new object[] { nameInUrl }
             );
             methodBuilder.SetCustomAttribute(httpPostAttribBuilder);
 
@@ -515,7 +521,7 @@ namespace System.Web.UJMW {
       bool response, DynamicUjmwControllerOptions options
     ) {
       
-      string wrapperTypeFullName = serviceType.Namespace + ".MessageWrappers." + wrapperNamePattern.Replace("[Method]", methodInfo.Name);
+      string wrapperTypeFullName = serviceType.Namespace + ".MessageWrappers." + wrapperNamePattern.Replace("[Method]", methodInfo.GetNameOrOverride(true));
       
       if (response) {
         wrapperTypeFullName = wrapperTypeFullName + UjmwResponseDtoSuffix;

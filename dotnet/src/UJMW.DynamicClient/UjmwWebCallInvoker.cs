@@ -92,6 +92,13 @@ namespace System.Web.UJMW {
 
         }
         catch (Exception ex) {
+
+          if (httpCode >= 200 && httpCode < 300) {
+            //exceptions directly BEFORE sending or AFTER receiving should not cause a retry,
+            //because they are not related to the transport layer
+            throw; 
+          }
+
           if (!UjmwClientConfiguration.RetryDecider.Invoke(_ContractType, ex, currentTry, httpCode, ref endpointUrl)) {
             throw;
           }
@@ -106,6 +113,9 @@ namespace System.Web.UJMW {
     private object InvokeWebCallInternal(
       string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString, ref int httpReturnCode
     ) {
+      //a little hack to handle exceptions BEFORE sending the request should be handled in the same way as
+      //as exceptions AFTER successfully received a response
+      httpReturnCode = 200;
 
       string fullUrl;
       if (rootUrl.EndsWith("/")) {
@@ -119,6 +129,8 @@ namespace System.Web.UJMW {
         fullUrl = fullUrl + methodName;
       }
       else {
+
+        httpReturnCode = -1; //in case of exceptions during call
 
         //call the info-endpoint
         _HttpPostExecutor.ExecuteHttpPost( //will become a HTTP-GET because of content==null
@@ -191,6 +203,7 @@ namespace System.Web.UJMW {
       string rawJsonRequest = JsonConvert.SerializeObject(requestContent, jss);
 
       // ############### HTTP POST #############################################
+      httpReturnCode = -1; //in case of exceptions during call
 
       httpReturnCode = _HttpPostExecutor.ExecuteHttpPost(
         fullUrl,

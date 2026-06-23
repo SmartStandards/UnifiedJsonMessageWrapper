@@ -78,6 +78,18 @@ The wrapper capsule is **ALWAYS required, also if there is none or just one argu
 
   
 
+### Method Naming
+
+By default, concrete method-urls are derived directly from the interface method names:
+
+`https://host/api/v1/concreteApiEndpoint/ThisIsTheMethodName` 
+
+If a different public endpoint name is required, UJMW supports the standard .NET `System.ComponentModel.DisplayNameAttribute` and uses its value as the published endpoint name.
+
+This concrete attribute was chosen intentionally because contract assemblies are expected to remain **completely dependency-free** and must not require additional framework packages. While the attribute was originally designed for display metadata rather than routing, it's the only one generally available attribute within the .NET Base Class Library to be used for this purpose.
+
+
+
 # The "return"-Property
 
 "return" is a constant name which is magic-value between the other argument Names. It represents the return-value of this Function, which is invoked. 
@@ -118,50 +130,6 @@ Please note that the "fault"-Property should only used for critical, non-busines
 
 
 
-# The "returnCode"-Pattern
-
-This is just a propose for using an OUT-Arg which usually should have a name like "returnCode" to do something like a Try...Methods (in some Languages). In this case were not blocking the primary "return" value just for delivering an information about the success of a invoked method.
-
-* The code does not have a dedicated semantic to always be an error - so it must not be called "errorCode"!
-
-* If an returnCode was delivered, which indicated an error, then some additional details can be placed within the "lastError"-SideChannel (as described below)
-
-
-
-
-# File/Binary transfers 
-
-There is an exception (coming with version 1.1) in which the use of a JSON wrapper should not be used. Whenever **files need to be transferred**! Here we want to stick as closely as possible to the **traditional transmission methods**, as this has some advantages if the client component is a single page application in the browser. On the server side, it also makes sense that files do not end up in RAM as byte[], but rather the streaming support of the respective transport technology (if available) can in principle be used.
-
-So we now define **method conventions**, if they apply, the UJMW layers should automatically choose a different form of transmission:
-
-**downloads a simple byte-stream response** (=classic browser download) and **uploads in the form of a ['multipart/form-data'](https://stackoverflow.com/questions/8659808/how-does-http-file-upload -work) posts** take place.
-
-### Convention for downloads (in C#)
-
-Is fulfilled/activated by **using the type 'Stream' as the return type**, thereby enacting the following behavior:
-
-* There may (optionally) be an OUT parameter named '*fileName*' of type string
-
-* There may (optionally) be an OUT parameter named '*fileContentType*' of type string
-
-* **Additional OUT or REF parameters are prohibited**
-
-* The handling of IN parameters remains unaffected and can take place through a request with the JSON wrapper
-
-
-### Convention for uploads (in C#)
-
-Is fulfilled/activated by **using the Stream type as the type for at least one IN parameter**, thereby enacting the following behavior:
-
-* **Additional IN parameters** that are not of the 'Stream' type are exceptionally **transferred as query parameters** within the URL
-
-* Any IN parameters that are of type 'Stream' each represent a file to be uploaded
-
-* IN parameters of the string type can bind additional information for one file at a time using a further convention (well-known names): the **Parameter name corresponds to the pattern** `<name-of-the-corresponding-Steam-Paramter>ContentType` (**=ContentType of that file**) OR `<name-of-the-corresponding-Steam-Parameter>Name`  (**=Name of that file**) these are automatically transmitted by the transport layer via the relevant transport protocols (body/headers).
-
-
-
 # Side-Channels
 
 This part is optional within the wrapper!
@@ -177,6 +145,19 @@ To avoid conflicts with the regular arguments, we need a sub-structure which is 
 ```
 
 'Ambience' is a very complex concern, so that we cant give a full introduction here. It relates to 'aspect orientation' (AOP) and 'contextual' programming principles. Our [SmartAmbience](https://github.com/SmartStandards/SmartAmbience) Library will provide convenience for that and can easy be coupled with the UJMW side channel.
+
+
+
+# The "returnCode"-Pattern
+
+This is just a propose for using an OUT-Arg which usually should have a name like "returnCode" to do something like a Try...Methods (in some Languages). In this case were not blocking the primary "return" value just for delivering an information about the success of a invoked method.
+
+- The code does not have a dedicated semantic to always be an error - so it must not be called "errorCode"!
+- If an returnCode was delivered, which indicated an error, then some additional details can be placed within the "lastError"-SideChannel (as described below)
+
+
+
+
 
 
 

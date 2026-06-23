@@ -37,15 +37,15 @@ namespace UJMW.CommandLineFacade {
       _MethodCache.Clear();
 
       foreach (var kvp in _ServiceFactories) {
-        var serviceType = kvp.Key;
-        var methods = serviceType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        Type serviceType = kvp.Key;
+        MethodInfo[] methods = serviceType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
-        foreach (var method in methods) {
+        foreach (MethodInfo method in methods) {
           // If overloaded, use "MethodName|ParamType1,ParamType2" as key
           var paramTypes = method.GetParameters();
           var methodKey = paramTypes.Length == 0
-            ? method.Name
-            : $"{method.Name}|{string.Join(",", paramTypes.Select(p => p.ParameterType.FullName))}";
+            ? method.GetNameOrOverride(false)
+            : $"{method.GetNameOrOverride(false)}|{string.Join(",", paramTypes.Select(p => p.ParameterType.FullName))}";
 
           _MethodCache[methodKey] = (serviceType, method);
         }
@@ -285,5 +285,7 @@ namespace UJMW.CommandLineFacade {
       if (type.IsValueType) return Activator.CreateInstance(type);
       return null;
     }
+
   }
+
 }

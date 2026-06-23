@@ -480,7 +480,8 @@ namespace System.Web.UJMW {
 
                 methodIlGen.Emit(OpCodes.Ldarg_0); // < unsere klasseninstanz auf den stack
                 methodIlGen.Emit(OpCodes.Ldfld, fieldBuilderDynamicProxyInvoker); // feld '_DynamicProxyInvoker' laden auf den stack)
-                methodIlGen.Emit(OpCodes.Ldstr, mi.Name); // < methodenname als string auf den stack holen
+                string methodNameInUrl = mi.GetNameOrOverride(false);
+                methodIlGen.Emit(OpCodes.Ldstr, methodNameInUrl); // < methodenname als string auf den stack holen
                 methodIlGen.Emit(OpCodes.Ldloc, argumentRedirectionArray); // pufferarray auf den stack holen
                 methodIlGen.Emit(OpCodes.Ldloc, argumentNameArray); // pufferarray auf den stack holen
                 methodIlGen.Emit(OpCodes.Ldstr, methodSignatureString); // < methoden-signatur als string auf den stack holen

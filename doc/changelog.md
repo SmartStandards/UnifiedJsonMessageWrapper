@@ -7,7 +7,8 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* RetryDecider will now only be called on exception during request-execution (not when preparation fails or during post-processing)
+* **new Feature**: now supports attribute based overrides for method-names
 
 
 

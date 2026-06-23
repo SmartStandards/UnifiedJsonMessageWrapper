@@ -5,9 +5,11 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.Threading;
+using System.ComponentModel;
+
 #if NET5_0_OR_GREATER
 #else
-  using SwaggerWcf.Attributes;
+using SwaggerWcf.Attributes;
   using System.ServiceModel.Web;
 #endif
 
@@ -24,8 +26,9 @@ namespace UJMW.DemoWcfService {
 
 #if NET5_0_OR_GREATER
 #else
-    [OperationContract, WebInvoke(Method = "POST")]
+    [OperationContract(Action="the-base-method"), WebInvoke(Method = "POST")]
 #endif
+    [DisplayName("the-base-method")]
     string BaseMethod();
 
   }
