@@ -140,29 +140,30 @@ namespace System {
     /// <summary>
     /// Invokes a method by calling an external executable that uses CommandLineWrapper.
     /// </summary>
-    /// <param name="methodName">The method to invoke.</param>
+    /// <param name="uniqueMethodNameOnTransportLayer"></param>
+    /// <param name="method">The method to invoke.</param>
     /// <param name="arguments">The argument values.</param>
     /// <param name="argumentNames">The argument names (must match method parameter names).</param>
     /// <param name="methodSignatureString">Unused, for compatibility.</param>
     /// <returns>The result from the external process, deserialized from JSON.</returns>
-    public object InvokeCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+    public object InvokeCall(string uniqueMethodNameOnTransportLayer, MethodInfo method, object[] arguments, string[] argumentNames, string methodSignatureString) {
       if (_CallMode == CommandLineCallMode.PerCall) {
-        return InvokeCallPerCall(methodName, arguments, argumentNames, methodSignatureString);
+        return InvokeCallPerCall(uniqueMethodNameOnTransportLayer, method, arguments, argumentNames, methodSignatureString);
       } else {
-        return InvokeCallPersistent(methodName, arguments, argumentNames, methodSignatureString);
+        return InvokeCallPersistent(uniqueMethodNameOnTransportLayer, method, arguments, argumentNames, methodSignatureString);
       }
     }
 
-    private object InvokeCallPerCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+    private object InvokeCallPerCall(string uniqueMethodNameOnTransportLayer, MethodInfo method, object[] arguments, string[] argumentNames, string methodSignatureString) {
       var exePath = _ExePath;
 
-      MethodInfo method = UjmwWebCallInvoker.FindMethod(_ContractType, methodName);
+      //MethodInfo method = UjmwWebCallInvoker.FindMethod(_ContractType, methodName);
       ParameterInfo[] parameters = method.GetParameters();
-      if (method == null) {
-        throw new MissingMethodException(
-          $"Method '{methodName}' not found in contract '{_ContractType.FullName}'."
-        );
-      }
+      //if (method == null) {
+      //  throw new MissingMethodException(
+      //    $"Method '{methodName}' not found in contract '{_ContractType.FullName}'."
+      //  );
+      //}
 
       // Build paramsJson as a JSON object with argument names as properties
       var paramDict = new Dictionary<string, object>();
@@ -192,7 +193,7 @@ namespace System {
       // Prepare process start info
       var psi = new ProcessStartInfo {
         FileName = exePath,
-        Arguments = $"\"{methodName}\" \"{paramsJson.Replace("\"", "\\\"")}\"",
+        Arguments = $"\"{uniqueMethodNameOnTransportLayer}\" \"{paramsJson.Replace("\"", "\\\"")}\"",
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false,
@@ -331,14 +332,14 @@ namespace System {
       }
     }
 
-    private object InvokeCallPersistent(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
-      MethodInfo method = UjmwWebCallInvoker.FindMethod(_ContractType, methodName);
+    private object InvokeCallPersistent(string uniqueMethodNameOnTransportLayer, MethodInfo method, object[] arguments, string[] argumentNames, string methodSignatureString) {
+      //MethodInfo method = UjmwWebCallInvoker.FindMethod(_ContractType, methodName);
       ParameterInfo[] parameters = method.GetParameters();
-      if (method == null) {
-        throw new MissingMethodException(
-          $"Method '{methodName}' not found in contract '{_ContractType.FullName}'."
-        );
-      }
+      //if (method == null) {
+      //  throw new MissingMethodException(
+      //    $"Method '{methodName}' not found in contract '{_ContractType.FullName}'."
+      //  );
+      //}
 
       // Build paramsJson as a JSON object with argument names as properties
       var paramDict = new Dictionary<string, object>();
@@ -373,7 +374,7 @@ namespace System {
       }
 
       // Prepare the line to send: <methodName> <paramsJson> <taskId>
-      string lineToSend = $"{methodName} {paramsJson} {taskId}";
+      string lineToSend = $"{uniqueMethodNameOnTransportLayer} {paramsJson} {taskId}";
 
       // Prepare a TaskCompletionSource to await the response
       var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);

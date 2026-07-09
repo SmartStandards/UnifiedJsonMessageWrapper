@@ -44,8 +44,6 @@ using System.Web.UJMW;
     );
   }
 
-
-
   bool success = DynamicClientFactory.TryResolveContractVersionOnServerSide(svc, out Version versionOnServerSide, out string[] knownMethodNames);
 
 

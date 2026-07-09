@@ -351,10 +351,12 @@ namespace System.Web.UJMW {
 
         #endregion
 
-        var allMethods = new List<MethodInfo>();
+        #region " METHODS "
+
+        List<MethodInfo> allMethods = new List<MethodInfo>();
         CollectAllMethodsForType(applicableType, allMethods);
 
-        foreach (var mi in allMethods) {
+        foreach (MethodInfo mi in allMethods) {
           var methodSignatureString = mi.ToString();
           var methodNameBlacklist = new[] { "ToString", "GetHashCode", "GetType", "Equals" };
           if (!mi.IsSpecialName && !methodNameBlacklist.Contains(mi.Name)) {
@@ -480,8 +482,32 @@ namespace System.Web.UJMW {
 
                 methodIlGen.Emit(OpCodes.Ldarg_0); // < unsere klasseninstanz auf den stack
                 methodIlGen.Emit(OpCodes.Ldfld, fieldBuilderDynamicProxyInvoker); // feld '_DynamicProxyInvoker' laden auf den stack)
-                string methodNameInUrl = mi.GetNameOrOverride(false);
-                methodIlGen.Emit(OpCodes.Ldstr, methodNameInUrl); // < methodenname als string auf den stack holen
+                string uniqueMethodNameOnTransportLayer = mi.GetNameOrOverride(false);
+                methodIlGen.Emit(OpCodes.Ldstr, uniqueMethodNameOnTransportLayer); // < methodenname als string auf den stack holen
+
+                #region " Riesen Aufstand um die Methodinfo hier sauber als 2. argument übergeben zu können... "
+
+                //erstmal brauchen wir 'MethodBase.GetMethodFromHandle' als hilfmethode 
+                MethodInfo getMethodFromHandleMethod = typeof(MethodBase).GetMethod(
+                  nameof(MethodBase.GetMethodFromHandle),
+                  new Type[] { typeof(RuntimeMethodHandle), typeof(RuntimeTypeHandle) }
+                );
+
+                //dann müssen wir über den typ gehen (da wri bei der ausführung des emitteten codes da erstmal ran müssen)
+                Type declaringType = mi.DeclaringType;
+
+                //AUFRUF VON: MethodBase.GetMethodFromHandle(handle,type)
+                methodIlGen.Emit(OpCodes.Ldtoken, mi);
+                methodIlGen.Emit(OpCodes.Ldtoken, declaringType);
+                methodIlGen.Emit(OpCodes.Call, getMethodFromHandleMethod);
+
+                //ergebnis (jetzt akkut auf dem stack liegend) casten
+                methodIlGen.Emit(OpCodes.Castclass, typeof(MethodInfo));
+
+                //-> danach liegt auf dem stack (hoffentlich am richtigen ort - nämlich arg2) die MethodInfo
+
+                #endregion
+
                 methodIlGen.Emit(OpCodes.Ldloc, argumentRedirectionArray); // pufferarray auf den stack holen
                 methodIlGen.Emit(OpCodes.Ldloc, argumentNameArray); // pufferarray auf den stack holen
                 methodIlGen.Emit(OpCodes.Ldstr, methodSignatureString); // < methoden-signatur als string auf den stack holen
@@ -559,6 +585,93 @@ namespace System.Web.UJMW {
           }
         }
 
+        #endregion
+
+        #region " PROPERTIES "
+
+        List<PropertyInfo> allProperties = new List<PropertyInfo>();
+        CollectAllPropertiesForType(applicableType, allProperties);
+
+        foreach (PropertyInfo propertyInfo in allProperties) {
+
+          MethodInfo getMethod = propertyInfo.GetGetMethod();
+          MethodInfo setMethod = propertyInfo.GetSetMethod();
+
+          bool propertyIsReadOnly = getMethod != null && setMethod == null;
+          bool propertyTypeIsPrimitive = (
+            propertyInfo.PropertyType.IsPrimitive || propertyInfo.PropertyType.IsEnum ||
+            propertyInfo.PropertyType == typeof(string) || propertyInfo.PropertyType == typeof(decimal) ||
+            propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(Guid)
+          );
+
+          if (!propertyIsReadOnly || propertyTypeIsPrimitive) {
+            ImplementPropertyWithNotImplementedException(typeBuilder, propertyInfo, getMethod, setMethod);
+            continue;
+          }
+
+          FieldBuilder propertySingletonField = typeBuilder.DefineField(
+            $"_{propertyInfo.Name}Instance",
+            typeof(object),
+            FieldAttributes.Private
+          );
+
+          MethodBuilder getterBuilder = typeBuilder.DefineMethod(
+            getMethod.Name,
+            MethodAttributes.Public |
+            MethodAttributes.ReuseSlot |
+            MethodAttributes.HideBySig |
+            MethodAttributes.SpecialName |
+            MethodAttributes.Virtual,
+            propertyInfo.PropertyType,
+            Array.Empty<Type>()
+          );
+
+          ILGenerator getterIlGen = getterBuilder.GetILGenerator();
+
+          LocalBuilder singletonLocal = getterIlGen.DeclareLocal(typeof(object));
+          Label singletonAlreadyCreatedLabel = getterIlGen.DefineLabel();
+
+          getterIlGen.Emit(OpCodes.Ldarg_0);
+          getterIlGen.Emit(OpCodes.Ldfld, propertySingletonField);
+          getterIlGen.Emit(OpCodes.Dup);
+          getterIlGen.Emit(OpCodes.Brtrue_S, singletonAlreadyCreatedLabel);
+          getterIlGen.Emit(OpCodes.Pop);
+
+          getterIlGen.Emit(OpCodes.Ldtoken, propertyInfo.PropertyType);
+          getterIlGen.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle)));
+          getterIlGen.Emit(OpCodes.Ldstr, propertyInfo.Name);
+          getterIlGen.Emit(OpCodes.Ldarg_0);
+
+          MethodInfo createReadOnlyPropertySingletonMethod = typeof(DynamicClientFactory).GetMethod(
+            nameof(DynamicClientFactory.CreateOnDemandInstanceForVirtuallyImplementedProperty),
+            new Type[] { typeof(Type), typeof(string), typeof(IUjmwClient) }
+          );
+
+          getterIlGen.Emit(OpCodes.Call, createReadOnlyPropertySingletonMethod);
+          getterIlGen.Emit(OpCodes.Stloc, singletonLocal);
+
+          getterIlGen.Emit(OpCodes.Ldarg_0);
+          getterIlGen.Emit(OpCodes.Ldloc, singletonLocal);
+          getterIlGen.Emit(OpCodes.Stfld, propertySingletonField);
+
+          getterIlGen.Emit(OpCodes.Ldloc, singletonLocal);
+
+          getterIlGen.MarkLabel(singletonAlreadyCreatedLabel);
+
+          if (propertyInfo.PropertyType.IsValueType) {
+            getterIlGen.Emit(OpCodes.Unbox_Any, propertyInfo.PropertyType);
+          }
+          else {
+            getterIlGen.Emit(OpCodes.Castclass, propertyInfo.PropertyType);
+          }
+
+          getterIlGen.Emit(OpCodes.Ret);
+
+          typeBuilder.DefineMethodOverride(getterBuilder, getMethod);
+        }
+        
+        #endregion
+
         var dynamicType = typeBuilder.CreateType();
         // assemblyBuilder.Save("Dynassembly.dll")
 
@@ -581,6 +694,98 @@ namespace System.Web.UJMW {
       foreach (Type intf in t.GetInterfaces()) {
         CollectAllMethodsForType(intf, target);
       }
+    }
+
+    private static void CollectAllPropertiesForType(Type t, List<PropertyInfo> target) {
+      foreach (PropertyInfo pi in t.GetProperties()) {
+        if (target.Contains(pi)) continue;
+        target.Add(pi);
+      }
+      if (t.BaseType != null) {
+        CollectAllPropertiesForType(t.BaseType, target);
+      }
+      foreach (Type intf in t.GetInterfaces()) {
+        CollectAllPropertiesForType(intf, target);
+      }
+    }
+
+    /// <summary>
+    /// Implements unsupported property accessors with a hard NotImplementedException.
+    /// </summary>
+    private static void ImplementPropertyWithNotImplementedException(
+      TypeBuilder typeBuilder,
+      PropertyInfo propertyInfo,
+      MethodInfo getMethod,
+      MethodInfo setMethod
+    ) {
+      if (typeBuilder == null) {
+        throw new ArgumentNullException(nameof(typeBuilder));
+      }
+
+      if (propertyInfo == null) {
+        throw new ArgumentNullException(nameof(propertyInfo));
+      }
+
+      ConstructorInfo notImplementedExceptionConstructor = typeof(NotImplementedException).GetConstructor(Type.EmptyTypes);
+
+      if (notImplementedExceptionConstructor == null) {
+        throw new InvalidOperationException("The default constructor of NotImplementedException was not found.");
+      }
+
+      if (getMethod != null) {
+        MethodBuilder getterBuilder = typeBuilder.DefineMethod(
+          getMethod.Name,
+          MethodAttributes.Public |
+          MethodAttributes.ReuseSlot |
+          MethodAttributes.HideBySig |
+          MethodAttributes.SpecialName |
+          MethodAttributes.Virtual,
+          propertyInfo.PropertyType,
+          Array.Empty<Type>()
+        );
+
+        ILGenerator getterIlGen = getterBuilder.GetILGenerator();
+
+        getterIlGen.Emit(OpCodes.Newobj, notImplementedExceptionConstructor);
+        getterIlGen.Emit(OpCodes.Throw);
+
+        typeBuilder.DefineMethodOverride(getterBuilder, getMethod);
+      }
+
+      if (setMethod != null) {
+        MethodBuilder setterBuilder = typeBuilder.DefineMethod(
+          setMethod.Name,
+          MethodAttributes.Public |
+          MethodAttributes.ReuseSlot |
+          MethodAttributes.HideBySig |
+          MethodAttributes.SpecialName |
+          MethodAttributes.Virtual,
+          typeof(void),
+          new Type[] { propertyInfo.PropertyType }
+        );
+
+        setterBuilder.DefineParameter(1, ParameterAttributes.In, "value");
+
+        ILGenerator setterIlGen = setterBuilder.GetILGenerator();
+
+        setterIlGen.Emit(OpCodes.Newobj, notImplementedExceptionConstructor);
+        setterIlGen.Emit(OpCodes.Throw);
+
+        typeBuilder.DefineMethodOverride(setterBuilder, setMethod);
+      }
+    }
+
+    //ACHTUNG WEAK REFERENCE -> wird aus emit aufgerufen
+    public static object CreateOnDemandInstanceForVirtuallyImplementedProperty(
+      Type propertyType,
+      string propertyName,
+      IUjmwClient dynamicClientInstance
+    ) {
+
+      //TODO: hier ujmw-unter-clients erzeugen! dazu brauchen wir in jedem
+      //      ujmw-client einen SubClientPath der an den invoker weitergegeben wird
+      throw new NotImplementedException("This feature is comming soon...");
+
     }
 
     //https://www.aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
@@ -753,7 +958,7 @@ namespace System.Web.UJMW {
         string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
         string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
 
-        string rawInfoResponse = invoker.InvokeCall(null, new object[0], new string[0], null)?.ToString();
+        string rawInfoResponse = invoker.InvokeCall(null, null, new object[0], new string[0], null)?.ToString();
 
         if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
           JObject json = JObject.Parse(rawInfoResponse);
@@ -793,7 +998,7 @@ namespace System.Web.UJMW {
           string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
           string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
 
-          string rawInfoResponse = invoker.InvokeCall(null, new object[0], new string[0], null)?.ToString();
+          string rawInfoResponse = invoker.InvokeCall(null, null, new object[0], new string[0], null)?.ToString();
 
           if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
             JObject json = JObject.Parse(rawInfoResponse);

@@ -39,33 +39,35 @@ namespace System.Web.UJMW {
       }
     }
 
-    internal static MethodInfo FindMethod(Type declaringType,string methodName) {
-      MethodInfo m = declaringType.GetMethod(methodName);
-      if(m != null) {
-        return m; //99%
-      }
-      if(declaringType.BaseType != null) {
-        m = FindMethod(declaringType.BaseType, methodName);
-        if (m != null) {
-          return m;
-        }
-      }
-      foreach (Type iType in declaringType.GetInterfaces()){
-        m = FindMethod(iType, methodName);
-        if (m != null) {
-          return m;
-        }
-      }
-      return null;
-    }
+    //internal static MethodInfo FindMethod(Type declaringType,string methodName) {
+    //  MethodInfo m = declaringType.GetMethod(methodName);
+    //  if(m != null) {
+    //    return m; //99%
+    //  }
+
+    //  if(declaringType.BaseType != null) {
+    //    m = FindMethod(declaringType.BaseType, methodName);
+    //    if (m != null) {
+    //      return m;
+    //    }
+    //  }
+    //  foreach (Type iType in declaringType.GetInterfaces()){
+    //    m = FindMethod(iType, methodName);
+    //    if (m != null) {
+    //      return m;
+    //    }
+    //  }
+    //  return null;
+    //}
 
     private object _UrlReloadLock = new object();
     private string _CachedEndpointUrl = null;
     private DateTime _EndpointUrlCacheTime = DateTime.MinValue;
 
-    public object InvokeCall(string methodName, object[] arguments, string[] argumentNames, string methodSignatureString) {
+    //WARNING: WILL BE INVOKED VIA EMIT - WEAK REFERENCE!!!
+    public object InvokeCall(string uniqueMethodNameOnTransportLayer, MethodInfo method, object[] arguments, string[] argumentNames, string methodSignatureString) {
          
-      if(methodName != null && methodName == nameof(IDisposable.Dispose)) {
+      if(uniqueMethodNameOnTransportLayer != null && uniqueMethodNameOnTransportLayer == nameof(IDisposable.Dispose)) {
         _OnDisposeInvoked.Invoke();
         return null;
       }
@@ -88,7 +90,7 @@ namespace System.Web.UJMW {
         int httpCode = 0;
         try {
 
-          return InvokeWebCallInternal(endpointUrl, methodName, arguments, argumentNames, methodSignatureString, ref httpCode);
+          return InvokeWebCallInternal(endpointUrl, uniqueMethodNameOnTransportLayer, method, arguments, argumentNames, methodSignatureString, ref httpCode);
 
         }
         catch (Exception ex) {
@@ -111,7 +113,7 @@ namespace System.Web.UJMW {
     }
 
     private object InvokeWebCallInternal(
-      string rootUrl, string methodName, object[] arguments, string[] argumentNames, string methodSignatureString, ref int httpReturnCode
+      string rootUrl, string uniqueMethodNameOnTransportLayer, MethodInfo method, object[] arguments, string[] argumentNames, string methodSignatureString, ref int httpReturnCode
     ) {
       //a little hack to handle exceptions BEFORE sending the request should be handled in the same way as
       //as exceptions AFTER successfully received a response
@@ -125,8 +127,8 @@ namespace System.Web.UJMW {
         fullUrl = rootUrl + "/";
       }
 
-      if (methodName != null) {
-        fullUrl = fullUrl + methodName;
+      if (uniqueMethodNameOnTransportLayer != null) {
+        fullUrl = fullUrl + uniqueMethodNameOnTransportLayer;
       }
       else {
 
@@ -143,7 +145,7 @@ namespace System.Web.UJMW {
         return infoRawResponse;
       }
 
-      MethodInfo method = FindMethod(_ContractType, methodName);
+      //MethodInfo method = FindMethod(_ContractType, methodName);
       var requestContent = new Dictionary<string, object>();
       Dictionary<string, string> requestHeaders = null;
 
