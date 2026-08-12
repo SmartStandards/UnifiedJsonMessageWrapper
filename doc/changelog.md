@@ -5,8 +5,14 @@ This files contains a version history including all changes relevant for semanti
 
 
 
-## Upcoming Changes (5.6.1-develop)
-released **2026-07-09**, including:
+## Upcoming Changes
+
+*(none)*
+
+
+
+## v 5.6.2
+released **2026-08-12**, including:
  - Fix: DynamicClient  now also compatible with DisplayName Feature. Preparation for Property-Sub-Client Feature
 
 
