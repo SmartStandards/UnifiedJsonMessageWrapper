@@ -150,7 +150,7 @@ namespace System.Web.UJMW {
 
       var httpPostExecutor = new WebClientBasedHttpPostExecutor(httpClient, httpAuthHeaderGetter);
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
-      return CreateInstance(applicableType, invoker);
+      return CreateInstance(applicableType, invoker, string.Empty);
     }
 
     public static TApplicable CreateInstance<TApplicable>(IHttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
@@ -160,17 +160,26 @@ namespace System.Web.UJMW {
 
     public static object CreateInstance(Type applicableType, IHttpPostExecutor httpPostExecutor, Func<string> urlGetter) {
       UjmwWebCallInvoker invoker = new UjmwWebCallInvoker(applicableType, httpPostExecutor, urlGetter);
-      return CreateInstance(applicableType, invoker);
+      return CreateInstance(applicableType, invoker, string.Empty);
     }
 
     #endregion
 
     public static TApplicable CreateInstance<TApplicable>(IAbstractCallInvoker invoker, params object[] constructorArgs) {
-      return (TApplicable)CreateInstance(typeof(TApplicable), invoker, constructorArgs);
+      return (TApplicable)CreateInstance(typeof(TApplicable), invoker, string.Empty, constructorArgs);
     }
 
     private static ModuleBuilder _CombinedBuilder = null;
-    private static object CreateInstance(Type applicableType, IAbstractCallInvoker invoker, params object[] constructorArgs) {
+    private static object CreateInstance(Type applicableType, IAbstractCallInvoker invoker, string subClientPath, params object[] constructorArgs) {
+     
+      if (subClientPath == null || subClientPath == "/") {
+        subClientPath = string.Empty;
+      }
+
+      if (subClientPath.EndsWith ("/") || subClientPath.StartsWith("/")) {
+        throw new ArgumentException("'subClientPath' must not start ort end with '/'");
+      }
+      
       Type dynamicType;
       if (UjmwClientConfiguration.UseCombinedDynamicAssembly) {
         if(_CombinedBuilder == null) {
@@ -183,6 +192,7 @@ namespace System.Web.UJMW {
       }
       var extendedConstructorArgs = constructorArgs.ToList();
       extendedConstructorArgs.Add(invoker);
+      extendedConstructorArgs.Add(subClientPath);
       var instance = Activator.CreateInstance(dynamicType, extendedConstructorArgs.ToArray());
       return instance;
     }
@@ -258,6 +268,7 @@ namespace System.Web.UJMW {
         // ##### FIELD DEFINITIONs #####
 
         var fieldBuilderDynamicProxyInvoker = typeBuilder.DefineField("_DynamicProxyInvoker", iDynamicProxyInvokerType, FieldAttributes.Private);
+        var fieldSubClientPath = typeBuilder.DefineField("_SubClientPath", typeof(string), FieldAttributes.Private);
 
         // ##### CONSTRUCTOR DEFINITIONs #####
 
@@ -265,10 +276,15 @@ namespace System.Web.UJMW {
 
           // create a proxy for each constructor in the base class
           foreach (var constructorOnBase in baseType.GetConstructors()) {
+
             var constructorArgs = new List<Type>();
             foreach (var p in constructorOnBase.GetParameters())
               constructorArgs.Add(p.ParameterType);
+
+            //add our own additional constructors
             constructorArgs.Add(typeof(IAbstractCallInvoker));
+            constructorArgs.Add(typeof(string));
+
             var constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, CallingConventions.Standard, constructorArgs.ToArray());
             // CODE: Public Sub New([...],dynamicProxyInvoker As IDynamicProxyInvoker)
 
@@ -282,12 +298,16 @@ namespace System.Web.UJMW {
                 withBlock.Emit(OpCodes.Ldarg, (byte)i); // load the other Arguments (Constructor-Params) excluding the last one
               withBlock.Emit(OpCodes.Call, constructorOnBase); // CODE: MyBase.New([...])
               withBlock.Emit(OpCodes.Nop); // ------------------
-              withBlock.Emit(OpCodes.Ldarg, 0); // load Argument(0) (which is a pointer to the instance of our class)
-              byte argIndex = (byte)constructorArgs.Count;
+              byte lastArgIndex = (byte)constructorArgs.Count;
               // TODO: prüfen ob valutype!!!!! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
               // .Emit(OpCodes.Ldarg, argIndex) 'load the last Argument (Constructor-Param: IDynamicProxyInvoker)
-              withBlock.Emit(OpCodes.Ldarg_S, argIndex); // load the last Argument (Constructor-Param: IDynamicProxyInvoker)
+              withBlock.Emit(OpCodes.Ldarg, 0); // load Argument(0) (which is a pointer to the instance of our class)  
+              withBlock.Emit(OpCodes.Ldarg_S, lastArgIndex - 1); // load the last Argument (Constructor-Param: IDynamicProxyInvoker)
               withBlock.Emit(OpCodes.Stfld, fieldBuilderDynamicProxyInvoker); // CODE: _DynamicProxyInvoker = dynamicProxyInvoker
+              withBlock.Emit(OpCodes.Nop); // ------------------
+              withBlock.Emit(OpCodes.Ldarg, 0); // load Argument(0) (which is a pointer to the instance of our class)
+              withBlock.Emit(OpCodes.Ldarg, lastArgIndex); // load the Argument (Constructor-Param: subClientPath)
+              withBlock.Emit(OpCodes.Stfld, fieldSubClientPath); // CODE: _SubClientPath = subClientPath
               withBlock.Emit(OpCodes.Nop);
               withBlock.Emit(OpCodes.Ret); // ------------------
             }
@@ -298,7 +318,7 @@ namespace System.Web.UJMW {
           var constructorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
             CallingConventions.HasThis,
-            new[] { typeof(IAbstractCallInvoker) }
+            new[] { typeof(IAbstractCallInvoker), typeof(string) }
           );
 
           // CODE: Public Sub New(dynamicProxyInvoker As IDynamicProxyInvoker)
@@ -309,6 +329,10 @@ namespace System.Web.UJMW {
             constructorIlGen.Emit(OpCodes.Ldarg, 0); // load Argument(0) (which is a pointer to the instance of our class)
             constructorIlGen.Emit(OpCodes.Ldarg, 1); // load the Argument (Constructor-Param: IDynamicProxyInvoker)
             constructorIlGen.Emit(OpCodes.Stfld, fieldBuilderDynamicProxyInvoker); // CODE: _DynamicProxyInvoker = dynamicProxyInvoker
+            constructorIlGen.Emit(OpCodes.Nop); // ------------------
+            constructorIlGen.Emit(OpCodes.Ldarg, 0); // load Argument(0) (which is a pointer to the instance of our class)
+            constructorIlGen.Emit(OpCodes.Ldarg, 2); // load the Argument (Constructor-Param: subClientPath)
+            constructorIlGen.Emit(OpCodes.Stfld, fieldSubClientPath); // CODE: _SubClientPath = subClientPath
             constructorIlGen.Emit(OpCodes.Ret); // ------------------
           }
         }
@@ -332,6 +356,23 @@ namespace System.Web.UJMW {
         getInvokerMethodIlGen.Emit(OpCodes.Ret);
 
         typeBuilder.DefineMethodOverride(getInvokerMethodBuilder, getInvokerMethod);
+
+        //Function GetSubClientPath() As string -> IL implementierung, die einfach nur das feld returnt:
+
+        MethodInfo getSubClientPathMethod = typeof(IUjmwClient).GetMethod(nameof(IUjmwClient.GetSubClientPath));
+
+        MethodBuilder getSubClientPathMethodBuilder = typeBuilder.DefineMethod(
+          getSubClientPathMethod.Name, MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+          getSubClientPathMethod.ReturnType, Array.Empty<Type>()
+        );
+        ILGenerator getSubClientPathIlGen = getSubClientPathMethodBuilder.GetILGenerator();
+
+        getSubClientPathIlGen.Emit(OpCodes.Ldarg_0);
+        getSubClientPathIlGen.Emit(OpCodes.Ldfld, fieldSubClientPath);
+        getSubClientPathIlGen.Emit(OpCodes.Ret);
+
+        typeBuilder.DefineMethodOverride(getSubClientPathMethodBuilder, getSubClientPathMethod);
+
 
         //Function GetContract() As Type -> IL implementierung, die einfach nur unseren applicableType in statischer form returnt:
 
@@ -482,8 +523,15 @@ namespace System.Web.UJMW {
 
                 methodIlGen.Emit(OpCodes.Ldarg_0); // < unsere klasseninstanz auf den stack
                 methodIlGen.Emit(OpCodes.Ldfld, fieldBuilderDynamicProxyInvoker); // feld '_DynamicProxyInvoker' laden auf den stack)
+
+                methodIlGen.Emit(OpCodes.Ldarg_0);
+                methodIlGen.Emit(OpCodes.Ldfld, fieldSubClientPath);
                 string uniqueMethodNameOnTransportLayer = mi.GetNameOrOverride(false);
                 methodIlGen.Emit(OpCodes.Ldstr, uniqueMethodNameOnTransportLayer); // < methodenname als string auf den stack holen
+                MethodInfo stringConcatMethod = typeof(string).GetMethod( nameof(string.Concat), new Type[] { typeof(string), typeof(string) });
+                methodIlGen.Emit(OpCodes.Call, stringConcatMethod);
+                //jetzt liegt direkt nach dem _DynamicProxyInvoker von oben nurnoch ein weitrer zusammengesetzer string
+                //_SubClientPath + uniqueMethodNameOnTransportLayer auf dem stack!
 
                 #region " Riesen Aufstand um die Methodinfo hier sauber als 2. argument übergeben zu können... "
 
@@ -782,10 +830,17 @@ namespace System.Web.UJMW {
       IUjmwClient dynamicClientInstance
     ) {
 
-      //TODO: hier ujmw-unter-clients erzeugen! dazu brauchen wir in jedem
-      //      ujmw-client einen SubClientPath der an den invoker weitergegeben wird
-      throw new NotImplementedException("This feature is comming soon...");
+      IAbstractCallInvoker parentInvoker = dynamicClientInstance.GetInvoker();
 
+      string subClientPath = dynamicClientInstance.GetSubClientPath();
+      if (string.IsNullOrWhiteSpace(subClientPath)){
+        subClientPath = propertyName;
+      }
+      else {
+        subClientPath = subClientPath + "/" + propertyName;
+      }
+      
+      return CreateInstance(propertyType, parentInvoker, subClientPath);
     }
 
     //https://www.aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
