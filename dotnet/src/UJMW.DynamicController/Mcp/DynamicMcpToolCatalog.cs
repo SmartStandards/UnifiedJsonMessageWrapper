@@ -6,8 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Web.UJMW;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Discovers API Explorer operations and exposes them as MCP tool descriptors.
@@ -17,7 +18,7 @@ namespace System.Web.UJMW {
     private const string _DynamicControllerBaseFullName = "System.Web.UJMW.DynamicUjmwControllerFactory+DynamicControllerBase`1";
 
     private readonly IApiDescriptionGroupCollectionProvider _ApiDescriptionProvider;
-    private readonly DynamicMcpControllerRegistrar _Registrar;
+    private readonly DynamicUjmwControllerRegistrar _Registrar;
     private readonly DynamicMcpJsonSchemaBuilder _SchemaBuilder;
     private readonly DynamicMcpXmlDocumentationProvider _XmlDocumentationProvider;
 
@@ -29,7 +30,7 @@ namespace System.Web.UJMW {
     /// <param name="schemaBuilder">The JSON schema builder.</param>
     public DynamicMcpToolCatalog(
       IApiDescriptionGroupCollectionProvider apiDescriptionProvider,
-      DynamicMcpControllerRegistrar registrar,
+      DynamicUjmwControllerRegistrar registrar,
       DynamicMcpJsonSchemaBuilder schemaBuilder,
       DynamicMcpXmlDocumentationProvider xmlDocumentationProvider
     ) {
@@ -46,7 +47,7 @@ namespace System.Web.UJMW {
     public DynamicMcpToolDescriptor[] GetTools() {
       List<DynamicMcpToolDescriptor> tools = new List<DynamicMcpToolDescriptor>();
       Dictionary<string, int> toolNameUsage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-      DynamicMcpAccessRegistration[] registrations = _Registrar.Entries;
+      Tuple<Type, DynamicUjmwControllerOptions>[] registrations = _Registrar.Entries.Where((entry) => entry.Item2 != null && entry.Item2.EnableMcp).ToArray();
 
       foreach (ApiDescriptionGroup group in _ApiDescriptionProvider.ApiDescriptionGroups.Items) {
         foreach (ApiDescription apiDescription in group.Items) {
@@ -55,7 +56,7 @@ namespace System.Web.UJMW {
           }
 
           Type serviceType = this.TryResolveServiceType(apiDescription);
-          DynamicMcpAccessRegistration registration = this.FindRegistration(registrations, serviceType, apiDescription.GroupName);
+          Tuple<Type, DynamicUjmwControllerOptions> registration = this.FindRegistration(registrations, serviceType, apiDescription.GroupName);
           if (registration == null) {
             continue;
           }
@@ -113,7 +114,7 @@ namespace System.Web.UJMW {
     /// <returns>The created MCP tool descriptor.</returns>
     private DynamicMcpToolDescriptor CreateToolDescriptor(
       ApiDescription apiDescription,
-      DynamicMcpAccessRegistration registration,
+      Tuple<Type, DynamicUjmwControllerOptions> registration,
       Dictionary<string, int> toolNameUsage
     ) {
       ControllerActionDescriptor controllerAction = apiDescription.ActionDescriptor as ControllerActionDescriptor;
@@ -125,17 +126,17 @@ namespace System.Web.UJMW {
         methodName = "Call";
       }
 
-      string toolName = this.BuildToolName(registration.ServiceType, methodName, apiDescription.GroupName, registration.Options);
+      string toolName = this.BuildToolName(registration.Item1, methodName, apiDescription.GroupName, registration.Item2);
       toolName = this.MakeUniqueName(toolName, toolNameUsage);
 
       DynamicMcpToolDescriptor tool = new DynamicMcpToolDescriptor();
       tool.Name = toolName;
-      MethodInfo contractMethod = this.FindContractMethod(registration.ServiceType, methodName, apiDescription);
-      tool.Description = this.BuildDescription(registration.ServiceType, methodName, registration.Options, contractMethod);
+      MethodInfo contractMethod = this.FindContractMethod(registration.Item1, methodName, apiDescription);
+      tool.Description = this.BuildDescription(registration.Item1, methodName, registration.Item2, contractMethod);
       tool.RelativePath = apiDescription.RelativePath;
       tool.HttpMethod = apiDescription.HttpMethod;
-      tool.ServiceType = registration.ServiceType;
-      tool.Options = registration.Options;
+      tool.ServiceType = registration.Item1;
+      tool.Options = registration.Item2;
       tool.ApiDescription = apiDescription;
       tool.InputSchema = _SchemaBuilder.BuildInputSchema(apiDescription, contractMethod);
       return tool;
@@ -148,8 +149,8 @@ namespace System.Web.UJMW {
     /// <param name="serviceType">The discovered service type.</param>
     /// <param name="apiGroupName">The API Explorer group name.</param>
     /// <returns>The matching registration or null.</returns>
-    private DynamicMcpAccessRegistration FindRegistration(
-      DynamicMcpAccessRegistration[] registrations,
+    private Tuple<Type, DynamicUjmwControllerOptions> FindRegistration(
+      Tuple<Type, DynamicUjmwControllerOptions>[] registrations,
       Type serviceType,
       string apiGroupName
     ) {
@@ -157,12 +158,12 @@ namespace System.Web.UJMW {
         return null;
       }
 
-      foreach (DynamicMcpAccessRegistration registration in registrations) {
-        if (!this.IsServiceMatch(registration.ServiceType, serviceType)) {
+      foreach (Tuple<Type, DynamicUjmwControllerOptions> registration in registrations) {
+        if (!this.IsServiceMatch(registration.Item1, serviceType)) {
           continue;
         }
-        if (!string.IsNullOrWhiteSpace(registration.Options.ApiGroupName)) {
-          if (!string.Equals(registration.Options.ApiGroupName, apiGroupName, StringComparison.OrdinalIgnoreCase)) {
+        if (!string.IsNullOrWhiteSpace(registration.Item2.ApiGroupName)) {
+          if (!string.Equals(registration.Item2.ApiGroupName, apiGroupName, StringComparison.OrdinalIgnoreCase)) {
             continue;
           }
         }
@@ -208,9 +209,9 @@ namespace System.Web.UJMW {
         return dynamicContractType;
       }
 
-      foreach (DynamicMcpAccessRegistration registration in _Registrar.Entries) {
-        if (registration.ServiceType.IsAssignableFrom(controllerType)) {
-          return registration.ServiceType;
+      foreach (Tuple<Type, DynamicUjmwControllerOptions> registration in _Registrar.Entries) {
+        if (registration.Item1.IsAssignableFrom(controllerType)) {
+          return registration.Item1;
         }
       }
 
@@ -244,16 +245,16 @@ namespace System.Web.UJMW {
     /// <param name="apiGroupName">The API Explorer group name.</param>
     /// <param name="options">The access options.</param>
     /// <returns>The sanitized MCP tool name.</returns>
-    private string BuildToolName(Type serviceType, string methodName, string apiGroupName, DynamicMcpAccessOptions options) {
+    private string BuildToolName(Type serviceType, string methodName, string apiGroupName, DynamicUjmwControllerOptions options) {
       string interfaceName = serviceType.Name;
-      string pattern = options.ToolNamePattern;
+      string pattern = options.McpToolNamePattern;
       if (string.IsNullOrWhiteSpace(pattern)) {
         pattern = "{Interface}_{Method}";
       }
 
       string rawName = pattern.Replace("{Interface}", interfaceName).Replace("{Method}", methodName).Replace("{Group}", apiGroupName);
-      if (!string.IsNullOrWhiteSpace(options.ToolNamePrefix)) {
-        rawName = options.ToolNamePrefix + rawName;
+      if (!string.IsNullOrWhiteSpace(options.McpToolNamePrefix)) {
+        rawName = options.McpToolNamePrefix + rawName;
       }
 
       return this.SanitizeToolName(rawName);
@@ -266,17 +267,17 @@ namespace System.Web.UJMW {
     /// <param name="methodName">The API method name.</param>
     /// <param name="options">The access options.</param>
     /// <returns>The MCP tool description.</returns>
-    private string BuildDescription(Type serviceType, string methodName, DynamicMcpAccessOptions options, MethodInfo contractMethod) {
+    private string BuildDescription(Type serviceType, string methodName, DynamicUjmwControllerOptions options, MethodInfo contractMethod) {
       string targetDescription = serviceType.FullName + "." + methodName;
       string xmlSummary = _XmlDocumentationProvider.GetMethodSummary(contractMethod);
       if (!string.IsNullOrWhiteSpace(xmlSummary)) {
-        if (!string.IsNullOrWhiteSpace(options.Description)) {
-          return options.Description + " " + xmlSummary;
+        if (!string.IsNullOrWhiteSpace(options.McpDescription)) {
+          return options.McpDescription + " " + xmlSummary;
         }
         return xmlSummary;
       }
-      if (!string.IsNullOrWhiteSpace(options.Description)) {
-        return options.Description + " " + targetDescription;
+      if (!string.IsNullOrWhiteSpace(options.McpDescription)) {
+        return options.McpDescription + " " + targetDescription;
       }
       return "Calls " + targetDescription + " through the ASP.NET Core API Explorer endpoint.";
     }

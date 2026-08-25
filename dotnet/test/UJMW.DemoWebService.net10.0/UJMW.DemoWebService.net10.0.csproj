@@ -97,7 +97,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\UJMW.DynamicClient.net10.0\UJMW.DynamicClient.net10.0.csproj" />
     <ProjectReference Include="..\..\src\UJMW.DynamicController.net10.0\UJMW.DynamicController.net10.0.csproj" />
-    <ProjectReference Include="..\..\src\UJMW.McpServer.net10.0\UJMW.McpServer.net10.0.csproj" />
   </ItemGroup>
 
 </Project>

@@ -267,6 +267,36 @@ namespace System.Web.UJMW {
     /// </summary>
     public string ApiGroupName { get; set; } = null;
 
+    /// <summary>
+    /// Enables exposure of this dynamic controller as MCP tools.
+    /// </summary>
+    public bool EnableMcp { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets an optional fixed prefix prepended to generated MCP tool names.
+    /// </summary>
+    public string McpToolNamePrefix { get; set; } = null;
+
+    /// <summary>
+    /// Gets or sets the generated MCP tool name pattern.
+    /// </summary>
+    public string McpToolNamePattern { get; set; } = "{Interface}_{Method}";
+
+    /// <summary>
+    /// Gets or sets an optional description prefix for all exposed MCP tools of this interface.
+    /// </summary>
+    public string McpDescription { get; set; } = null;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Authorization header from the MCP request is forwarded.
+    /// </summary>
+    public bool McpCopyAuthorizationHeader { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets additional request headers copied from the MCP request to the target API call.
+    /// </summary>
+    public string[] McpCopiedHeaderNames { get; set; } = Array.Empty<string>();
+
     internal DynamicUjmwControllerOptions Clone() {
 
       DynamicUjmwControllerOptions clone = new DynamicUjmwControllerOptions();
@@ -284,6 +314,13 @@ namespace System.Web.UJMW {
       clone.AuthAttributeConstructorParams = this.AuthAttributeConstructorParams;
       clone.ContextualizationHook = this.ContextualizationHook;
       clone.SubServiceNavPath = this.SubServiceNavPath.ToArray();
+      clone.ApiGroupName = this.ApiGroupName;
+      clone.EnableMcp = this.EnableMcp;
+      clone.McpToolNamePrefix = this.McpToolNamePrefix;
+      clone.McpToolNamePattern = this.McpToolNamePattern;
+      clone.McpDescription = this.McpDescription;
+      clone.McpCopyAuthorizationHeader = this.McpCopyAuthorizationHeader;
+      clone.McpCopiedHeaderNames = this.McpCopiedHeaderNames?.ToArray() ?? Array.Empty<string>();
 
       lock (this._ContextualGetterBasedArguments) {
         foreach (var kvp in this._ContextualGetterBasedArguments) {

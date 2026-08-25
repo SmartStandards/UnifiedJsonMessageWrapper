@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Xml.Linq;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Reads XML documentation comments for service contracts exposed through MCP.

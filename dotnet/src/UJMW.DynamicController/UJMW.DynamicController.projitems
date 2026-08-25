@@ -25,5 +25,14 @@
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AuthHeaderInterceptorAttribute.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)XmlCommentAccessExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpController.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpControllerOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpEndpoint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpJsonRpcRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpJsonSchemaBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpToolCatalog.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpToolDescriptor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\DynamicMcpXmlDocumentationProvider.cs" />
   </ItemGroup>
 </Project>
+

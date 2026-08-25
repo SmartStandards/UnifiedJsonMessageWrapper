@@ -18,6 +18,12 @@ namespace System.Web.UJMW {
 
     private List<Tuple<Type, DynamicUjmwControllerOptions>> _Entries = new();
 
+    internal Tuple<Type, DynamicUjmwControllerOptions>[] Entries {
+      get {
+        return _Entries.ToArray();
+      }
+    }
+
     private ControllerFeature _GrabbedControllerFeature = null;
 
     void IApplicationFeatureProvider<ControllerFeature>.PopulateFeature(

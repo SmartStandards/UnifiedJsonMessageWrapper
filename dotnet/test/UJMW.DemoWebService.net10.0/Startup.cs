@@ -260,6 +260,7 @@ namespace Security {
 
         r.AddControllerFor<IWikiAccess>((c) => {
           c.ApiGroupName = nameof(WikiAccessService);
+          c.EnableMcp = true;
         });
 
         r.AddAnnouncementTriggerEndpoint();
@@ -272,11 +273,6 @@ namespace Security {
       wiki.ImportMarkdownFilesFromFolder("C:\\Temp\\_OneNoteExport\\1 x 1 der Programmierung");
 
       services.AddSingleton<IWikiAccess>(wiki);
-      services.AddDynamicMcpController(r => {
-        r.AddAccessTo<IWikiAccess>((c) => {
-          c.ApiGroupName = nameof(WikiAccessService);
-        });
-      });
       
       //services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");
       services.AddSwaggerGenSmartStandardsFlavored();

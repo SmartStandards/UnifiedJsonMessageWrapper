@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using UJMW.CommandLineFacade.Mcp;
 
 namespace UJMW.CommandLineFacade {
 
@@ -62,6 +63,14 @@ namespace UJMW.CommandLineFacade {
         return factory as Func<TServiceType>;
       }
       return null;
+    }
+
+    internal static (Type ServiceType, MethodInfo Method)[] GetRegisteredServiceMethodsForMcp() {
+      return _MethodCache.Values.Distinct().ToArray();
+    }
+
+    internal static object InvokeServiceMethodForMcp(string methodName, string paramsJson) {
+      return InvokeServiceMethod(methodName, paramsJson);
     }
 
     /// <summary>
@@ -278,6 +287,13 @@ namespace UJMW.CommandLineFacade {
         tasks.Add(task);
       }
       Task.WaitAll(tasks.ToArray());
+    }
+
+    /// <summary>
+    /// Processes MCP JSON-RPC requests from standard input and writes responses to standard output.
+    /// </summary>
+    public static void ProcessMcpStdIn() {
+      CommandLineMcpEndpoint.ProcessStdIn();
     }
 
     // Helper to get default value for a type

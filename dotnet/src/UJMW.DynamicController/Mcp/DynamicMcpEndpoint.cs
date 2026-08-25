@@ -14,7 +14,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Handles the JSON-RPC based MCP endpoint.
@@ -373,11 +373,11 @@ namespace System.Web.UJMW {
     /// <param name="tool">The MCP tool descriptor.</param>
     /// <param name="requestMessage">The target HTTP request message.</param>
     private void CopyRequestHeaders(HttpContext context, DynamicMcpToolDescriptor tool, HttpRequestMessage requestMessage) {
-      if (tool.Options.CopyAuthorizationHeader) {
+      if (tool.Options.McpCopyAuthorizationHeader) {
         this.CopyRequestHeader(context, requestMessage, "Authorization");
       }
 
-      string[] copiedHeaderNames = tool.Options.CopiedHeaderNames;
+      string[] copiedHeaderNames = tool.Options.McpCopiedHeaderNames;
       if (copiedHeaderNames == null) {
         return;
       }

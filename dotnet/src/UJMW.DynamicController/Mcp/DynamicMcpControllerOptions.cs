@@ -1,6 +1,6 @@
 using System;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Provides global configuration values for the dynamic MCP endpoint.

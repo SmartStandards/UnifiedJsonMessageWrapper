@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using System.Web.UJMW.Mcp;
 
 namespace System.Web.UJMW {
 
@@ -13,6 +14,13 @@ namespace System.Web.UJMW {
       var registrar = new DynamicUjmwControllerRegistrar();
 
       configMethod.Invoke(registrar);
+
+      services.AddSingleton(registrar);
+      services.AddSingleton<DynamicMcpControllerOptions>();
+      services.AddSingleton<DynamicMcpXmlDocumentationProvider>();
+      services.AddSingleton<DynamicMcpJsonSchemaBuilder>();
+      services.AddSingleton<DynamicMcpToolCatalog>();
+      services.AddTransient<DynamicMcpEndpoint>();
 
       builder.ConfigureApplicationPartManager(
         (apm) => apm.FeatureProviders.Add(registrar)

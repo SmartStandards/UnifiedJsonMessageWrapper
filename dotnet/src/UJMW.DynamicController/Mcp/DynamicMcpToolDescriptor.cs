@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using System;
+using System.Web.UJMW;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Describes one API operation that is exposed as an MCP tool.
@@ -13,7 +14,7 @@ namespace System.Web.UJMW {
     private string _RelativePath;
     private string _HttpMethod;
     private Type _ServiceType;
-    private DynamicMcpAccessOptions _Options;
+    private DynamicUjmwControllerOptions _Options;
     private ApiDescription _ApiDescription;
     private Newtonsoft.Json.Linq.JObject _InputSchema;
 
@@ -78,9 +79,9 @@ namespace System.Web.UJMW {
     }
 
     /// <summary>
-    /// Gets or sets the access options.
+    /// Gets or sets the dynamic controller options.
     /// </summary>
-    public DynamicMcpAccessOptions Options {
+    public DynamicUjmwControllerOptions Options {
       get {
         return _Options;
       }

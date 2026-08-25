@@ -14,5 +14,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\HelperExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)(Setup)\UjmwHostConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CommandLineWrapper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Mcp\CommandLineMcpEndpoint.cs" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Describes one JSON-RPC request accepted by the dynamic MCP endpoint.

@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace System.Web.UJMW {
+namespace System.Web.UJMW.Mcp {
 
   /// <summary>
   /// Hosts the dynamic MCP JSON-RPC endpoint as an ASP.NET Core MVC action.
@@ -12,7 +12,6 @@ namespace System.Web.UJMW {
   [ApiController]
   [Route("_mcp")]
   [ApiExplorerSettings(GroupName = "MCP")]
-  [Tags("MCP")]
   public sealed class DynamicMcpController : ControllerBase {
 
     private readonly DynamicMcpEndpoint _Endpoint;
