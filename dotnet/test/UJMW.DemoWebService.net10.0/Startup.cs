@@ -258,8 +258,24 @@ namespace Security {
           ApiGroupName = "CLI-Demo"
         });
 
+        r.AddControllerFor<IWikiAccess>((c) => {
+          c.ApiGroupName = nameof(WikiAccessService);
+        });
+
         r.AddAnnouncementTriggerEndpoint();
 
+      });
+
+
+
+      var wiki = new WikiAccessService();
+      wiki.ImportMarkdownFilesFromFolder("C:\\Temp\\_OneNoteExport\\1 x 1 der Programmierung");
+
+      services.AddSingleton<IWikiAccess>(wiki);
+      services.AddDynamicMcpController(r => {
+        r.AddAccessTo<IWikiAccess>((c) => {
+          c.ApiGroupName = nameof(WikiAccessService);
+        });
       });
       
       //services.AddUjmwStandardSwaggerGen("Fileaccess-Demo");

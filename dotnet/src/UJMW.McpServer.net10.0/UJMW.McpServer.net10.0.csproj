@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>UJMW.McpServer</AssemblyName>
+    <RootNamespace>System</RootNamespace>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>UJMW.McpServer</PackageId>
+    <Description>An MCP server facade for ASP.NET Core APIs discovered via API Explorer</Description>
+    <Product>UJMW</Product>
+    <Company>(public domain)</Company>
+    <Copyright>SmartStandards</Copyright>
+    <Version>5.6.1-develop</Version>
+    <AssemblyVersion>5.6.1</AssemblyVersion>
+    <Authors>SmartStandards</Authors>
+    <FileVersion>5.6.1</FileVersion>
+    <PackageTags></PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>..\..\dist\bin-net10.0\UJMW.McpServer.xml</DocumentationFile>
+    <OutputPath>..\..\dist\bin-net10.0\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;DEBUG;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>..\..\dist\bin-net10.0\</OutputPath>
+    <DocumentationFile>..\..\dist\bin-net10.0\UJMW.McpServer.xml</DocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DefineConstants>TRACE;NET5</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+</Project>

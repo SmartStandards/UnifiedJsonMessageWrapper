@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "ujmw-demo-mcp": {
+      "type": "http",
+      "url": "http://localhost:55202/_mcp"
+    }
+  }
+}
