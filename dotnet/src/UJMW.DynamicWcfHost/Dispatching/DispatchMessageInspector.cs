@@ -269,8 +269,13 @@ namespace System.Web.UJMW {
         outgoingHttpResponse.SuppressEntityBody = true;
         return;
       }
-      if (state?.ContractMethod == null) { //<< indicates a BadRequest
-        outgoingHttpResponse.StatusCode = HttpStatusCode.BadRequest;
+      if (state?.ContractMethod == null) { //<< indicates a BadRequest or any other failue (incl. unauthorized...)
+
+        if(outgoingHttpResponse.StatusCode == HttpStatusCode.OK) {
+          //only in case of 'OK' (indicates, that no other error-handling-code has already set a propper status code)
+          //we will set the status code to 'BadRequest' (400)...
+          outgoingHttpResponse.StatusCode = HttpStatusCode.BadRequest;
+        }
 
         //disable that html response body with WCF-ramblings
         outgoingHttpResponse.SuppressEntityBody = true;

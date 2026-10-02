@@ -58,7 +58,7 @@ namespace UJMW.DemoWcfService {
           
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
-            httpReturnCode = 403;
+            httpReturnCode = 401;
             failedReason = "This demo requires at least ANY string as authheader!";
             return false;
           }
