@@ -11,6 +11,12 @@ This files contains a version history including all changes relevant for semanti
 
 
 
+## v 5.6.3
+released **2026-10-02**, including:
+ - Fix WCF-AuthTokenEval-Hook could not transfer proper statuscode on failure (was always HTTP 400)
+
+
+
 ## v 5.6.2
 released **2026-08-12**, including:
  - Fix: DynamicClient  now also compatible with DisplayName Feature. Preparation for Property-Sub-Client Feature

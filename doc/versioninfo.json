@@ -1,10 +1,10 @@
 {
-  "currentVersionWithSuffix": "5.6.2",
+  "currentVersionWithSuffix": "5.6.3",
   "releaseType": "",
-  "currentVersion": "5.6.2",
+  "currentVersion": "5.6.3",
   "currentMajor": 5,
   "currentMinor": 6,
-  "currentFix": 2,
+  "currentFix": 3,
   "previousVersion": "0.0.0",
   "changeGrade": "initial",
   "versionTimeInfo": "00:00:00",
