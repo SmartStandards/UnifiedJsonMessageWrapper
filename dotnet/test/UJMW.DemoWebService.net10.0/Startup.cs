@@ -147,12 +147,16 @@ namespace Security {
         }
       );
 
-      UjmwHostConfiguration.AuthHeaderEvaluator = (
-        (string rawAuthHeader, Type contractType, MethodInfo targetContractMethod, string callingMachine, ref int httpReturnCode, ref string failedReason) => {
+      UjmwHostConfiguration.SetAuthHeaderEvaluator(
+        (string rawAuthHeader, Type contractType, MethodInfo targetContractMethod, string apiGroupName, string callingMachine, ref int httpReturnCode, ref string failedReason, ref System.Collections.Generic.KeyValuePair<string, string>[] responseHeaders) => {
           //in this demo - any auth header is ok - but there must be one ;-)
           if (string.IsNullOrWhiteSpace(rawAuthHeader)) {
-            httpReturnCode = 403;
+            httpReturnCode = 401;
             failedReason = "This demo requires at least ANY string as authheader!";
+            //demonstrates the response-header feature incl. the '{RequestBaseUrl}' placeholder
+            responseHeaders = new System.Collections.Generic.KeyValuePair<string, string>[] {
+              new System.Collections.Generic.KeyValuePair<string, string>("WWW-Authenticate", "Bearer resource_metadata=\"{RequestBaseUrl}/.well-known/oauth-protected-resource\"")
+            };
             return false;
           }
           return true;

@@ -7,7 +7,7 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-*(none)*
+* new Feature: alternate AuthHeaderEvaluator with extended params (apiGroupName and additional responseHeaders) + opt-in for per-request trace-message
 
 
 

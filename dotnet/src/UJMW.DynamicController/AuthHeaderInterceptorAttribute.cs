@@ -19,7 +19,8 @@ namespace System.Web.UJMW {
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next) {
 
-      if (UjmwHostConfiguration.AuthHeaderEvaluator == null) {
+      AuthHeaderValidationMethod authHeaderEvaluator = UjmwHostConfiguration.CurrentAuthHeaderEvaluator;
+      if (authHeaderEvaluator == null) {
         await next();
         return;
       }
@@ -58,11 +59,19 @@ namespace System.Web.UJMW {
 
         }
 
+        string apiGroupName = GetApiGroupNameFromContext(context);
+
         int httpReturnCode = 200;
         string failedReason = string.Empty;
-        if (!UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-          rawHeader, contractType, calledContractMethod, apiCaller, ref httpReturnCode, ref failedReason
-        )) {
+        KeyValuePair<string, string>[] responseHeaders = new KeyValuePair<string, string>[0];
+        bool authSuccess = authHeaderEvaluator.Invoke(
+          rawHeader, contractType, calledContractMethod, apiGroupName, apiCaller,
+          ref httpReturnCode, ref failedReason, ref responseHeaders
+        );
+
+        WriteResponseHeaders(context.HttpContext, responseHeaders);
+
+        if (!authSuccess) {
          
           if (httpReturnCode == 200) {
             httpReturnCode = 403;
@@ -96,6 +105,55 @@ namespace System.Web.UJMW {
       }
 
     }//OnActionExecutionAsync()
+
+    /// <summary>
+    /// Writes the response headers returned by the AuthHeaderEvaluator, after replacing the
+    /// placeholder '{RequestBaseUrl}' with the base URL of the current request.
+    /// </summary>
+    private static void WriteResponseHeaders(HttpContext httpContext, KeyValuePair<string, string>[] responseHeaders) {
+      if (responseHeaders == null || responseHeaders.Length == 0) {
+        return;
+      }
+      string requestBaseUrl = GetRequestBaseUrl(httpContext.Request);
+      foreach (KeyValuePair<string, string> responseHeader in responseHeaders) {
+        if (string.IsNullOrWhiteSpace(responseHeader.Key)) {
+          continue;
+        }
+        string headerValue = UjmwHostConfiguration.ResolveRequestBaseUrlPlaceholder(responseHeader.Value, requestBaseUrl);
+        httpContext.Response.Headers.Append(responseHeader.Key, headerValue);
+      }
+    }
+
+    /// <summary>
+    /// Builds 'scheme://host[:port]' plus path base (without trailing slash) from the incoming request.
+    /// </summary>
+    private static string GetRequestBaseUrl(HttpRequest request) {
+      string requestBaseUrl = request.Scheme + "://" + request.Host.ToUriComponent() + request.PathBase.ToUriComponent();
+      return requestBaseUrl.TrimEnd('/');
+    }
+
+    private static Dictionary<Type, string> _ApiGroupNamesPerControllerType = new Dictionary<Type, string>();
+
+    /// <summary>
+    /// Returns the API group name (from '[ApiExplorerSettings(GroupName)]' of the controller class)
+    /// or an empty string, if no group name is declared.
+    /// </summary>
+    private static string GetApiGroupNameFromContext(ActionExecutingContext context) {
+      Type controllerType = context.Controller.GetType();
+      lock (_ApiGroupNamesPerControllerType) {
+        string apiGroupName;
+        if (_ApiGroupNamesPerControllerType.TryGetValue(controllerType, out apiGroupName)) {
+          return apiGroupName;
+        }
+        apiGroupName = string.Empty;
+        ApiExplorerSettingsAttribute apiExplorerSettings = controllerType.GetCustomAttribute<ApiExplorerSettingsAttribute>(true);
+        if (apiExplorerSettings != null && !string.IsNullOrWhiteSpace(apiExplorerSettings.GroupName)) {
+          apiGroupName = apiExplorerSettings.GroupName;
+        }
+        _ApiGroupNamesPerControllerType.Add(controllerType, apiGroupName);
+        return apiGroupName;
+      }
+    }
 
     //private static Dictionary<string, MethodInfo> _MethodBuffer = new Dictionary<string, MethodInfo>();
 

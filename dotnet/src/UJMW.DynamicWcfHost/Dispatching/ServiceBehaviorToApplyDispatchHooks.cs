@@ -14,10 +14,16 @@ namespace System.Web.UJMW {
 
     private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
     private OutgoingResponseSideChannelConfiguration _OutboundSideChannelCfg;
+    private string _ApiGroupName;
 
-    public ServiceBehaviorToApplyDispatchHooks(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg) {
+    /// <summary></summary>
+    /// <param name="inboundSideChannelCfg"></param>
+    /// <param name="outboundSideChannelCfg"></param>
+    /// <param name="apiGroupName">logical name of the endpoint (derived from the relative endpoint path, "" if unknown)</param>
+    public ServiceBehaviorToApplyDispatchHooks(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg, string apiGroupName) {
       _InboundSideChannelCfg = inboundSideChannelCfg;
       _OutboundSideChannelCfg = outboundSideChannelCfg;
+      _ApiGroupName = apiGroupName;
     }
 
     public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters) {
@@ -32,7 +38,7 @@ namespace System.Web.UJMW {
 
       foreach (ChannelDispatcher dispatcher in serviceHostBase.ChannelDispatchers) {
         foreach (EndpointDispatcher endpoint in dispatcher.Endpoints) {
-          endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector(_InboundSideChannelCfg, _OutboundSideChannelCfg));
+          endpoint.DispatchRuntime.MessageInspectors.Add(new DispatchMessageInspector(_InboundSideChannelCfg, _OutboundSideChannelCfg, _ApiGroupName));
         }
       }
 

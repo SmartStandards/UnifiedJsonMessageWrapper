@@ -42,6 +42,7 @@ namespace System.Web.UJMW {
     private static PropertyInfo _ApiExplorerSettingsGroupNameProp = typeof(ApiExplorerSettingsAttribute).GetProperty(nameof(ApiExplorerSettingsAttribute.GroupName));
 
     private static ConstructorInfo _AuthHeaderInterceptorAttributeConstructor = typeof(AuthHeaderInterceptorAttribute).GetConstructors().Single();
+    private static ConstructorInfo _AllowAnonymousAttributeConstructor = typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute).GetConstructor(Type.EmptyTypes);
 
     private static ConstructorInfo _TagsAttributeContructor = Type.GetType("Microsoft.AspNetCore.Http.TagsAttribute, Microsoft.AspNetCore.Http.Extensions", false)?.GetConstructors()?.FirstOrDefault();
 
@@ -249,6 +250,14 @@ namespace System.Web.UJMW {
           _AuthHeaderInterceptorAttributeConstructor, new object[] { }
         );
         typeBuilder.SetCustomAttribute(authHeaderInterceptorAttributeBuilder);
+
+        if (options.AllowAnonymousForAuthHeaderEvaluatorHook) {
+          //optional: the authentication is done by the UJMW hook, so a host-wide FallbackPolicy should not double-check it
+          CustomAttributeBuilder allowAnonymousAttributeBuilder = new CustomAttributeBuilder(
+            _AllowAnonymousAttributeConstructor, new object[] { }
+          );
+          typeBuilder.SetCustomAttribute(allowAnonymousAttributeBuilder);
+        }
       }
 
       // ##### FIELD DEFINITIONs #####

@@ -69,6 +69,25 @@ namespace System.Web.UJMW {
     /// </summary>
     public bool EnableAuthHeaderEvaluatorHook { get; set; } = true;
 
+    private bool _AllowAnonymousForAuthHeaderEvaluatorHook = false;
+
+    /// <summary>
+    /// OPTIONAL (default: false): When true AND 'EnableAuthHeaderEvaluatorHook' is true, an '[AllowAnonymous]' attribute
+    /// will be emitted on the dynamic controller, so that a host-wide ASP.NET Core 'FallbackPolicy' (or other authorization
+    /// policies) will not double-check calls, whose authentication is already done by the UJMW AuthHeaderEvaluator hook.
+    /// WARNING: only enable this, if an evaluator is registered via 'UjmwHostConfiguration.SetAuthHeaderEvaluator(...)',
+    /// because '[AllowAnonymous]' disables the ASP.NET Core authorization for the controller completely
+    /// (including an attribute emitted via 'AuthAttribute')!
+    /// </summary>
+    public bool AllowAnonymousForAuthHeaderEvaluatorHook {
+      get {
+        return _AllowAnonymousForAuthHeaderEvaluatorHook;
+      }
+      set {
+        _AllowAnonymousForAuthHeaderEvaluatorHook = value;
+      }
+    }
+
     /// <summary>
     /// If enabled, any user can access the controller via http-GET (without authentication) and will see an info-site.
     /// </summary>
@@ -279,6 +298,7 @@ namespace System.Web.UJMW {
       clone.EnableRequestSidechannel = this.EnableRequestSidechannel;
       clone.EnableResponseSidechannel = this.EnableResponseSidechannel;
       clone.EnableAuthHeaderEvaluatorHook = this.EnableAuthHeaderEvaluatorHook;
+      clone.AllowAnonymousForAuthHeaderEvaluatorHook = this.AllowAnonymousForAuthHeaderEvaluatorHook;
       clone.EnableInfoSite = this.EnableInfoSite;
       clone.AuthAttribute = this.AuthAttribute;
       clone.AuthAttributeConstructorParams = this.AuthAttributeConstructorParams;

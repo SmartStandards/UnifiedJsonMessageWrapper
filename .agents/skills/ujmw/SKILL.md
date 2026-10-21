@@ -1418,9 +1418,43 @@ UJMW can centrally evaluate the HTTP Authorization header with knowledge of:
 
 - contract type,
 - target contract method,
+- API group name (logical name of the endpoint),
 - remote caller information.
 
-Example shape:
+The evaluator can additionally return HTTP response headers (for accepted AND rejected requests).
+
+Preferred registration (new form, `AuthHeaderValidationMethod`):
+
+```csharp
+UjmwHostConfiguration.SetAuthHeaderEvaluator(
+  (
+    string rawAuthHeader,
+    Type contractType,
+    MethodInfo targetContractMethod,
+    string apiGroupName,
+    string callingMachine,
+    ref int httpReturnCode,
+    ref string failedReason,
+    ref KeyValuePair<string, string>[] responseHeaders
+  ) => {
+
+    // validate
+    // optional: responseHeaders = new[] { new KeyValuePair<string, string>("WWW-Authenticate", "Bearer resource_metadata=\"{RequestBaseUrl}/.well-known/oauth-protected-resource\"") };
+
+    return true;
+  }
+);
+```
+
+Rules:
+
+- `responseHeaders` is initialized with an empty array (never `null`) before the call. The host writes all returned headers to the HTTP response, regardless of the evaluation result.
+- Header values may contain the literal placeholder `{RequestBaseUrl}` (case-sensitive, every occurrence). The host replaces it with `scheme://host[:port]` plus path base / application virtual path, without trailing slash. Evaluators therefore do not need to know the public host URL.
+- `apiGroupName` (ASP.NET Core): the `ApiExplorerSettings(GroupName)` of the dynamic controller (= `options.ApiGroupName`), `""` if none.
+- `apiGroupName` (WCF): derived from the relative endpoint path of the service activation: trim `/`, remove trailing `.svc` (case-insensitive), replace `/` with `-`, preserve casing (`/api/v1/Calendar.svc` → `api-v1-Calendar`), `""` if unknown.
+- The CommandLineFacade exposes the same API surface but never invokes the evaluator.
+
+Legacy form (still supported, marked `[Obsolete]`):
 
 ```csharp
 UjmwHostConfiguration.AuthHeaderEvaluator =
@@ -1439,6 +1473,8 @@ UjmwHostConfiguration.AuthHeaderEvaluator =
   };
 ```
 
+Internally only ONE evaluator is stored (always in the new form). Legacy delegates are wrapped (API group name ignored, no response headers). Reading the obsolete property returns the original legacy delegate, or a reverse wrapper when the new form was registered. The last registration wins.
+
 ### 16.2 Endpoint opt-out
 
 ```csharp
@@ -1446,6 +1482,14 @@ options.EnableAuthHeaderEvaluatorHook = false;
 ```
 
 This is a deliberate exception and SHOULD NOT be applied casually.
+
+Optional (ASP.NET Core only, default `false`):
+
+```csharp
+options.AllowAnonymousForAuthHeaderEvaluatorHook = true;
+```
+
+Emits `[AllowAnonymous]` on the dynamic controller (only when `EnableAuthHeaderEvaluatorHook` is also `true`), so a host-wide ASP.NET Core `FallbackPolicy` does not double-check calls that are already authenticated by the UJMW evaluator. Only enable this when an evaluator is registered, because `[AllowAnonymous]` disables the ASP.NET Core authorization for that controller completely (including an `AuthAttribute`).
 
 ### 16.3 AuthTokenHandling relationship
 

@@ -149,7 +149,10 @@ namespace System.Web.UJMW {
           customizedServiceBehaviour = host.Description.Behaviors.Find<ServiceBehaviorToApplyDispatchHooks>();
         }
         else { 
-          customizedServiceBehaviour = new ServiceBehaviorToApplyDispatchHooks(inboundSideChannelCfg, outboundSideChannelCfg);
+          customizedServiceBehaviour = new ServiceBehaviorToApplyDispatchHooks(
+            inboundSideChannelCfg, outboundSideChannelCfg,
+            UjmwHostConfiguration.DeriveApiGroupNameFromRelativeEndpointPath(GetRelativeEndpointPath(baseAddresses[0]))
+          );
           host.Description.Behaviors.Add(customizedServiceBehaviour);
         }
 
@@ -172,6 +175,23 @@ namespace System.Web.UJMW {
         }
         throw;
       }
+    }
+
+    /// <summary>
+    /// Returns the (unescaped) path of the given endpoint address relative to the application virtual path
+    /// (example: 'http://host/app/api/v1/Calendar.svc' -> '/api/v1/Calendar.svc').
+    /// </summary>
+    private static string GetRelativeEndpointPath(Uri endpointAddress) {
+      string absolutePath = Uri.UnescapeDataString(endpointAddress.AbsolutePath);
+      string applicationVPath = HostingEnvironment.ApplicationVirtualPath;
+      if (applicationVPath == null) {
+        applicationVPath = string.Empty;
+      }
+      applicationVPath = applicationVPath.TrimEnd('/');
+      if (applicationVPath.Length > 0 && absolutePath.StartsWith(applicationVPath + "/", StringComparison.OrdinalIgnoreCase)) {
+        return absolutePath.Substring(applicationVPath.Length);
+      }
+      return absolutePath;
     }
 
     private static void CollectUrlsFrom(Uri[] concreteAddresses) {

@@ -406,7 +406,9 @@ namespace System.Web.UJMW {
                   }
                 }
 
-                DevLogger.LogTrace(0, 72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
+                if (UjmwHostConfiguration.EnableTraceMessagesForEveryIncommingRequest) {
+                  DevLogger.LogTrace(0, 72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
+                }
 
                 ///// (end) RESTORE INCOMMING SIDECHANNEL /////
 

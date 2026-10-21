@@ -21,10 +21,50 @@ namespace System.Web.UJMW {
 
     private IncommingRequestSideChannelConfiguration _InboundSideChannelCfg;
     private OutgoingResponseSideChannelConfiguration _OutboundSideChannelCfg;
+    private string _ApiGroupName;
 
-    public DispatchMessageInspector(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg) {
+    /// <summary>
+    /// Transports the response headers returned by the AuthHeaderEvaluator (placeholders already resolved)
+    /// from 'AfterReceiveRequest' to 'BeforeSendReply'. It is attached to the current OperationContext
+    /// (instead of the correlation state, because in case of a rejection 'BeforeSendReply' will be called
+    /// without a correlation state, and instead of an AsyncLocal, because WCF does not guarantee that the
+    /// ExecutionContext flows between these dispatcher stages).
+    /// </summary>
+    private sealed class AuthResponseHeadersExtension : IExtension<OperationContext> {
+
+      private KeyValuePair<string, string>[] _Headers;
+
+      public AuthResponseHeadersExtension(KeyValuePair<string, string>[] headers) {
+        _Headers = headers;
+      }
+
+      public KeyValuePair<string, string>[] Headers {
+        get {
+          return _Headers;
+        }
+      }
+
+      /// <summary>
+      /// No-op (required by IExtension).
+      /// </summary>
+      public void Attach(OperationContext owner) {
+      }
+
+      /// <summary>
+      /// No-op (required by IExtension).
+      /// </summary>
+      public void Detach(OperationContext owner) {
+      }
+
+    }
+
+    public DispatchMessageInspector(IncommingRequestSideChannelConfiguration inboundSideChannelCfg, OutgoingResponseSideChannelConfiguration outboundSideChannelCfg, string apiGroupName) {
       _InboundSideChannelCfg = inboundSideChannelCfg;
       _OutboundSideChannelCfg = outboundSideChannelCfg;
+      _ApiGroupName = apiGroupName;
+      if (_ApiGroupName == null) {
+        _ApiGroupName = string.Empty;
+      }
     }
 
     private class CorellationStateContainer {
@@ -40,6 +80,8 @@ namespace System.Web.UJMW {
 
       HttpRequestMessageProperty httpRequest = (HttpRequestMessageProperty)incomingWcfMessage.Properties[HttpRequestMessageProperty.Name];
 
+      AuthHeaderValidationMethod authHeaderEvaluator = UjmwHostConfiguration.CurrentAuthHeaderEvaluator;
+
       CorellationStateContainer corellationState = new CorellationStateContainer();
       corellationState.HttpVerb = httpRequest.Method;
       corellationState.HttpOrigin = httpRequest.Headers["origin"]?.ToString();
@@ -48,7 +90,7 @@ namespace System.Web.UJMW {
       }
 
       //no hook neccessarry
-      if (UjmwHostConfiguration.AuthHeaderEvaluator == null && _InboundSideChannelCfg.AcceptedChannels.Length == 0) {
+      if (authHeaderEvaluator == null && _InboundSideChannelCfg.AcceptedChannels.Length == 0) {
         corellationState.SkipBody = true;
         return corellationState;
       }
@@ -95,7 +137,7 @@ namespace System.Web.UJMW {
       int httpReturnCode = 200;
       string failedReason = string.Empty;
 
-      if (UjmwHostConfiguration.AuthHeaderEvaluator != null) {
+      if (authHeaderEvaluator != null) {
 
         string rawAuthHeader = null;
 
@@ -103,10 +145,17 @@ namespace System.Web.UJMW {
           rawAuthHeader = httpRequest.Headers["Authorization"];
         }
 
-        bool authSuccess = UjmwHostConfiguration.AuthHeaderEvaluator.Invoke(
-          rawAuthHeader, serviceContractType, corellationState.ContractMethod,
-          callingMachine, ref httpReturnCode, ref failedReason
+        KeyValuePair<string, string>[] responseHeaders = new KeyValuePair<string, string>[0];
+
+        bool authSuccess = authHeaderEvaluator.Invoke(
+          rawAuthHeader, serviceContractType, corellationState.ContractMethod, _ApiGroupName,
+          callingMachine, ref httpReturnCode, ref failedReason, ref responseHeaders
         );
+
+        KeyValuePair<string, string>[] resolvedResponseHeaders = ResolveResponseHeaders(responseHeaders, fullCallUrl);
+        if (resolvedResponseHeaders != null) {
+          OperationContext.Current.Extensions.Add(new AuthResponseHeadersExtension(resolvedResponseHeaders));
+        }
 
         if (!authSuccess) {
 
@@ -258,6 +307,18 @@ namespace System.Web.UJMW {
         outgoingHttpResponse.Headers.Add("Access-Control-Allow-Headers", UjmwHostConfiguration.CorsAllowHeaders);
       }
 
+      //headers provided by the AuthHeaderEvaluator (for accepted AND rejected requests)
+      OperationContext currentOperationContext = OperationContext.Current;
+      if (currentOperationContext != null) {
+        AuthResponseHeadersExtension authResponseHeadersExtension = currentOperationContext.Extensions.Find<AuthResponseHeadersExtension>();
+        if (authResponseHeadersExtension != null) {
+          currentOperationContext.Extensions.Remove(authResponseHeadersExtension);
+          foreach (KeyValuePair<string, string> authResponseHeader in authResponseHeadersExtension.Headers) {
+            outgoingHttpResponse.Headers.Add(authResponseHeader.Key, authResponseHeader.Value);
+          }
+        }
+      }
+
       if (state == null && outgoingHttpResponse.StatusCode == HttpStatusCode.OK) {
         outgoingHttpResponse.StatusCode = HttpStatusCode.OK;
         //dont skip body - because this resonse contains the .svc-overview page
@@ -311,6 +372,34 @@ namespace System.Web.UJMW {
 
         ///// (end) CAPTURE OUTGOING BACKCHANNEL /////      
       }
+    }
+
+    /// <summary>
+    /// Filters invalid entries and resolves the '{RequestBaseUrl}' placeholder within the header values
+    /// (base URL = 'scheme://host[:port]' plus application virtual path, without trailing slash).
+    /// </summary>
+    private static KeyValuePair<string, string>[] ResolveResponseHeaders(KeyValuePair<string, string>[] responseHeaders, string fullCallUrl) {
+      if (responseHeaders == null || responseHeaders.Length == 0) {
+        return null;
+      }
+      string requestBaseUrl = string.Empty;
+      Uri callUri;
+      if (Uri.TryCreate(fullCallUrl, UriKind.Absolute, out callUri)) {
+        string applicationVPath = System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath;
+        if (applicationVPath == null) {
+          applicationVPath = string.Empty;
+        }
+        requestBaseUrl = (callUri.GetLeftPart(UriPartial.Authority) + applicationVPath).TrimEnd('/');
+      }
+      List<KeyValuePair<string, string>> resolvedHeaders = new List<KeyValuePair<string, string>>();
+      foreach (KeyValuePair<string, string> responseHeader in responseHeaders) {
+        if (string.IsNullOrWhiteSpace(responseHeader.Key)) {
+          continue;
+        }
+        string resolvedValue = UjmwHostConfiguration.ResolveRequestBaseUrlPlaceholder(responseHeader.Value, requestBaseUrl);
+        resolvedHeaders.Add(new KeyValuePair<string, string>(responseHeader.Key, resolvedValue));
+      }
+      return resolvedHeaders.ToArray();
     }
 
     private string GetJsonBodyFromWcfMessage(ref Message message) {
