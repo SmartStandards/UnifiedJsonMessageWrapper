@@ -699,6 +699,66 @@ details.section > .section-body {
   color: #666;
 }
 
+/* parameter documentation as help side panel right of the request/response boxes */
+.test-client-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.editor-column {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.doc-column {
+  flex: 0 0 340px;
+  max-width: 40%;
+  max-height: 75vh;
+  overflow: auto;
+  position: sticky;
+  top: 0;
+  background: #fbfbf4;
+  border: 1px solid #e3e3d0;
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.doc-block + .doc-block {
+  margin-top: 10px;
+}
+
+.doc-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.doc-entry {
+  margin-bottom: 6px;
+}
+
+.doc-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.doc-name {
+  font-weight: 600;
+  font-family: Consolas, monospace;
+}
+
+.doc-type {
+  color: #777;
+  font-family: Consolas, monospace;
+}
+
+.doc-text {
+  white-space: pre-wrap;
+  color: #333;
+}
+
 .doc-member {
   margin: 4px 0 0 14px;
   padding-left: 8px;

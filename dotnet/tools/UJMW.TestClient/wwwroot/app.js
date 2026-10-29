@@ -917,6 +917,7 @@
     if (!method) {
       e.signature.textContent = '';
       setDocText(e.methodSummary, '');
+      e.docColumn.classList.add('hidden');
       return;
     }
     e.signature.textContent = method.signature;
@@ -926,27 +927,25 @@
     const inputParameters = parameters.filter((p) => p.direction !== 'out');
     const outputParameters = parameters.filter((p) => p.direction !== 'in');
 
+    // only documented parameters/members are mentioned (undocumented ones would only be noise)
     const appendEntry = (container, name, typeName, description, suffix, members) => {
+      const documentedMembers = (members || []).filter((member) => member.description);
+      if (!description && documentedMembers.length === 0) {
+        return;
+      }
       const entry = el('div', 'doc-entry');
       const head = el('div', 'doc-entry-head');
       head.append(el('span', 'doc-name', name), el('span', 'doc-type', typeName + (suffix || '')));
       entry.appendChild(head);
       if (description) {
         entry.appendChild(el('div', 'doc-text', description));
-      } else if (!members || members.length === 0) {
-        entry.appendChild(el('div', 'doc-text doc-missing', '(no description)'));
       }
       // properties of complex types (e.g. the 'MyMethodRequest' capsule) carry the interesting documentation
-      (members || []).forEach((member) => {
+      documentedMembers.forEach((member) => {
         const memberEntry = el('div', 'doc-entry doc-member');
         const memberHead = el('div', 'doc-entry-head');
         memberHead.append(el('span', 'doc-name', '.' + member.name), el('span', 'doc-type', member.typeName));
-        memberEntry.appendChild(memberHead);
-        if (member.description) {
-          memberEntry.appendChild(el('div', 'doc-text', member.description));
-        } else {
-          memberEntry.appendChild(el('div', 'doc-text doc-missing', '(no description)'));
-        }
+        memberEntry.append(memberHead, el('div', 'doc-text', member.description));
         entry.appendChild(memberEntry);
       });
       container.appendChild(entry);
@@ -954,9 +953,6 @@
 
     const requestDocs = el('div', 'doc-block');
     requestDocs.appendChild(el('div', 'doc-title', 'Request parameters'));
-    if (inputParameters.length === 0) {
-      requestDocs.appendChild(el('div', 'doc-text doc-missing', '(none)'));
-    }
     inputParameters.forEach((p) => {
       let suffix = '';
       if (p.direction === 'ref') {
@@ -975,10 +971,13 @@
     outputParameters.forEach((p) => {
       appendEntry(responseDocs, p.name, p.typeName, p.description, ' (' + p.direction + ')', p.members);
     });
-    if (responseDocs.childNodes.length === 1) {
-      responseDocs.appendChild(el('div', 'doc-text doc-missing', '(void)'));
+    if (requestDocs.childNodes.length > 1) {
+      e.docColumn.appendChild(requestDocs);
     }
-    e.docColumn.append(requestDocs, responseDocs);
+    if (responseDocs.childNodes.length > 1) {
+      e.docColumn.appendChild(responseDocs);
+    }
+    e.docColumn.classList.toggle('hidden', e.docColumn.childNodes.length === 0);
   }
 
   function applyPreset(preset) {
