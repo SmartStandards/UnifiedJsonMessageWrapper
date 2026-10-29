@@ -29,6 +29,9 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 | UJMW invocation is plain HTTP (`HttpClient.Send`, synchronous on a worker thread) | the test client must not depend on the contract assembly being executable; it reproduces the UJMW wire protocol ("Level C" of the `ujmw` skill) |
 | Persistence: one JSON file per user `%APPDATA%\UJMW.TestClient\settings.json` (Newtonsoft.Json); WebView2 user data in `%LOCALAPPDATA%\UJMW.TestClient\WebView2` | persistent per user, roaming capable |
 | JWT generation via `jose-jwt` | requirement |
+| Infrastructure data (zones as area tree, hosts with web applications, OAuth configurations, wellknown endpoints) is provided by `System.Web.UJMW.IUjmwManagedInfrastructure` (shared in `UJMW.DynamicClient`) | reusable contract; only infrastructure-relevant data, never user-specific presets/templates/JWT inputs |
+| Infrastructure source selectable in the settings: **Local** (`LocalUjmwManagedInfrastructure`, `%APPDATA%\UJMW.TestClient\infrastructure.json`), **External** (UJMW `DynamicClientFactory` proxy with URL + token) or **Reflection** (public parameterless implementation in a DLL next to the client; only DLLs referencing `UJMW.DynamicClient` are loaded) | out-of-the-box usable locally, centrally manageable in organizations |
+| Editing is only offered if `GetCapabilities().IsReadOnly == false`; Resolve only if `CanResolve == true` | capability-driven UI |
 | Target framework `net10.0-windows` | aligned with newest TFM of the solution |
 
 ## 3. Functional requirements
@@ -55,10 +58,11 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 ### 3.4 Type detail view (main tree: type selected)
 
 - **URL field** with a persistent history **per FullQualifiedTypeName** (DLL- and version-independent) as dropdown, ordered by last-used descending. Free text input is possible.
-- **Resolve** button next to the URL: opens a dialog that will query an ApiCatalog service with an infrastructure zone info and show a selection of resolved URLs. *The concrete resolution is not specified yet* – currently a placeholder dialog (zone selection + empty result list + notice).
-- **Infrastructure zones** are maintained in the settings of the client (name, ApiCatalog URL, description).
+- **Zone** field: dropdown (zones of the managed infrastructure, flattened area tree) **or** free text input; persisted per user (`CurrentZone`). The zone replaces the placeholder `{zone}` inside the SideChannel content before sending (JSON-string-escaped, i.e. use it inside a JSON string: `"zone": "{zone}"`).
+- **Resolve** button next to the zone: only enabled if `IUjmwManagedInfrastructure.GetCapabilities().CanResolve`. Calls `Resolve(contractName = FullQualifiedTypeName, zone)`; one URL is applied directly, multiple URLs open a child popup for selection.
+- **Wellknown** combobox: wellknown endpoints of the contract from the infrastructure store (mapping contract -> host + web application + endpoint URL, resulting URL `https://<host>/<applicationBaseUrl>/<endpointUrl>`; the endpoint URL is maintained exclusively here). Selecting applies the URL; **New…** / **Delete** only if the store is not read-only.
 - **Open browser** button next to the URL.
-- Once a URL is present, the following areas are shown:
+- The following areas are **always visible but greyed out/disabled** as long as no URL is present:
 	- a) **Authorization** header value: manual input or issued via a special dialog containing
 		- a **JWT generator** based on `jose-jwt` (algorithm, sign key incl. base64 flag, payload JSON, lifetime, automatic `iat`/`nbf`/`exp`); all inputs including the sign key are persisted,
 		- an **OAuth authorization code flow requestor** based on WebView2 (authorize URL, token URL, client id, optional client secret, redirect URI, scope, PKCE); settings persisted.
@@ -68,7 +72,9 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 	- combobox with all methods of the type (interfaces include inherited interface methods),
 	- selecting a method prepares a JSON request: all non-`out` parameters (`ref` included), meaningfully filled, optional parameters with their compiled default value, complex types expanded (camelCase property names, depth-limited),
 	- the sidechannel property is always pre-filled as `"_": {AUTO}`; the token `{AUTO}` is replaced **immediately before sending** with the content of the SideChannel text box (`{}` if empty),
-	- **EXECUTE** button (`POST <url>/<methodName>`, `Content-Type: application/json`, optional `Authorization` header),
+	- **EXECUTE** button (`POST <url>/<methodName>`, `Content-Type: application/json`, optional `Authorization` header); the request timeout is configurable in the settings (**default 5 seconds**, per-call `CancellationTokenSource`),
+	- request and response text boxes use the **full width** of the area (minus the documentation column), have a fixed (doubled) height, are not resizable and show scrollbars,
+	- **XML documentation** (`<assembly>.xml` next to the DLL, read by `XmlDocReader`): the type summary is shown below the header, the method summary below the signature, parameter / return value descriptions in a **documentation column at the right edge** of the test client area,
 	- read-only result box:
 		- `fault` property not null and not `""` -> background **light red**,
 		- hard HTTP error codes / transport exceptions / invalid UJMW responses -> shown in the box with **darker red** background.

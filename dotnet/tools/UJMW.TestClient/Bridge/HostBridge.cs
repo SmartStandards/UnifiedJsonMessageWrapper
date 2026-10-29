@@ -10,7 +10,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Web.UJMW;
 using UJMW.TestClient.Auth;
+using UJMW.TestClient.Infrastructure;
 using UJMW.TestClient.Inspection;
 using UJMW.TestClient.Invocation;
 using UJMW.TestClient.Model;
@@ -74,6 +76,10 @@ namespace UJMW.TestClient.Bridge {
         this.BeginExecute(id, args);
         return;
       }
+      if (_InfrastructureCommands.Contains(command)) {
+        this.BeginInfrastructureCommand(id, command, args);
+        return;
+      }
       JToken result;
       try {
         result = this.ExecuteCommand(command, args, droppedPaths);
@@ -108,6 +114,18 @@ namespace UJMW.TestClient.Bridge {
           return this.BuildState();
         case "getTypeDetail":
           return this.GetTypeDetail(args.Value<string>("path"), args.Value<string>("typeFullName"));
+        case "setClientSettings":
+          this.SetClientSettings(args.Value<int>("requestTimeoutSeconds"));
+          return this.BuildState();
+        case "setCurrentZone":
+          this.Settings.CurrentZone = args.Value<string>("zone");
+          _Store.Save();
+          return JValue.CreateNull();
+        case "saveInfrastructureSettings":
+          this.SaveInfrastructureSettings(args["infrastructure"].ToObject<InfrastructureSettings>(_Serializer));
+          return this.BuildState();
+        case "findInfrastructureImplementations":
+          return new JArray(InfrastructureProvider.FindReflectionCandidates());
         case "touchUrl":
           this.TouchUrl(args.Value<string>("typeFullName"), args.Value<string>("url"));
           return this.BuildUrlHistory(args.Value<string>("typeFullName"));
@@ -144,15 +162,10 @@ namespace UJMW.TestClient.Bridge {
           this.Settings.LeftPanelWidth = args.Value<int>("leftPanelWidth");
           _Store.Save();
           return JValue.CreateNull();
-        case "saveZones":
-          this.SaveZones(args["zones"].ToObject<InfrastructureZone[]>(_Serializer));
-          return this.BuildState();
         case "generateJwt":
           return this.GenerateJwt(args["jwt"].ToObject<JwtGeneratorSettings>(_Serializer));
         case "startOAuth":
           return this.StartOAuth(args["oauth"].ToObject<OAuthSettings>(_Serializer));
-        case "resolveUrls":
-          return this.ResolveUrls(args.Value<string>("zoneName"), args.Value<string>("typeFullName"));
         default:
           throw new NotSupportedException($"Unknown command '{command}'.");
       }
@@ -177,8 +190,10 @@ namespace UJMW.TestClient.Bridge {
       state["dlls"] = dlls;
       state["presets"] = JToken.FromObject(this.Settings.Presets, _Serializer);
       state["sideChannelTemplates"] = JToken.FromObject(this.Settings.SideChannelTemplates, _Serializer);
-      state["zones"] = JToken.FromObject(this.Settings.Zones, _Serializer);
       state["jwt"] = JToken.FromObject(this.Settings.Jwt, _Serializer);
+      state["requestTimeoutSeconds"] = this.Settings.RequestTimeoutSeconds;
+      state["currentZone"] = this.Settings.CurrentZone;
+      state["infrastructureSettings"] = JToken.FromObject(this.Settings.Infrastructure, _Serializer);
       state["oauth"] = JToken.FromObject(this.Settings.OAuth, _Serializer);
       state["sideChannelText"] = this.Settings.SideChannelText;
       state["leftPanelWidth"] = this.Settings.LeftPanelWidth;
@@ -261,10 +276,15 @@ namespace UJMW.TestClient.Bridge {
     private JObject GetTypeDetail(string path, string typeFullName) {
       JObject detail = new JObject();
       if (File.Exists(path)) {
-        detail["methods"] = JToken.FromObject(AssemblyInspector.GetMethods(path, typeFullName), _Serializer);
+        ContractDescriptor contract = AssemblyInspector.GetContract(path, typeFullName);
+        detail["methods"] = JToken.FromObject(contract.Methods, _Serializer);
+        detail["summary"] = contract.Summary;
+        detail["hasDocumentationFile"] = contract.HasDocumentationFile;
         detail["warning"] = null;
       } else {
         detail["methods"] = new JArray();
+        detail["summary"] = string.Empty;
+        detail["hasDocumentationFile"] = false;
         detail["warning"] = $"The file '{path}' does not exist (anymore) - methods can not be listed.";
       }
       detail["urlHistory"] = this.BuildUrlHistory(typeFullName);
@@ -361,6 +381,8 @@ namespace UJMW.TestClient.Bridge {
       string authHeader = args.Value<string>("authHeader");
       string sideChannel = args.Value<string>("sideChannel");
       string requestText = args.Value<string>("requestText");
+      string zone = args.Value<string>("zone");
+      int timeoutSeconds = this.Settings.RequestTimeoutSeconds;
 
       if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(methodName)) {
         this.PostReply(id, false, null, "URL and method are required.");
@@ -371,10 +393,13 @@ namespace UJMW.TestClient.Bridge {
       }
 
       this.Settings.SideChannelText = sideChannel;
+      if (zone != null) {
+        this.Settings.CurrentZone = zone;
+      }
       _Store.Save();
 
       Task.Run(() => {
-        InvocationResult invocationResult = UjmwInvoker.Invoke(url, methodName, authHeader, sideChannel, requestText);
+        InvocationResult invocationResult = UjmwInvoker.Invoke(url, methodName, authHeader, sideChannel, zone, requestText, timeoutSeconds);
         _Owner.BeginInvoke(new Action(() => this.PostReply(id, true, JToken.FromObject(invocationResult, _Serializer), null)));
       });
     }
@@ -479,7 +504,7 @@ namespace UJMW.TestClient.Bridge {
 
     #endregion
 
-    #region " SideChannel templates and zones "
+    #region " SideChannel templates "
 
     /// <summary>
     /// Creates or overwrites a sidechannel template.
@@ -506,29 +531,273 @@ namespace UJMW.TestClient.Bridge {
       _Store.Save();
     }
 
+    #endregion
+
+    #region " Client settings and managed infrastructure "
+
+    private static readonly HashSet<string> _InfrastructureCommands = new HashSet<string>(StringComparer.Ordinal) {
+      "getInfrastructure",
+      "saveInfrastructureZones",
+      "saveInfrastructureHosts",
+      "saveOAuthConfigurations",
+      "getWellknownEndpoints",
+      "saveWellknownEndpoint",
+      "deleteWellknownEndpoint",
+      "resolveUrls"
+    };
+
+    private readonly object _InfrastructureLock = new object();
+    private IUjmwManagedInfrastructure _Infrastructure = null;
+
     /// <summary>
-    /// Replaces the list of infrastructure zones.
+    /// Applies the general client settings.
     /// </summary>
-    private void SaveZones(InfrastructureZone[] zones) {
-      if (zones == null) {
-        zones = new InfrastructureZone[0];
+    private void SetClientSettings(int requestTimeoutSeconds) {
+      if (requestTimeoutSeconds < 1) {
+        throw new InvalidOperationException("The timeout must be at least 1 second.");
       }
-      this.Settings.Zones = zones.Where((z) => z != null && !string.IsNullOrWhiteSpace(z.Name)).ToArray();
+      this.Settings.RequestTimeoutSeconds = requestTimeoutSeconds;
       _Store.Save();
     }
 
     /// <summary>
-    /// Placeholder for the ApiCatalog based URL resolution (not specified yet).
+    /// Switches the source of the managed infrastructure (Local, External or Reflection).
     /// </summary>
-    private JObject ResolveUrls(string zoneName, string typeFullName) {
-      InfrastructureZone zone = this.Settings.Zones.FirstOrDefault((z) => z.Name == zoneName);
-      if (zone == null) {
-        throw new InvalidOperationException($"The infrastructure zone '{zoneName}' does not exist.");
+    private void SaveInfrastructureSettings(InfrastructureSettings infrastructureSettings) {
+      if (infrastructureSettings == null) {
+        infrastructureSettings = new InfrastructureSettings();
       }
-      JObject result = new JObject();
-      result["urls"] = new JArray();
-      result["message"] = $"The ApiCatalog based resolution is not specified yet. In a future version the ApiCatalog '{zone.ApiCatalogUrl}' of zone '{zone.Name}' will be queried for '{typeFullName}'.";
+      infrastructureSettings.LegacyDataMigrated = this.Settings.Infrastructure.LegacyDataMigrated;
+      this.Settings.Infrastructure = infrastructureSettings;
+      _Store.Save();
+      lock (_InfrastructureLock) {
+        _Infrastructure = null;
+      }
+    }
+
+    /// <summary>
+    /// Executes an infrastructure command on a worker thread (an external store is called via HTTP).
+    /// </summary>
+    private void BeginInfrastructureCommand(long id, string command, JObject args) {
+      InfrastructureSettings infrastructureSettings = this.Settings.Infrastructure;
+      this.MigrateLegacyInfrastructureData();
+      Task.Run(() => {
+        JToken result = null;
+        string error = null;
+        try {
+          IUjmwManagedInfrastructure infrastructure = this.GetInfrastructure(infrastructureSettings);
+          result = this.ExecuteInfrastructureCommand(infrastructure, command, args);
+        } catch (Exception ex) {
+          //bridge boundary: every failure (also of external/custom stores) is reported to the UI
+          error = UnwrapMessage(ex);
+        }
+        _Owner.BeginInvoke(new Action(() => this.PostReply(id, error == null, result, error)));
+      });
+    }
+
+    /// <summary>
+    /// Returns the cached store instance (or creates it).
+    /// </summary>
+    private IUjmwManagedInfrastructure GetInfrastructure(InfrastructureSettings infrastructureSettings) {
+      lock (_InfrastructureLock) {
+        if (_Infrastructure == null) {
+          _Infrastructure = InfrastructureProvider.Create(infrastructureSettings);
+        }
+        return _Infrastructure;
+      }
+    }
+
+    /// <summary>
+    /// Dispatches the infrastructure commands.
+    /// </summary>
+    private JToken ExecuteInfrastructureCommand(IUjmwManagedInfrastructure infrastructure, string command, JObject args) {
+      switch (command) {
+        case "getInfrastructure":
+          return this.BuildInfrastructureState(infrastructure);
+        case "saveInfrastructureZones":
+          EnsureWritable(infrastructure);
+          infrastructure.SaveZones(args["zones"].ToObject<UjmwInfrastructureZone[]>(_Serializer));
+          return this.BuildInfrastructureState(infrastructure);
+        case "saveInfrastructureHosts":
+          EnsureWritable(infrastructure);
+          infrastructure.SaveHosts(args["hosts"].ToObject<UjmwInfrastructureHost[]>(_Serializer));
+          return this.BuildInfrastructureState(infrastructure);
+        case "saveOAuthConfigurations":
+          EnsureWritable(infrastructure);
+          infrastructure.SaveOAuthConfigurations(args["configurations"].ToObject<UjmwOAuthConfiguration[]>(_Serializer));
+          return this.BuildInfrastructureState(infrastructure);
+        case "getWellknownEndpoints":
+          return this.BuildWellknownEndpoints(infrastructure, args.Value<string>("contractName"));
+        case "saveWellknownEndpoint":
+          EnsureWritable(infrastructure);
+          UjmwWellknownEndpoint endpoint = args["endpoint"].ToObject<UjmwWellknownEndpoint>(_Serializer);
+          infrastructure.SaveWellknownEndpoint(endpoint);
+          return this.BuildWellknownEndpoints(infrastructure, endpoint.ContractName);
+        case "deleteWellknownEndpoint":
+          EnsureWritable(infrastructure);
+          string contractName = args.Value<string>("contractName");
+          infrastructure.DeleteWellknownEndpoint(contractName, args.Value<string>("hostUrl"), args.Value<string>("webApplicationName"));
+          return this.BuildWellknownEndpoints(infrastructure, contractName);
+        case "resolveUrls":
+          return this.ResolveUrls(infrastructure, args.Value<string>("contractName"), args.Value<string>("zone"));
+        default:
+          throw new NotSupportedException($"Unknown command '{command}'.");
+      }
+    }
+
+    /// <summary>
+    /// Returns capabilities, zones, hosts and OAuth configurations of the store.
+    /// </summary>
+    private JObject BuildInfrastructureState(IUjmwManagedInfrastructure infrastructure) {
+      JObject state = new JObject();
+      state["capabilities"] = JToken.FromObject(GetCapabilities(infrastructure), _Serializer);
+      state["zones"] = JToken.FromObject(EmptyIfNull(infrastructure.GetZones()), _Serializer);
+      state["hosts"] = JToken.FromObject(EmptyIfNull(infrastructure.GetHosts()), _Serializer);
+      state["oauthConfigurations"] = JToken.FromObject(EmptyIfNull(infrastructure.GetOAuthConfigurations()), _Serializer);
+      return state;
+    }
+
+    /// <summary>
+    /// Returns the wellknown endpoints of a contract including the composed url
+    /// ('&lt;host&gt;/&lt;applicationBaseUrl&gt;/&lt;endpointUrl&gt;').
+    /// </summary>
+    private JArray BuildWellknownEndpoints(IUjmwManagedInfrastructure infrastructure, string contractName) {
+      UjmwInfrastructureHost[] hosts = EmptyIfNull(infrastructure.GetHosts());
+      UjmwWellknownEndpoint[] endpoints = EmptyIfNull(infrastructure.GetWellknownEndpoints(contractName));
+      JArray result = new JArray();
+      foreach (UjmwWellknownEndpoint endpoint in endpoints) {
+        string applicationBaseUrl = string.Empty;
+        UjmwInfrastructureHost host = hosts.FirstOrDefault((h) => string.Equals(TrimUrl(h.HostUrl), TrimUrl(endpoint.HostUrl), StringComparison.OrdinalIgnoreCase));
+        if (host != null && host.WebApplications != null) {
+          UjmwWebApplication application = host.WebApplications.FirstOrDefault((a) => string.Equals(a.Name, endpoint.WebApplicationName, StringComparison.OrdinalIgnoreCase));
+          if (application != null) {
+            applicationBaseUrl = application.ApplicationBaseUrl;
+          }
+        }
+        JObject item = (JObject)JToken.FromObject(endpoint, _Serializer);
+        item["url"] = ComposeUrl(endpoint.HostUrl, applicationBaseUrl, endpoint.EndpointUrl);
+        result.Add(item);
+      }
       return result;
+    }
+
+    /// <summary>
+    /// Resolves the urls of a contract within a zone (only if the store supports it).
+    /// </summary>
+    private JArray ResolveUrls(IUjmwManagedInfrastructure infrastructure, string contractName, string zone) {
+      if (!GetCapabilities(infrastructure).CanResolve) {
+        throw new InvalidOperationException("The current infrastructure store does not support url resolution.");
+      }
+      string[] urls = EmptyIfNull(infrastructure.Resolve(contractName, zone));
+      return new JArray(urls.Where((u) => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Moves the former (client-local) zones and OAuth settings once into the local infrastructure store.
+    /// </summary>
+    private void MigrateLegacyInfrastructureData() {
+      InfrastructureSettings infrastructureSettings = this.Settings.Infrastructure;
+      if (infrastructureSettings.LegacyDataMigrated) {
+        return;
+      }
+      LocalUjmwManagedInfrastructure localStore = new LocalUjmwManagedInfrastructure(InfrastructureProvider.LocalStoreFilePath);
+      if (localStore.GetZones().Length == 0 && this.Settings.Zones.Length > 0) {
+        UjmwInfrastructureZone[] zones = this.Settings.Zones.Select((z) => {
+          UjmwInfrastructureZone zone = new UjmwInfrastructureZone();
+          zone.Name = z.Name;
+          zone.Description = z.Description;
+          return zone;
+        }).ToArray();
+        localStore.SaveZones(zones);
+      }
+      OAuthSettings oauth = this.Settings.OAuth;
+      if (localStore.GetOAuthConfigurations().Length == 0 && !string.IsNullOrWhiteSpace(oauth.AuthorizeUrl)) {
+        UjmwOAuthConfiguration configuration = new UjmwOAuthConfiguration();
+        configuration.Name = "Default";
+        configuration.AuthorizeUrl = oauth.AuthorizeUrl;
+        configuration.TokenUrl = oauth.TokenUrl;
+        configuration.ClientId = oauth.ClientId;
+        configuration.ClientSecret = oauth.ClientSecret;
+        configuration.RedirectUri = oauth.RedirectUri;
+        configuration.Scope = oauth.Scope;
+        configuration.UsePkce = oauth.UsePkce;
+        localStore.SaveOAuthConfigurations(new UjmwOAuthConfiguration[] { configuration });
+      }
+      infrastructureSettings.LegacyDataMigrated = true;
+      this.Settings.Zones = new InfrastructureZone[0];
+      _Store.Save();
+    }
+
+    /// <summary>
+    /// Returns the capabilities (never null).
+    /// </summary>
+    private static UjmwInfrastructureCapabilities GetCapabilities(IUjmwManagedInfrastructure infrastructure) {
+      UjmwInfrastructureCapabilities capabilities = infrastructure.GetCapabilities();
+      if (capabilities == null) {
+        capabilities = new UjmwInfrastructureCapabilities();
+        capabilities.IsReadOnly = true;
+      }
+      return capabilities;
+    }
+
+    /// <summary>
+    /// Throws if the store is read-only.
+    /// </summary>
+    private static void EnsureWritable(IUjmwManagedInfrastructure infrastructure) {
+      if (GetCapabilities(infrastructure).IsReadOnly) {
+        throw new InvalidOperationException("The current infrastructure store is read-only.");
+      }
+    }
+
+    /// <summary>
+    /// Joins url segments with exactly one '/' (empty segments are skipped).
+    /// </summary>
+    private static string ComposeUrl(params string[] segments) {
+      List<string> parts = new List<string>();
+      for (int i = 0; i < segments.Length; i++) {
+        string segment = segments[i];
+        if (string.IsNullOrWhiteSpace(segment)) {
+          continue;
+        }
+        segment = segment.Trim();
+        if (parts.Count == 0) {
+          parts.Add(segment.TrimEnd('/'));
+        } else {
+          parts.Add(segment.Trim('/'));
+        }
+      }
+      return string.Join("/", parts.Where((p) => p.Length > 0));
+    }
+
+    /// <summary>
+    /// Trims whitespace and trailing slashes.
+    /// </summary>
+    private static string TrimUrl(string url) {
+      if (url == null) {
+        return string.Empty;
+      }
+      return url.Trim().TrimEnd('/');
+    }
+
+    /// <summary>
+    /// Returns an empty array instead of null.
+    /// </summary>
+    private static T[] EmptyIfNull<T>(T[] items) {
+      if (items == null) {
+        return new T[0];
+      }
+      return items;
+    }
+
+    /// <summary>
+    /// Returns the message of the innermost relevant exception (reflection/proxy wrappers are skipped).
+    /// </summary>
+    private static string UnwrapMessage(Exception ex) {
+      Exception current = ex;
+      while ((current is System.Reflection.TargetInvocationException || current is AggregateException) && current.InnerException != null) {
+        current = current.InnerException;
+      }
+      return current.Message;
     }
 
     #endregion

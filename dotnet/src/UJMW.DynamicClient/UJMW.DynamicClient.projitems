@@ -20,5 +20,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)HttpPostExecutor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwWebCallInvoker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IAbstractCallInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\IUjmwManagedInfrastructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\LocalUjmwManagedInfrastructure.cs" />
   </ItemGroup>
 </Project>

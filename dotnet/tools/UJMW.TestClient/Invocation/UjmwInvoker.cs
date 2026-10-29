@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using UJMW.TestClient.Inspection;
 
 namespace UJMW.TestClient.Invocation {
@@ -60,27 +60,47 @@ namespace UJMW.TestClient.Invocation {
   /// </summary>
   internal static class UjmwInvoker {
 
-    private static readonly HttpClient _HttpClient = new HttpClient();
+    /// <summary>
+    /// Placeholder within the sidechannel content which is replaced by the selected zone.
+    /// </summary>
+    public const string _ZonePlaceholder = "{zone}";
+
+    private static readonly HttpClient _HttpClient = CreateHttpClient();
 
     /// <summary>
-    /// Replaces the {AUTO} token by the sidechannel content and posts the request to '&lt;baseUrl&gt;/&lt;methodName&gt;'.
+    /// Creates the shared client - the timeout is applied per call (see 'Invoke').
+    /// </summary>
+    private static HttpClient CreateHttpClient() {
+      HttpClient httpClient = new HttpClient();
+      httpClient.Timeout = Timeout.InfiniteTimeSpan;
+      return httpClient;
+    }
+
+    /// <summary>
+    /// Replaces the {zone} placeholder within the sidechannel and the {AUTO} token by the sidechannel content
+    /// and posts the request to '&lt;baseUrl&gt;/&lt;methodName&gt;'.
     /// Never throws for expected failures - they are reported as result of kind 'Error'.
     /// </summary>
-    public static InvocationResult Invoke(string baseUrl, string methodName, string authHeader, string sideChannelText, string requestText) {
+    public static InvocationResult Invoke(string baseUrl, string methodName, string authHeader, string sideChannelText, string zone, string requestText, int timeoutSeconds) {
+      if (timeoutSeconds < 1) {
+        timeoutSeconds = 1;
+      }
       string requestBody;
       string preparationError;
-      if (!TryPrepareRequestBody(requestText, sideChannelText, out requestBody, out preparationError)) {
+      string resolvedSideChannel = ReplaceZonePlaceholder(sideChannelText, zone);
+      if (!TryPrepareRequestBody(requestText, resolvedSideChannel, out requestBody, out preparationError)) {
         return InvocationResult.Create(InvocationResult._KindError, preparationError);
       }
       string url = CombineUrl(baseUrl, methodName);
       Stopwatch stopwatch = Stopwatch.StartNew();
       try {
+        using (CancellationTokenSource timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
         using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url)) {
           request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
           if (!string.IsNullOrWhiteSpace(authHeader)) {
             request.Headers.TryAddWithoutValidation("Authorization", authHeader.Trim());
           }
-          using (HttpResponseMessage response = _HttpClient.Send(request)) {
+          using (HttpResponseMessage response = _HttpClient.Send(request, timeoutSource.Token)) {
             string responseBody = ReadBody(response);
             stopwatch.Stop();
             return EvaluateResponse(url, response, responseBody, stopwatch.ElapsedMilliseconds);
@@ -88,13 +108,29 @@ namespace UJMW.TestClient.Invocation {
         }
       } catch (HttpRequestException ex) {
         return InvocationResult.Create(InvocationResult._KindError, $"POST {url}\r\n\r\nTransport failure: {ex.Message}");
-      } catch (TaskCanceledException) {
-        return InvocationResult.Create(InvocationResult._KindError, $"POST {url}\r\n\r\nTimeout after {_HttpClient.Timeout.TotalSeconds} seconds.");
+      } catch (OperationCanceledException) {
+        return InvocationResult.Create(InvocationResult._KindError, $"POST {url}\r\n\r\nTimeout after {timeoutSeconds} seconds.");
       } catch (UriFormatException ex) {
         return InvocationResult.Create(InvocationResult._KindError, $"Invalid URL '{url}': {ex.Message}");
       } catch (InvalidOperationException ex) {
         return InvocationResult.Create(InvocationResult._KindError, $"Invalid URL '{url}': {ex.Message}");
       }
+    }
+
+    /// <summary>
+    /// Replaces the {zone} placeholder (JSON-string-escaped, so it can be used within quotes).
+    /// </summary>
+    public static string ReplaceZonePlaceholder(string sideChannelText, string zone) {
+      if (string.IsNullOrEmpty(sideChannelText)) {
+        return sideChannelText;
+      }
+      string zoneText = zone;
+      if (zoneText == null) {
+        zoneText = string.Empty;
+      }
+      string escapedZone = JsonConvert.ToString(zoneText.Trim());
+      escapedZone = escapedZone.Substring(1, escapedZone.Length - 2);
+      return sideChannelText.Replace(_ZonePlaceholder, escapedZone);
     }
 
     /// <summary>

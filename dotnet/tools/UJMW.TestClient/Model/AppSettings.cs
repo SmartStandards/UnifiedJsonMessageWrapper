@@ -16,6 +16,45 @@ namespace UJMW.TestClient.Model {
     private OAuthSettings _OAuth = new OAuthSettings();
     private string _SideChannelText = "{\r\n}";
     private int _LeftPanelWidth = 380;
+    private int _RequestTimeoutSeconds = 5;
+    private string _CurrentZone = string.Empty;
+    private InfrastructureSettings _Infrastructure = new InfrastructureSettings();
+
+    /// <summary>
+    /// Timeout for UJMW invocations (default: 5 seconds).
+    /// </summary>
+    public int RequestTimeoutSeconds {
+      get {
+        return _RequestTimeoutSeconds;
+      }
+      set {
+        _RequestTimeoutSeconds = value;
+      }
+    }
+
+    /// <summary>
+    /// Last selected (or manually entered) infrastructure zone, used for the {zone} placeholder and for resolving.
+    /// </summary>
+    public string CurrentZone {
+      get {
+        return _CurrentZone;
+      }
+      set {
+        _CurrentZone = value;
+      }
+    }
+
+    /// <summary>
+    /// Selection of the 'IUjmwManagedInfrastructure' source.
+    /// </summary>
+    public InfrastructureSettings Infrastructure {
+      get {
+        return _Infrastructure;
+      }
+      set {
+        _Infrastructure = value;
+      }
+    }
 
     public DllEntry[] Dlls {
       get {
@@ -98,6 +137,80 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _LeftPanelWidth = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// Selects which 'IUjmwManagedInfrastructure' is used ('Local', 'External' or 'Reflection').
+  /// </summary>
+  public sealed class InfrastructureSettings {
+
+    public const string _ModeLocal = "Local";
+    public const string _ModeExternal = "External";
+    public const string _ModeReflection = "Reflection";
+
+    private string _Mode = _ModeLocal;
+    private string _ExternalUrl = string.Empty;
+    private string _ExternalAuthHeader = string.Empty;
+    private string _ReflectionTypeName = string.Empty;
+    private bool _LegacyDataMigrated = false;
+
+    public string Mode {
+      get {
+        return _Mode;
+      }
+      set {
+        _Mode = value;
+      }
+    }
+
+    /// <summary>
+    /// Base url of the externally managed UJMW service (mode 'External').
+    /// </summary>
+    public string ExternalUrl {
+      get {
+        return _ExternalUrl;
+      }
+      set {
+        _ExternalUrl = value;
+      }
+    }
+
+    /// <summary>
+    /// Authorization header (or plain token) for the externally managed service (mode 'External').
+    /// </summary>
+    public string ExternalAuthHeader {
+      get {
+        return _ExternalAuthHeader;
+      }
+      set {
+        _ExternalAuthHeader = value;
+      }
+    }
+
+    /// <summary>
+    /// Assembly qualified name of an implementation found in a DLL next to the client (mode 'Reflection').
+    /// </summary>
+    public string ReflectionTypeName {
+      get {
+        return _ReflectionTypeName;
+      }
+      set {
+        _ReflectionTypeName = value;
+      }
+    }
+
+    /// <summary>
+    /// True when the former zones/OAuth settings of the client were moved into the local infrastructure store.
+    /// </summary>
+    public bool LegacyDataMigrated {
+      get {
+        return _LegacyDataMigrated;
+      }
+      set {
+        _LegacyDataMigrated = value;
       }
     }
 

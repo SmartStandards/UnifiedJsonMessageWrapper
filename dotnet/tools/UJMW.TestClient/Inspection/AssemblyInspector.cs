@@ -102,9 +102,9 @@ namespace UJMW.TestClient.Inspection {
     }
 
     /// <summary>
-    /// Returns all methods (UJMW operations) of the given type including prepared request templates.
+    /// Returns the documentation and all methods (UJMW operations) of the given type including prepared request templates.
     /// </summary>
-    public static MethodDescriptor[] GetMethods(string assemblyPath, string typeFullName) {
+    public static ContractDescriptor GetContract(string assemblyPath, string typeFullName) {
       EnsureFileExists(assemblyPath);
       using (MetadataLoadContext context = CreateContext(assemblyPath)) {
         Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
@@ -112,16 +112,53 @@ namespace UJMW.TestClient.Inspection {
         if (type == null) {
           throw new InvalidOperationException($"Type '{typeFullName}' was not found in '{assemblyPath}'.");
         }
+        XmlDocReader typeDocs = XmlDocReader.ForAssemblyPath(assemblyPath);
+        ContractDescriptor contract = new ContractDescriptor();
+        contract.HasDocumentationFile = File.Exists(Path.ChangeExtension(assemblyPath, ".xml"));
+        contract.Summary = typeDocs.GetTypeSummary(type);
+
         List<MethodDescriptor> result = new List<MethodDescriptor>();
         foreach (MethodInfo method in CollectMethods(type)) {
+          XmlDocReader methodDocs = typeDocs;
+          if (method.DeclaringType != null && method.DeclaringType.Assembly != assembly) {
+            methodDocs = XmlDocReader.ForAssembly(method.DeclaringType.Assembly);
+          }
           MethodDescriptor descriptor = new MethodDescriptor();
           descriptor.Name = method.Name;
           descriptor.Signature = BuildSignature(method);
           descriptor.RequestTemplate = RequestTemplateBuilder.BuildRequestTemplate(method);
+          descriptor.Summary = methodDocs.GetMethodSummary(method);
+          descriptor.ReturnTypeName = GetFriendlyTypeName(method.ReturnType);
+          descriptor.ReturnsDescription = methodDocs.GetMethodReturns(method);
+          descriptor.Parameters = BuildParameters(method, methodDocs);
           result.Add(descriptor);
         }
-        return result.ToArray();
+        contract.Methods = result.ToArray();
+        return contract;
       }
+    }
+
+    /// <summary>
+    /// Builds the parameter descriptors of a method (including their documentation).
+    /// </summary>
+    private static ParameterDescriptor[] BuildParameters(MethodInfo method, XmlDocReader docs) {
+      List<ParameterDescriptor> parameters = new List<ParameterDescriptor>();
+      foreach (ParameterInfo parameter in method.GetParameters()) {
+        ParameterDescriptor descriptor = new ParameterDescriptor();
+        descriptor.Name = parameter.Name;
+        descriptor.TypeName = GetFriendlyTypeName(parameter.ParameterType);
+        if (parameter.ParameterType.IsByRef) {
+          if (parameter.IsOut) {
+            descriptor.Direction = ParameterDescriptor._DirectionOut;
+          } else {
+            descriptor.Direction = ParameterDescriptor._DirectionRef;
+          }
+        }
+        descriptor.IsOptional = parameter.HasDefaultValue;
+        descriptor.Description = docs.GetParameterDescription(method, parameter.Name);
+        parameters.Add(descriptor);
+      }
+      return parameters.ToArray();
     }
 
     /// <summary>

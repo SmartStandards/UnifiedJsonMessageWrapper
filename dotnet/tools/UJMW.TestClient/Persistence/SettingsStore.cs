@@ -107,6 +107,15 @@ namespace UJMW.TestClient.Persistence {
       if (settings.SideChannelText == null) {
         settings.SideChannelText = string.Empty;
       }
+      if (settings.Infrastructure == null) {
+        settings.Infrastructure = new InfrastructureSettings();
+      }
+      if (settings.CurrentZone == null) {
+        settings.CurrentZone = string.Empty;
+      }
+      if (settings.RequestTimeoutSeconds < 1) {
+        settings.RequestTimeoutSeconds = 5;
+      }
     }
 
   }

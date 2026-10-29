@@ -62,7 +62,8 @@
     selectedKey: null,
     collapsedKeys: new Set(),
     collapsedNamespaceKeys: new Set(),
-    detail: null
+    detail: null,
+    infrastructure: null
   };
 
   let sideChannelSaveTimer = null;
@@ -608,6 +609,31 @@
     e.warningBox = el('div', 'warning hidden');
     panel.appendChild(e.warningBox);
 
+    e.typeSummary = el('div', 'doc-summary hidden');
+    panel.appendChild(e.typeSummary);
+
+    // zone
+    const zoneRow = fieldRow('Zone');
+    e.zoneInput = textInput(ui.state.currentZone, 'Infrastructure zone (select or type), replaces {zone} in the SideChannel');
+    e.zoneInput.setAttribute('list', 'zoneOptions');
+    e.zoneInput.addEventListener('change', () => {
+      ui.state.currentZone = e.zoneInput.value.trim();
+      callHost('setCurrentZone', { zone: ui.state.currentZone }).catch(showError);
+    });
+    e.resolveButton = button('Resolve\u2026', openResolveDialog, null, 'Resolve the URL via the managed infrastructure');
+    e.resolveButton.disabled = !infrastructureCanResolve();
+    zoneRow.append(e.zoneInput, e.resolveButton);
+    panel.appendChild(zoneRow);
+
+    // wellknown
+    const wellknownRow = fieldRow('Wellknown');
+    e.wellknownSelect = el('select');
+    e.wellknownSelect.addEventListener('change', applySelectedWellknown);
+    e.wellknownAddButton = button('New\u2026', openWellknownDialog, null, 'Add a wellknown endpoint for this contract');
+    e.wellknownDeleteButton = button('Delete', deleteSelectedWellknown, null, 'Delete the selected wellknown endpoint');
+    wellknownRow.append(e.wellknownSelect, e.wellknownAddButton, e.wellknownDeleteButton);
+    panel.appendChild(wellknownRow);
+
     // URL
     const urlRow = fieldRow('URL');
     e.urlCombo = createHistoryCombo('Service base URL, e.g. https://host/api/MyService');
@@ -615,12 +641,11 @@
     e.urlInput.addEventListener('input', updateAfterUrlVisibility);
     urlRow.append(
       e.urlCombo.wrapper,
-      button('Resolve\u2026', openResolveDialog, null, 'Resolve the URL via an ApiCatalog of an infrastructure zone'),
       button('\u{1F310}', openUrlInBrowser, 'icon', 'Open URL in browser')
     );
     panel.appendChild(urlRow);
 
-    e.afterUrl = el('div', 'hidden');
+    e.afterUrl = el('div', 'after-url');
     panel.appendChild(e.afterUrl);
 
     // authorization
@@ -650,7 +675,7 @@
     sideChannelBody.append(
       templateRow,
       e.sideChannelInput,
-      el('div', 'info', 'This JSON object replaces the {AUTO} token of the "_" property immediately before the request is sent.')
+      el('div', 'info', 'This JSON object replaces the {AUTO} token of the "_" property immediately before the request is sent. The placeholder {zone} is replaced by the selected zone.')
     );
     sideChannelSection.appendChild(sideChannelBody);
     e.afterUrl.appendChild(sideChannelSection);
@@ -663,19 +688,31 @@
     e.methodSelect.addEventListener('change', applyMethodTemplate);
     methodRow.appendChild(e.methodSelect);
     e.signature = el('div', 'signature code');
-    e.requestInput = el('textarea', 'code');
+    e.methodSummary = el('div', 'doc-summary hidden');
+    e.requestInput = el('textarea', 'code editor');
+    e.requestInput.id = 'requestInput';
     e.requestInput.spellcheck = false;
+    e.requestInput.wrap = 'off';
     const executeRow = el('div', 'execute-row');
     e.executeButton = button('EXECUTE', executeRequest, 'primary');
     e.executeStatus = el('span', 'execute-status');
     executeRow.append(e.executeButton, e.executeStatus);
-    e.resultOutput = el('textarea', 'code');
+    e.resultOutput = el('textarea', 'code editor');
+    e.resultOutput.id = 'resultOutput';
     e.resultOutput.readOnly = true;
     e.resultOutput.spellcheck = false;
-    testClient.append(methodRow, e.signature, e.requestInput, executeRow, e.resultOutput);
+    e.resultOutput.wrap = 'off';
+
+    const testClientColumns = el('div', 'test-client-columns');
+    const editorColumn = el('div', 'editor-column');
+    editorColumn.append(e.requestInput, executeRow, e.resultOutput);
+    e.docColumn = el('div', 'doc-column');
+    testClientColumns.append(editorColumn, e.docColumn);
+    testClient.append(methodRow, e.signature, e.methodSummary, testClientColumns);
     e.afterUrl.appendChild(testClient);
 
     refreshTemplateSelect();
+    loadWellknownEndpoints();
 
     callHost('getTypeDetail', { path: dll.path, typeFullName: checkedType.fullName }).then((result) => {
       if (ui.detail !== detail) {
@@ -694,6 +731,7 @@
         e.warningBox.textContent = result.warning;
         e.warningBox.classList.remove('hidden');
       }
+      setDocText(e.typeSummary, result.summary);
       e.urlCombo.setItems(result.urlHistory);
       if (presetToLoad) {
         applyPreset(presetToLoad);
@@ -715,11 +753,18 @@
     if (!detail) {
       return;
     }
-    if (detail.elements.urlInput.value.trim().length > 0) {
-      detail.elements.afterUrl.classList.remove('hidden');
+    const hasUrl = detail.elements.urlInput.value.trim().length > 0;
+    const afterUrl = detail.elements.afterUrl;
+    if (hasUrl) {
+      afterUrl.classList.remove('disabled');
+      afterUrl.title = '';
     } else {
-      detail.elements.afterUrl.classList.add('hidden');
+      afterUrl.classList.add('disabled');
+      afterUrl.title = 'Enter a URL first.';
     }
+    afterUrl.querySelectorAll('input, select, textarea, button').forEach((control) => {
+      control.disabled = !hasUrl;
+    });
   }
 
   function currentMethod() {
@@ -735,12 +780,78 @@
     const e = ui.detail.elements;
     const method = currentMethod();
     if (method) {
-      e.signature.textContent = method.signature;
       e.requestInput.value = method.requestTemplate;
     } else {
-      e.signature.textContent = '';
       e.requestInput.value = '';
     }
+    renderMethodDocumentation();
+  }
+
+  function setDocText(element, text) {
+    element.textContent = text || '';
+    if (text) {
+      element.classList.remove('hidden');
+    } else {
+      element.classList.add('hidden');
+    }
+  }
+
+  function renderMethodDocumentation() {
+    const e = ui.detail.elements;
+    const method = currentMethod();
+    e.docColumn.innerHTML = '';
+    if (!method) {
+      e.signature.textContent = '';
+      setDocText(e.methodSummary, '');
+      return;
+    }
+    e.signature.textContent = method.signature;
+    setDocText(e.methodSummary, method.summary);
+
+    const parameters = method.parameters || [];
+    const inputParameters = parameters.filter((p) => p.direction !== 'out');
+    const outputParameters = parameters.filter((p) => p.direction !== 'in');
+
+    const appendEntry = (container, name, typeName, description, suffix) => {
+      const entry = el('div', 'doc-entry');
+      const head = el('div', 'doc-entry-head');
+      head.append(el('span', 'doc-name', name), el('span', 'doc-type', typeName + (suffix || '')));
+      entry.appendChild(head);
+      if (description) {
+        entry.appendChild(el('div', 'doc-text', description));
+      } else {
+        entry.appendChild(el('div', 'doc-text doc-missing', '(no description)'));
+      }
+      container.appendChild(entry);
+    };
+
+    const requestDocs = el('div', 'doc-block');
+    requestDocs.appendChild(el('div', 'doc-title', 'Request parameters'));
+    if (inputParameters.length === 0) {
+      requestDocs.appendChild(el('div', 'doc-text doc-missing', '(none)'));
+    }
+    inputParameters.forEach((p) => {
+      let suffix = '';
+      if (p.direction === 'ref') {
+        suffix = ' (ref)';
+      } else if (p.isOptional) {
+        suffix = ' (optional)';
+      }
+      appendEntry(requestDocs, p.name, p.typeName, p.description, suffix);
+    });
+
+    const responseDocs = el('div', 'doc-block');
+    responseDocs.appendChild(el('div', 'doc-title', 'Response'));
+    if (method.returnTypeName && method.returnTypeName !== 'void') {
+      appendEntry(responseDocs, 'return', method.returnTypeName, method.returnsDescription);
+    }
+    outputParameters.forEach((p) => {
+      appendEntry(responseDocs, p.name, p.typeName, p.description, ' (' + p.direction + ')');
+    });
+    if (responseDocs.childNodes.length === 1) {
+      responseDocs.appendChild(el('div', 'doc-text doc-missing', '(void)'));
+    }
+    e.docColumn.append(requestDocs, responseDocs);
   }
 
   function applyPreset(preset) {
@@ -755,10 +866,7 @@
     if (methodIndex >= 0) {
       e.methodSelect.value = String(methodIndex);
     }
-    const method = currentMethod();
-    if (method) {
-      e.signature.textContent = method.signature;
-    }
+    renderMethodDocumentation();
     if (preset.requestJson) {
       e.requestInput.value = preset.requestJson;
     } else {
@@ -817,6 +925,7 @@
       methodName: method.name,
       authHeader: e.authInput.value,
       sideChannel: e.sideChannelInput.value,
+      zone: e.zoneInput.value.trim(),
       requestText: e.requestInput.value
     })).then((result) => {
       ui.state.sideChannelText = e.sideChannelInput.value;
@@ -1111,60 +1220,294 @@
     return !document.getElementById('modalLayer').classList.contains('hidden');
   }
 
-  // ======================================================================
-  //  dialogs: zones, resolve, issue token
-  // ======================================================================
+  function deepCopy(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
 
-  function openZonesDialog() {
-    const zones = ui.state.zones.map((z) => ({ name: z.name, apiCatalogUrl: z.apiCatalogUrl, description: z.description }));
-    const body = el('div');
-    body.appendChild(el('div', 'info', 'Infrastructure zones are used by the "Resolve\u2026" dialog to query an ApiCatalog service.'));
-
-    const table = el('table', 'zones');
-    const headRow = el('tr');
-    headRow.append(el('th', null, 'Name'), el('th', null, 'ApiCatalog URL'), el('th', null, 'Description'), el('th'));
-    const head = el('thead');
-    head.appendChild(headRow);
-    const tableBody = el('tbody');
-    table.append(head, tableBody);
-
-    const renderRows = () => {
-      tableBody.innerHTML = '';
-      zones.forEach((zone, index) => {
-        const row = el('tr');
-        ['name', 'apiCatalogUrl', 'description'].forEach((property) => {
-          const cell = el('td');
-          const input = textInput(zone[property]);
-          input.addEventListener('input', () => {
-            zone[property] = input.value;
-          });
-          cell.appendChild(input);
-          row.appendChild(cell);
-        });
-        const removeCell = el('td');
-        removeCell.appendChild(button('\u2715', () => {
-          zones.splice(index, 1);
-          renderRows();
-        }, 'icon', 'Remove zone'));
-        row.appendChild(removeCell);
-        tableBody.appendChild(row);
+  function createTabs(definitions) {
+    const container = el('div');
+    const tabBar = el('div', 'tabs');
+    const panes = [];
+    const tabs = [];
+    definitions.forEach((definition, index) => {
+      const tab = el('div', 'tab', definition.label);
+      const pane = definition.pane;
+      if (index === 0) {
+        tab.classList.add('active');
+      } else {
+        pane.classList.add('hidden');
+      }
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => t.classList.remove('active'));
+        panes.forEach((p) => p.classList.add('hidden'));
+        tab.classList.add('active');
+        pane.classList.remove('hidden');
       });
+      tabs.push(tab);
+      panes.push(pane);
+      tabBar.appendChild(tab);
+    });
+    container.appendChild(tabBar);
+    panes.forEach((pane) => container.appendChild(pane));
+    return container;
+  }
+
+  // ======================================================================
+  //  managed infrastructure (zones, hosts, oauth, wellknown, resolve)
+  // ======================================================================
+
+  function emptyInfrastructure() {
+    return {
+      capabilities: { isReadOnly: true, canResolve: false },
+      zones: [],
+      hosts: [],
+      oauthConfigurations: [],
+      error: null
     };
-    renderRows();
+  }
 
-    body.append(table, button('+ Add zone', () => {
-      zones.push({ name: '', apiCatalogUrl: '', description: '' });
-      renderRows();
-    }));
+  function infrastructureCanResolve() {
+    return !!(ui.infrastructure && ui.infrastructure.capabilities && ui.infrastructure.capabilities.canResolve);
+  }
 
-    openModal('Infrastructure zones', body, [
+  function infrastructureIsReadOnly() {
+    if (!ui.infrastructure || !ui.infrastructure.capabilities) {
+      return true;
+    }
+    return !!ui.infrastructure.capabilities.isReadOnly;
+  }
+
+  function applyInfrastructure(infrastructure) {
+    ui.infrastructure = infrastructure;
+    if (!ui.infrastructure.error) {
+      ui.infrastructure.error = null;
+    }
+    refreshZoneOptions();
+    refreshInfrastructureDependentControls();
+  }
+
+  function loadInfrastructure() {
+    return callHost('getInfrastructure').then(applyInfrastructure).catch((error) => {
+      const infrastructure = emptyInfrastructure();
+      infrastructure.error = error.message;
+      applyInfrastructure(infrastructure);
+    });
+  }
+
+  function flattenZones(zones, prefix, target) {
+    (zones || []).forEach((zone) => {
+      let path = zone.name;
+      if (prefix) {
+        path = prefix + ' / ' + zone.name;
+      }
+      target.push({ name: zone.name, path: path, description: zone.description });
+      flattenZones(zone.childZones, path, target);
+    });
+    return target;
+  }
+
+  function refreshZoneOptions() {
+    const dataList = document.getElementById('zoneOptions');
+    dataList.innerHTML = '';
+    flattenZones(ui.infrastructure.zones, null, []).forEach((zone) => {
+      const option = el('option');
+      option.value = zone.name;
+      option.label = zone.path;
+      dataList.appendChild(option);
+    });
+  }
+
+  function refreshInfrastructureDependentControls() {
+    const detail = ui.detail;
+    if (!detail) {
+      return;
+    }
+    const e = detail.elements;
+    e.resolveButton.disabled = !infrastructureCanResolve();
+    if (infrastructureCanResolve()) {
+      e.resolveButton.title = 'Resolve the URL via the managed infrastructure';
+    } else {
+      e.resolveButton.title = 'The current infrastructure store does not support url resolution';
+    }
+    e.wellknownAddButton.disabled = infrastructureIsReadOnly();
+    e.wellknownDeleteButton.disabled = infrastructureIsReadOnly() || !e.wellknownSelect.value;
+  }
+
+  function loadWellknownEndpoints() {
+    const detail = ui.detail;
+    if (!detail) {
+      return Promise.resolve();
+    }
+    return callHost('getWellknownEndpoints', { contractName: detail.typeFullName }).then((endpoints) => {
+      if (ui.detail === detail) {
+        renderWellknownEndpoints(endpoints);
+      }
+    }).catch((error) => {
+      if (ui.detail === detail) {
+        renderWellknownEndpoints([]);
+        detail.elements.wellknownSelect.title = error.message;
+      }
+    });
+  }
+
+  function renderWellknownEndpoints(endpoints) {
+    const detail = ui.detail;
+    const e = detail.elements;
+    detail.wellknownEndpoints = endpoints;
+    e.wellknownSelect.innerHTML = '';
+    let placeholderText = '(select a wellknown endpoint)';
+    if (endpoints.length === 0) {
+      placeholderText = '(no wellknown endpoints for this contract)';
+    }
+    const placeholder = el('option', null, placeholderText);
+    placeholder.value = '';
+    e.wellknownSelect.appendChild(placeholder);
+    endpoints.forEach((endpoint, index) => {
+      let label = endpoint.url;
+      if (endpoint.webApplicationName) {
+        label = endpoint.webApplicationName + '  \u2013  ' + endpoint.url;
+      }
+      const option = el('option', null, label);
+      option.value = String(index);
+      e.wellknownSelect.appendChild(option);
+    });
+    refreshInfrastructureDependentControls();
+  }
+
+  function selectedWellknownEndpoint() {
+    const detail = ui.detail;
+    const index = parseInt(detail.elements.wellknownSelect.value, 10);
+    if (isNaN(index)) {
+      return null;
+    }
+    return detail.wellknownEndpoints[index];
+  }
+
+  function applySelectedWellknown() {
+    const endpoint = selectedWellknownEndpoint();
+    refreshInfrastructureDependentControls();
+    if (!endpoint) {
+      return;
+    }
+    applyResolvedUrl(endpoint.url);
+  }
+
+  function applyResolvedUrl(url) {
+    ui.detail.elements.urlInput.value = url;
+    updateAfterUrlVisibility();
+    touchCurrentUrl().catch(showError);
+  }
+
+  function deleteSelectedWellknown() {
+    const endpoint = selectedWellknownEndpoint();
+    if (!endpoint) {
+      return;
+    }
+    if (!confirm('Delete the wellknown endpoint "' + endpoint.url + '"?')) {
+      return;
+    }
+    callHost('deleteWellknownEndpoint', {
+      contractName: endpoint.contractName,
+      hostUrl: endpoint.hostUrl,
+      webApplicationName: endpoint.webApplicationName
+    }).then(renderWellknownEndpoints).catch(showError);
+  }
+
+  function openWellknownDialog() {
+    const detail = ui.detail;
+    const endpoint = {
+      contractName: detail.typeFullName,
+      hostUrl: '',
+      webApplicationName: '',
+      endpointUrl: ''
+    };
+    const hosts = (ui.infrastructure && ui.infrastructure.hosts) || [];
+    const body = el('div');
+    body.appendChild(el('div', 'info', 'Maps the contract "' + detail.typeFullName + '" to a known host / web application. The resulting URL is <host>/<applicationBaseUrl>/<endpointUrl>.'));
+
+    const hostRow = fieldRow('Host');
+    const hostSelect = el('select');
+    hosts.forEach((host) => {
+      const option = el('option', null, host.hostUrl);
+      option.value = host.hostUrl;
+      hostSelect.appendChild(option);
+    });
+    hostRow.appendChild(hostSelect);
+
+    const applicationRow = fieldRow('Web application');
+    const applicationSelect = el('select');
+    applicationRow.appendChild(applicationSelect);
+
+    const endpointRow = fieldRow('Endpoint URL');
+    const endpointInput = textInput('', 'relative endpoint url of the contract, e.g. MyService');
+    endpointRow.appendChild(endpointInput);
+
+    const preview = el('div', 'info code');
+
+    const findHost = () => hosts.find((h) => h.hostUrl === hostSelect.value);
+    const findApplication = () => {
+      const host = findHost();
+      if (!host) {
+        return null;
+      }
+      return (host.webApplications || []).find((a) => a.name === applicationSelect.value);
+    };
+    const updatePreview = () => {
+      const parts = [];
+      if (hostSelect.value) {
+        parts.push(hostSelect.value.trim().replace(/\/+$/, ''));
+      }
+      const application = findApplication();
+      if (application && application.applicationBaseUrl) {
+        parts.push(application.applicationBaseUrl.trim().replace(/^\/+|\/+$/g, ''));
+      }
+      if (endpointInput.value.trim()) {
+        parts.push(endpointInput.value.trim().replace(/^\/+|\/+$/g, ''));
+      }
+      preview.textContent = parts.filter((p) => p.length > 0).join('/');
+    };
+    const renderApplications = () => {
+      applicationSelect.innerHTML = '';
+      const none = el('option', null, '(none)');
+      none.value = '';
+      applicationSelect.appendChild(none);
+      const host = findHost();
+      if (host) {
+        (host.webApplications || []).forEach((application) => {
+          const option = el('option', null, application.name + '  (' + application.applicationBaseUrl + ')');
+          option.value = application.name;
+          applicationSelect.appendChild(option);
+        });
+      }
+      updatePreview();
+    };
+    hostSelect.addEventListener('change', renderApplications);
+    applicationSelect.addEventListener('change', updatePreview);
+    endpointInput.addEventListener('input', updatePreview);
+    renderApplications();
+
+    if (hosts.length === 0) {
+      body.appendChild(el('div', 'warning', 'No hosts are defined yet. Use "\u2699 Settings" \u2192 "Hosts" to define them.'));
+    }
+    body.append(hostRow, applicationRow, endpointRow, el('div', 'info', 'Resulting URL'), preview);
+
+    openModal('New wellknown endpoint', body, [
       {
         label: 'Save',
         className: 'primary',
         action: (close) => {
-          callHost('saveZones', { zones: zones }).then((state) => {
-            applyState(state);
+          endpoint.hostUrl = hostSelect.value;
+          endpoint.webApplicationName = applicationSelect.value;
+          endpoint.endpointUrl = endpointInput.value.trim();
+          if (!endpoint.hostUrl) {
+            alert('Please select a host.');
+            return;
+          }
+          callHost('saveWellknownEndpoint', { endpoint: endpoint }).then((endpoints) => {
             close();
+            if (ui.detail === detail) {
+              renderWellknownEndpoints(endpoints);
+            }
           }).catch(showError);
         }
       },
@@ -1174,47 +1517,372 @@
 
   function openResolveDialog() {
     const detail = ui.detail;
-    const body = el('div');
-    let closeDialog = null;
-
-    if (ui.state.zones.length === 0) {
-      body.appendChild(el('div', 'info', 'No infrastructure zones are defined yet. Use "\u2699 Zones" (top left) to configure them.'));
-    } else {
-      const zoneRow = fieldRow('Zone');
-      const zoneSelect = el('select');
-      ui.state.zones.forEach((zone) => {
-        const option = el('option', null, zone.name + '  (' + zone.apiCatalogUrl + ')');
-        option.value = zone.name;
-        zoneSelect.appendChild(option);
-      });
-      const message = el('div', 'info');
+    const zone = detail.elements.zoneInput.value.trim();
+    if (!zone) {
+      alert('Please select or enter a zone first.');
+      return;
+    }
+    detail.elements.resolveButton.disabled = true;
+    callHost('resolveUrls', { contractName: detail.typeFullName, zone: zone }).then((urls) => {
+      if (ui.detail !== detail) {
+        return;
+      }
+      if (urls.length === 0) {
+        alert('No URL was resolved for "' + detail.typeFullName + '" within zone "' + zone + '".');
+        return;
+      }
+      if (urls.length === 1) {
+        applyResolvedUrl(urls[0]);
+        return;
+      }
+      const body = el('div');
+      body.appendChild(el('div', 'info', 'Multiple URLs were resolved - please select one:'));
       const urlList = el('div', 'url-list');
-      zoneRow.append(zoneSelect, button('Resolve', () => {
-        message.textContent = 'Resolving\u2026';
-        urlList.innerHTML = '';
-        callHost('resolveUrls', { zoneName: zoneSelect.value, typeFullName: detail.typeFullName }).then((result) => {
-          message.textContent = result.message || '';
-          result.urls.forEach((url) => {
-            const item = el('div', 'url-item', url);
-            item.addEventListener('click', () => {
-              detail.elements.urlInput.value = url;
-              updateAfterUrlVisibility();
-              touchCurrentUrl().catch(showError);
-              closeDialog();
-            });
-            urlList.appendChild(item);
-          });
-        }).catch((error) => {
-          message.textContent = error.message;
+      let closeDialog = null;
+      urls.forEach((url) => {
+        const item = el('div', 'url-item', url);
+        item.addEventListener('click', () => {
+          applyResolvedUrl(url);
+          closeDialog();
         });
-      }, 'primary'));
-      body.append(zoneRow, message, urlList);
+        urlList.appendChild(item);
+      });
+      body.appendChild(urlList);
+      closeDialog = openModal('Resolve URL \u2013 ' + shortTypeName(detail.typeFullName) + ' @ ' + zone, body, [
+        { label: 'Cancel', action: (close) => close() }
+      ]);
+    }).catch(showError).finally(() => {
+      refreshInfrastructureDependentControls();
+    });
+  }
+
+  // ======================================================================
+  //  dialog: settings (client, infrastructure source, zones, hosts, oauth)
+  // ======================================================================
+
+  function setReadOnly(container, readOnly) {
+    container.querySelectorAll('input, select, textarea, button').forEach((control) => {
+      if (!control.classList.contains('always-enabled')) {
+        control.disabled = readOnly;
+      }
+    });
+  }
+
+  function saveButton(label, onClick) {
+    const element = button(label, onClick, 'primary');
+    return element;
+  }
+
+  function buildClientPane() {
+    const pane = el('div');
+    const timeoutRow = fieldRow('Timeout (s)');
+    const timeoutInput = el('input');
+    timeoutInput.type = 'number';
+    timeoutInput.min = '1';
+    timeoutInput.value = String(ui.state.requestTimeoutSeconds);
+    timeoutRow.appendChild(timeoutInput);
+    pane.append(
+      timeoutRow,
+      el('div', 'info', 'Maximum duration of a single request which is executed by the test client (default: 5 seconds).'),
+      saveButton('Save', () => {
+        const seconds = parseInt(timeoutInput.value, 10);
+        if (isNaN(seconds) || seconds < 1) {
+          alert('The timeout must be at least 1 second.');
+          return;
+        }
+        callHost('setClientSettings', { requestTimeoutSeconds: seconds }).then(() => {
+          ui.state.requestTimeoutSeconds = seconds;
+        }).catch(showError);
+      })
+    );
+    return pane;
+  }
+
+  function buildSourcePane(onSourceChanged) {
+    const settings = deepCopy(ui.state.infrastructureSettings);
+    const pane = el('div');
+    pane.appendChild(el('div', 'info', 'Zones, hosts, OAuth configurations and wellknown endpoints are provided by an infrastructure store (IUjmwManagedInfrastructure). User specific data (presets, templates, JWT inputs) always stays local.'));
+
+    const modeRow = fieldRow('Source');
+    const modeSelect = el('select');
+    [
+      ['Local', 'Local (stored on this machine)'],
+      ['External', 'Externally managed (UJMW service)'],
+      ['Reflection', 'Implementation from a DLL next to the client']
+    ].forEach((entry) => {
+      const option = el('option', null, entry[1]);
+      option.value = entry[0];
+      modeSelect.appendChild(option);
+    });
+    modeSelect.value = settings.mode || 'Local';
+    modeRow.appendChild(modeSelect);
+
+    const externalPane = el('div');
+    const urlRow = fieldRow('Service URL');
+    urlRow.appendChild(bindText(textInput('', 'https://host/api/UjmwManagedInfrastructure'), settings, 'externalUrl'));
+    const authRow = fieldRow('Authorization');
+    authRow.appendChild(bindText(textInput('', 'Bearer token or plain token'), settings, 'externalAuthHeader'));
+    externalPane.append(urlRow, authRow);
+
+    const reflectionPane = el('div');
+    const typeRow = fieldRow('Implementation');
+    const typeSelect = el('select');
+    typeRow.append(typeSelect, button('Search', () => searchImplementations(), null, 'Search DLLs next to the client for implementations'));
+    reflectionPane.appendChild(typeRow);
+    const searchImplementations = () => {
+      typeSelect.innerHTML = '';
+      callHost('findInfrastructureImplementations').then((candidates) => {
+        if (candidates.length === 0) {
+          const option = el('option', null, '(no implementations found)');
+          option.value = '';
+          typeSelect.appendChild(option);
+        }
+        candidates.forEach((candidate) => {
+          const option = el('option', null, candidate.split(',')[0]);
+          option.value = candidate;
+          option.title = candidate;
+          typeSelect.appendChild(option);
+        });
+        if (settings.reflectionTypeName && candidates.indexOf(settings.reflectionTypeName) >= 0) {
+          typeSelect.value = settings.reflectionTypeName;
+        }
+      }).catch(showError);
+    };
+    if (settings.reflectionTypeName) {
+      const option = el('option', null, settings.reflectionTypeName.split(',')[0]);
+      option.value = settings.reflectionTypeName;
+      typeSelect.appendChild(option);
     }
 
-    closeDialog = openModal('Resolve URL \u2013 ' + shortTypeName(detail.typeFullName), body, [
-      { label: 'Close', action: (close) => close() }
-    ]);
+    const updateModeVisibility = () => {
+      externalPane.classList.toggle('hidden', modeSelect.value !== 'External');
+      reflectionPane.classList.toggle('hidden', modeSelect.value !== 'Reflection');
+    };
+    modeSelect.addEventListener('change', () => {
+      updateModeVisibility();
+      if (modeSelect.value === 'Reflection' && typeSelect.options.length === 0) {
+        searchImplementations();
+      }
+    });
+    updateModeVisibility();
+
+    const status = el('div', 'info');
+    const capabilities = ui.infrastructure.capabilities;
+    if (ui.infrastructure.error) {
+      status.textContent = 'Current store is not available: ' + ui.infrastructure.error;
+      status.className = 'warning';
+    } else {
+      let text = 'Current store: ';
+      if (capabilities.isReadOnly) {
+        text = text + 'read-only';
+      } else {
+        text = text + 'editable';
+      }
+      if (capabilities.canResolve) {
+        text = text + ', supports url resolution';
+      } else {
+        text = text + ', no url resolution';
+      }
+      status.textContent = text;
+    }
+
+    pane.append(modeRow, externalPane, reflectionPane, saveButton('Apply', () => {
+      settings.mode = modeSelect.value;
+      settings.reflectionTypeName = typeSelect.value;
+      callHost('saveInfrastructureSettings', { infrastructure: settings }).then((state) => {
+        applyState(state);
+        return loadInfrastructure();
+      }).then(() => {
+        loadWellknownEndpoints();
+        onSourceChanged();
+      }).catch(showError);
+    }), status);
+    return pane;
   }
+
+  function buildZonesPane() {
+    const zones = deepCopy(ui.infrastructure.zones || []);
+    const pane = el('div');
+    pane.appendChild(el('div', 'info', 'Zones are maintained as area tree. The selected zone is used for resolving and replaces {zone} in the SideChannel.'));
+    const treeContainer = el('div', 'zone-tree');
+
+    const renderLevel = (list, siblings, depth) => {
+      siblings.forEach((zone, index) => {
+        if (!zone.childZones) {
+          zone.childZones = [];
+        }
+        const row = el('div', 'zone-row');
+        row.style.paddingLeft = (depth * 20) + 'px';
+        row.append(
+          bindText(textInput('', 'Name'), zone, 'name'),
+          bindText(textInput('', 'Description'), zone, 'description'),
+          button('+ child', () => {
+            zone.childZones.push({ name: '', description: '', childZones: [] });
+            render();
+          }, null, 'Add a child zone'),
+          button('\u2715', () => {
+            siblings.splice(index, 1);
+            render();
+          }, 'icon', 'Remove zone (including child zones)')
+        );
+        list.appendChild(row);
+        renderLevel(list, zone.childZones, depth + 1);
+      });
+    };
+    const render = () => {
+      treeContainer.innerHTML = '';
+      renderLevel(treeContainer, zones, 0);
+      setReadOnly(treeContainer, infrastructureIsReadOnly());
+    };
+    render();
+
+    const addButton = button('+ Add zone', () => {
+      zones.push({ name: '', description: '', childZones: [] });
+      render();
+    });
+    const save = saveButton('Save zones', () => {
+      callHost('saveInfrastructureZones', { zones: zones }).then(applyInfrastructure).catch(showError);
+    });
+    addButton.disabled = infrastructureIsReadOnly();
+    save.disabled = infrastructureIsReadOnly();
+    pane.append(treeContainer, addButton, el('div', 'button-bar'), save);
+    return pane;
+  }
+
+  function buildHostsPane() {
+    const hosts = deepCopy(ui.infrastructure.hosts || []);
+    const pane = el('div');
+    pane.appendChild(el('div', 'info', 'Hosts are plain server URLs. Each host can contain web applications (name + application base URL).'));
+    const container = el('div');
+
+    const render = () => {
+      container.innerHTML = '';
+      hosts.forEach((host, hostIndex) => {
+        if (!host.webApplications) {
+          host.webApplications = [];
+        }
+        const box = el('div', 'host-box');
+        const hostRow = el('div', 'zone-row');
+        hostRow.append(
+          bindText(textInput('', 'https://server:port'), host, 'hostUrl'),
+          bindText(textInput('', 'Description'), host, 'description'),
+          button('\u2715', () => {
+            hosts.splice(hostIndex, 1);
+            render();
+          }, 'icon', 'Remove host')
+        );
+        box.appendChild(hostRow);
+        host.webApplications.forEach((application, applicationIndex) => {
+          const applicationRow = el('div', 'zone-row');
+          applicationRow.style.paddingLeft = '20px';
+          applicationRow.append(
+            bindText(textInput('', 'Web application name'), application, 'name'),
+            bindText(textInput('', 'Application base URL, e.g. /api'), application, 'applicationBaseUrl'),
+            button('\u2715', () => {
+              host.webApplications.splice(applicationIndex, 1);
+              render();
+            }, 'icon', 'Remove web application')
+          );
+          box.appendChild(applicationRow);
+        });
+        const addApplication = button('+ web application', () => {
+          host.webApplications.push({ name: '', applicationBaseUrl: '' });
+          render();
+        });
+        addApplication.style.marginLeft = '20px';
+        box.appendChild(addApplication);
+        container.appendChild(box);
+      });
+      setReadOnly(container, infrastructureIsReadOnly());
+    };
+    render();
+
+    const addButton = button('+ Add host', () => {
+      hosts.push({ hostUrl: '', description: '', webApplications: [] });
+      render();
+    });
+    const save = saveButton('Save hosts', () => {
+      callHost('saveInfrastructureHosts', { hosts: hosts }).then(applyInfrastructure).catch(showError);
+    });
+    addButton.disabled = infrastructureIsReadOnly();
+    save.disabled = infrastructureIsReadOnly();
+    pane.append(container, addButton, el('div', 'button-bar'), save);
+    return pane;
+  }
+
+  function buildOAuthPane() {
+    const configurations = deepCopy(ui.infrastructure.oauthConfigurations || []);
+    const pane = el('div');
+    pane.appendChild(el('div', 'info', 'OAuth configurations can be loaded within the "Issue\u2026" dialog of the authorization field.'));
+    const container = el('div');
+    const fields = [
+      ['Name', 'name'],
+      ['Authorize URL', 'authorizeUrl'],
+      ['Token URL', 'tokenUrl'],
+      ['Client id', 'clientId'],
+      ['Client secret', 'clientSecret'],
+      ['Redirect URI', 'redirectUri'],
+      ['Scope', 'scope']
+    ];
+
+    const render = () => {
+      container.innerHTML = '';
+      configurations.forEach((configuration, index) => {
+        const box = el('div', 'host-box');
+        fields.forEach((field) => {
+          const row = fieldRow(field[0]);
+          row.appendChild(bindText(textInput(), configuration, field[1]));
+          box.appendChild(row);
+        });
+        box.append(
+          bindCheckbox('use PKCE (S256)', configuration, 'usePkce'),
+          button('Remove', () => {
+            configurations.splice(index, 1);
+            render();
+          })
+        );
+        container.appendChild(box);
+      });
+      setReadOnly(container, infrastructureIsReadOnly());
+    };
+    render();
+
+    const addButton = button('+ Add configuration', () => {
+      configurations.push({ name: '', authorizeUrl: '', tokenUrl: '', clientId: '', clientSecret: '', redirectUri: 'http://localhost/oauth-callback', scope: '', usePkce: true });
+      render();
+    });
+    const save = saveButton('Save OAuth configurations', () => {
+      callHost('saveOAuthConfigurations', { configurations: configurations }).then(applyInfrastructure).catch(showError);
+    });
+    addButton.disabled = infrastructureIsReadOnly();
+    save.disabled = infrastructureIsReadOnly();
+    pane.append(container, addButton, el('div', 'button-bar'), save);
+    return pane;
+  }
+
+  function openSettingsDialog() {
+    let closeDialog = null;
+    const show = () => {
+      const body = createTabs([
+        { label: 'Client', pane: buildClientPane() },
+        { label: 'Infrastructure source', pane: buildSourcePane(() => {
+          closeDialog();
+          show();
+        }) },
+        { label: 'Zones', pane: buildZonesPane() },
+        { label: 'Hosts', pane: buildHostsPane() },
+        { label: 'OAuth', pane: buildOAuthPane() }
+      ]);
+      closeDialog = openModal('Settings', body, [
+        { label: 'Close', action: (close) => close() }
+      ]);
+    };
+    loadInfrastructure().then(show);
+  }
+
+  // ======================================================================
+  //  dialogs: issue token
+  // ======================================================================
 
   function bindText(input, target, property) {
     input.value = target[property] || '';
@@ -1341,13 +2009,48 @@
       ['Redirect URI', 'redirectUri'],
       ['Scope', 'scope']
     ];
+    const oauthFieldInputs = {};
+    const configurations = [];
+    if (ui.infrastructure && ui.infrastructure.oauthConfigurations) {
+      ui.infrastructure.oauthConfigurations.forEach((c) => configurations.push(c));
+    }
+    if (configurations.length > 0) {
+      const configurationRow = fieldRow('Configuration');
+      const configurationSelect = el('select');
+      const none = el('option', null, '(manual input)');
+      none.value = '';
+      configurationSelect.appendChild(none);
+      configurations.forEach((configuration, index) => {
+        const option = el('option', null, configuration.name);
+        option.value = String(index);
+        configurationSelect.appendChild(option);
+      });
+      configurationSelect.addEventListener('change', () => {
+        const index = parseInt(configurationSelect.value, 10);
+        if (isNaN(index)) {
+          return;
+        }
+        const configuration = configurations[index];
+        Object.keys(oauthFieldInputs).forEach((property) => {
+          oauth[property] = configuration[property] || '';
+          oauthFieldInputs[property].value = oauth[property];
+        });
+        oauth.usePkce = !!configuration.usePkce;
+        oauthPkceCheckbox.querySelector('input').checked = oauth.usePkce;
+      });
+      configurationRow.appendChild(configurationSelect);
+      oauthPane.appendChild(configurationRow);
+    }
     oauthFields.forEach((field) => {
       const row = fieldRow(field[0]);
-      row.appendChild(bindText(textInput(), oauth, field[1]));
+      const input = bindText(textInput(), oauth, field[1]);
+      oauthFieldInputs[field[1]] = input;
+      row.appendChild(input);
       oauthPane.appendChild(row);
     });
+    const oauthPkceCheckbox = bindCheckbox('use PKCE (S256)', oauth, 'usePkce');
     oauthPane.append(
-      bindCheckbox('use PKCE (S256)', oauth, 'usePkce'),
+      oauthPkceCheckbox,
       el('div', 'info', 'The login page is shown in an embedded browser window; the redirect URI is intercepted (it does not need to be reachable).'),
       button('Start code flow\u2026', () => {
         status.textContent = 'Waiting for the code flow\u2026';
@@ -1471,9 +2174,9 @@
     document.getElementById('btnAddDll').addEventListener('click', () => {
       callHost('addDllsViaDialog').then(applyState).catch(showError);
     });
-    document.getElementById('btnZones').addEventListener('click', () => {
+    document.getElementById('btnSettings').addEventListener('click', () => {
       if (!isModalOpen()) {
-        openZonesDialog();
+        openSettingsDialog();
       }
     });
     initSplitter();
@@ -1483,6 +2186,7 @@
     callHost('getState').then((state) => {
       document.getElementById('leftPanel').style.width = state.leftPanelWidth + 'px';
       applyState(state);
+      return loadInfrastructure();
     }).catch(showError);
   }
 

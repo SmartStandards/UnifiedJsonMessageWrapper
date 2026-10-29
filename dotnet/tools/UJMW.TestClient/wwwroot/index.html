@@ -11,7 +11,7 @@
       <div class="toolbar">
         <button id="btnAddDll" title="Add assemblies (or drop them from Windows Explorer)">Add DLL&hellip;</button>
         <span class="spacer"></span>
-        <button id="btnZones" title="Manage infrastructure zones">&#9881; Zones</button>
+        <button id="btnSettings" title="Client settings and managed infrastructure (zones, hosts, OAuth)">&#9881; Settings</button>
       </div>
       <div id="mainTree" class="tree" tabindex="0"></div>
       <div class="hint">Drop DLLs here &middot; <kbd>Del</kbd> removes the selected DLL</div>
@@ -23,6 +23,7 @@
   </div>
   <div id="contextMenu" class="context-menu hidden"></div>
   <div id="modalLayer" class="modal-layer hidden"></div>
+  <datalist id="zoneOptions"></datalist>
   <script src="app.js"></script>
 </body>
 </html>
