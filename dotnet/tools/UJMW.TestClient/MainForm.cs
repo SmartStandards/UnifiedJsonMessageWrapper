@@ -20,7 +20,7 @@ namespace UJMW.TestClient {
     private readonly WebView2 _WebView;
     private readonly HostBridge _Bridge;
 
-    public MainForm() {
+    public MainForm(string startupDllPath) {
       _Store = new SettingsStore();
 
       this.Text = "UJMW Test Client";
@@ -36,6 +36,9 @@ namespace UJMW.TestClient {
       this.Controls.Add(_WebView);
 
       _Bridge = new HostBridge(this, _WebView, _Store);
+      if (!string.IsNullOrWhiteSpace(startupDllPath)) {
+        _Bridge.SetStartupDll(startupDllPath);
+      }
 
       this.Load += this.OnFormLoad;
     }

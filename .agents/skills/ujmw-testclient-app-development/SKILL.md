@@ -30,7 +30,7 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 | Persistence: one JSON file per user `%APPDATA%\UJMW.TestClient\settings.json` (Newtonsoft.Json); WebView2 user data in `%LOCALAPPDATA%\UJMW.TestClient\WebView2` | persistent per user, roaming capable |
 | JWT generation via `jose-jwt` | requirement |
 | Infrastructure data (zones as area tree, hosts with web applications, OAuth configurations, wellknown endpoints) is provided by `System.Web.UJMW.IUjmwManagedInfrastructure` (shared in `UJMW.DynamicClient`) | reusable contract; only infrastructure-relevant data, never user-specific presets/templates/JWT inputs |
-| Infrastructure source selectable in the settings: **Local** (`LocalUjmwManagedInfrastructure`, `%APPDATA%\UJMW.TestClient\infrastructure.json`), **External** (UJMW `DynamicClientFactory` proxy with URL + token) or **Reflection** (public parameterless implementation in a DLL next to the client; only DLLs referencing `UJMW.DynamicClient` are loaded) | out-of-the-box usable locally, centrally manageable in organizations |
+| Infrastructure source selectable in the settings: **Local** (`LocalUjmwManagedInfrastructure`, `%APPDATA%\UJMW.TestClient\infrastructure.json`), **External** (UJMW `DynamicClientFactory` proxy with URL + token) or a **registered store provider** (public, non-abstract class with public parameterless constructor implementing the interface, found in a regularly added DLL, registered by the user; the registration (`RegisteredProvider`: DLL path + type name) survives the removal of the DLL from the list; loaded into an own `AssemblyLoadContext`, `UJMW.DynamicClient` and all client assemblies are shared) | out-of-the-box usable locally, centrally manageable in organizations, custom stores without neighbour-DLL scanning |
 | Editing is only offered if `GetCapabilities().IsReadOnly == false`; Resolve only if `CanResolve == true` | capability-driven UI |
 | Target framework `net10.0-windows` | aligned with newest TFM of the solution |
 
@@ -47,6 +47,8 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 - Display text: assembly name + version, e.g. `MyContracts (1.2.3.0)`.
 - DLLs whose file does not exist anymore are shown **greyed out** (they stay in the list).
 - Selected DLL can be removed with the **Del** key.
+- **Open with**: a DLL path passed as first command line argument is added (if not yet present) and selected directly after startup.
+- Types implementing `IUjmwManagedInfrastructure` (usable as store provider) are shown **bold and green** in the type selection; clicking them opens a dialog to register them as store provider (instead of checking them).
 
 ### 3.3 Type selection (detail view for a DLL)
 
@@ -58,9 +60,13 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 ### 3.4 Type detail view (main tree: type selected)
 
 - **URL field** with a persistent history **per FullQualifiedTypeName** (DLL- and version-independent) as dropdown, ordered by last-used descending. Free text input is possible.
-- **Zone** field: dropdown (zones of the managed infrastructure, flattened area tree) **or** free text input; persisted per user (`CurrentZone`). The zone replaces the placeholder `{zone}` inside the SideChannel content before sending (JSON-string-escaped, i.e. use it inside a JSON string: `"zone": "{zone}"`).
-- **Resolve** button next to the zone: only enabled if `IUjmwManagedInfrastructure.GetCapabilities().CanResolve`. Calls `Resolve(contractName = FullQualifiedTypeName, zone)`; one URL is applied directly, multiple URLs open a child popup for selection.
-- **Wellknown** combobox: wellknown endpoints of the contract from the infrastructure store (mapping contract -> host + web application + endpoint URL, resulting URL `https://<host>/<applicationBaseUrl>/<endpointUrl>`; the endpoint URL is maintained exclusively here). Selecting applies the URL; **New…** / **Delete** only if the store is not read-only.
+- **Zone** field: editable combobox (same style as the URL combobox, compact indented tree of the zones; selecting inserts the **full area path** joined by `/`, e.g. `Production/EU`) **or** free text input;
+- **URL lookup** (`…` button right of the URL field, left of the browser button) opens a dialog containing:
+  - **Resolve** button (only if `CanResolve`), using the zone of the main window; resolved URLs are added to the list.
+  - The list always contains the **wellknown endpoints** of the store (`https://<host>/<applicationBaseUrl>/<endpointUrl>`) and the **user-specific pins** (`PinnedEndpoint`, stored in `settings.json`, NOT in the store).
+  - A server/web application combobox: selecting an entry directly adds a pin `https://<host>/<applicationBaseUrl>/?????/<UJMW contract name>` (`UjmwContractNaming`), where `?????` intentionally marks a possible sub route to be edited.
+  - Removing the pin symbol deletes a pin; if the store is not read-only, wellknown entries can be deleted and pins can be **promoted** into the store (only after the `?????` placeholder was replaced).
+  - Clicking a URL applies it to the URL field.
 - **Open browser** button next to the URL.
 - The following areas are **always visible but greyed out/disabled** as long as no URL is present:
 	- a) **Authorization** header value: manual input or issued via a special dialog containing
@@ -107,7 +113,9 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 
 ### 4.1 Bridge commands
 
-`getState`, `addDllsViaDialog`, `dropFiles`, `removeDll`, `getDllTypes`, `toggleType`, `getTypeDetail`, `touchUrl`, `openBrowser`, `execute`, `savePreset`, `renamePreset`, `renameFolder`, `deletePreset`, `deleteFolder`, `saveSideChannelTemplate`, `deleteSideChannelTemplate`, `setSideChannelText`, `setLayout`, `saveZones`, `generateJwt`, `startOAuth`, `resolveUrls` (placeholder).
+`setLayout`, `setCurrentZone`, `setClientSettings`, `saveInfrastructureSettings`, `takeStartupDll`, `registerProvider`, `unregisterProvider`, `getPinnedEndpoints`, `savePinnedEndpoint`, `deletePinnedEndpoint`, `generateJwt`, `startOAuth`; asynchronous infrastructure commands: `getInfrastructure`, `saveInfrastructureZones`, `saveInfrastructureHosts`, `saveOAuthConfigurations`, `getWellknownEndpoints`, `saveWellknownEndpoint`, `deleteWellknownEndpoint`, `promotePinnedEndpoint`, `resolveUrls`.
+
+For manual tests of the store provider feature, `dotnet/test/UJMW.Tests/MockReadOnlyUjmwManagedInfrastructure.cs` (read-only, `CanResolve = true`) can be registered from the test assembly.
 
 When adding a UI feature: add a command in `HostBridge.ExecuteCommand`, keep the JS side free of business logic beyond rendering and input handling.
 
@@ -121,5 +129,4 @@ When adding a UI feature: add a command in `HostBridge.ExecuteCommand`, keep the
 
 ## 6. Open points
 
-- Specification of the Resolve dialog / ApiCatalog query (zone info transfer, response format).
 - Optional: HTTP-header sidechannel transport (currently only the `_` wrapper property).

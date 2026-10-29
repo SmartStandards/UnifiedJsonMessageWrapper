@@ -14,5 +14,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Mocks.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwHostConfigurationTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MockReadOnlyUjmwManagedInfrastructure.cs" />
   </ItemGroup>
 </Project>

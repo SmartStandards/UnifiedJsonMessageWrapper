@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>cf0a161a-99ba-4f01-af5e-16c6fcbc85ae</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>System</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)CommandLineExecutor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\OutgoingRequestSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\IncommingResponseSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TypeAliasBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwFaultException.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\UjmwClientConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HttpPostExecutor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwWebCallInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IAbstractCallInvoker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\IUjmwManagedInfrastructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\LocalUjmwManagedInfrastructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\UjmwContractNaming.cs" />
+  </ItemGroup>
+</Project>

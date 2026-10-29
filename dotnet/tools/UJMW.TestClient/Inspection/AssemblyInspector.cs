@@ -18,6 +18,8 @@ namespace UJMW.TestClient.Inspection {
     public const string _KindClass = "Class";
     public const string _KindStatic = "Static";
 
+    private const string _InfrastructureContractFullName = "System.Web.UJMW.IUjmwManagedInfrastructure";
+
     private static readonly Dictionary<string, string> _KeywordTypeNames = new Dictionary<string, string>() {
       { "System.Void", "void" },
       { "System.Object", "object" },
@@ -82,6 +84,7 @@ namespace UJMW.TestClient.Inspection {
           descriptor.FullName = type.FullName;
           descriptor.DisplayName = GetDisplayTypeName(type);
           descriptor.Kind = kind;
+          descriptor.IsInfrastructureProvider = IsInfrastructureProvider(type);
           List<TypeDescriptor> namespaceTypes;
           if (!typesByNamespace.TryGetValue(namespaceName, out namespaceTypes)) {
             namespaceTypes = new List<TypeDescriptor>();
@@ -98,6 +101,28 @@ namespace UJMW.TestClient.Inspection {
           result.Add(namespaceDescriptor);
         }
         return result.ToArray();
+      }
+    }
+
+    /// <summary>
+    /// Returns true when the type can be registered as store provider (public, non-abstract class
+    /// with a public parameterless constructor implementing 'IUjmwManagedInfrastructure').
+    /// </summary>
+    private static bool IsInfrastructureProvider(Type type) {
+      if (!type.IsClass || type.IsAbstract || !type.IsPublic || type.IsGenericTypeDefinition) {
+        return false;
+      }
+      try {
+        bool implementsContract = type.GetInterfaces().Any((i) => i.FullName == _InfrastructureContractFullName);
+        if (!implementsContract) {
+          return false;
+        }
+        return type.GetConstructors().Any((c) => c.GetParameters().Length == 0);
+      } catch (FileNotFoundException) {
+        //a referenced assembly is not resolvable -> can not be a usable provider
+        return false;
+      } catch (TypeLoadException) {
+        return false;
       }
     }
 

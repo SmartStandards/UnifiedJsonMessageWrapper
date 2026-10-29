@@ -62,6 +62,31 @@ input[type=text], select, textarea {
   background: #fff;
 }
 
+/* native selects are drawn like the editable combo (separate dropdown button on the right) */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-color: #fff;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0h8L4 5z' fill='%23333'/></svg>"),
+    linear-gradient(#fdfdfd, #fdfdfd),
+    linear-gradient(#adadad, #adadad);
+  background-repeat: no-repeat;
+  background-position: right 9px center, right 0 top 0, right 24px top 0;
+  background-size: 8px 5px, 24px 100%, 1px 100%;
+  cursor: default;
+}
+
+select:hover:not(:disabled) {
+  border-color: #0078d7;
+}
+
+select:disabled {
+  color: #9a9a9a;
+  background-color: #f0f0f0;
+}
+
 textarea.code, .code {
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
@@ -231,6 +256,85 @@ kbd {
   font-size: 15px;
 }
 
+.tree-row.store-provider .tree-label,
+.tree-row.store-provider .tree-icon {
+  color: #107c10;
+  font-weight: 700;
+}
+
+/* ---------- url lookup ---------- */
+
+.lookup-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lookup-list {
+  border: 1px solid #d6d6d6;
+  background: #fff;
+  max-height: 340px;
+  min-height: 80px;
+  overflow: auto;
+  margin-top: 6px;
+}
+
+.lookup-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-bottom: 1px solid #eee;
+}
+
+.lookup-item:hover {
+  background: #f3f9ff;
+}
+
+.lookup-url {
+  flex: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Consolas, "Cascadia Mono", monospace;
+}
+
+.lookup-url:hover {
+  text-decoration: underline;
+}
+
+.lookup-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 52px;
+  text-align: center;
+  color: #fff;
+}
+
+.lookup-badge-pin {
+  background: #8a5a00;
+}
+
+.lookup-badge-store {
+  background: #0078d7;
+}
+
+.lookup-badge-resolved {
+  background: #107c10;
+}
+
+.lookup-item button {
+  padding: 1px 6px;
+}
+
+button.pin-active {
+  background: #fff4ce;
+}
+
 /* ---------- detail ---------- */
 
 .detail-header {
@@ -323,7 +427,8 @@ kbd {
 }
 
 .combo-item {
-  padding: 4px 6px;
+  padding: 1px 6px;
+  line-height: 18px;
   cursor: default;
   white-space: nowrap;
   overflow: hidden;

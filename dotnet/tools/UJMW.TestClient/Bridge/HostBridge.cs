@@ -31,6 +31,7 @@ namespace UJMW.TestClient.Bridge {
     private readonly WebView2 _WebView;
     private readonly SettingsStore _Store;
     private readonly JsonSerializer _Serializer;
+    private string _StartupDllPath = null;
 
     public HostBridge(Form owner, WebView2 webView, SettingsStore store) {
       _Owner = owner;
@@ -124,8 +125,22 @@ namespace UJMW.TestClient.Bridge {
         case "saveInfrastructureSettings":
           this.SaveInfrastructureSettings(args["infrastructure"].ToObject<InfrastructureSettings>(_Serializer));
           return this.BuildState();
-        case "findInfrastructureImplementations":
-          return new JArray(InfrastructureProvider.FindReflectionCandidates());
+        case "takeStartupDll":
+          return this.TakeStartupDll();
+        case "registerProvider":
+          this.RegisterProvider(args.Value<string>("path"), args.Value<string>("typeFullName"));
+          return this.BuildState();
+        case "unregisterProvider":
+          this.UnregisterProvider(args.Value<string>("typeFullName"));
+          return this.BuildState();
+        case "getPinnedEndpoints":
+          return this.BuildPinnedEndpoints(args.Value<string>("typeFullName"));
+        case "savePinnedEndpoint":
+          this.SavePinnedEndpoint(args["pin"].ToObject<PinnedEndpoint>(_Serializer), args.Value<string>("oldUrl"));
+          return this.BuildPinnedEndpoints(args["pin"].Value<string>("typeFullName"));
+        case "deletePinnedEndpoint":
+          this.DeletePinnedEndpoint(args.Value<string>("typeFullName"), args.Value<string>("url"));
+          return this.BuildPinnedEndpoints(args.Value<string>("typeFullName"));
         case "touchUrl":
           this.TouchUrl(args.Value<string>("typeFullName"), args.Value<string>("url"));
           return this.BuildUrlHistory(args.Value<string>("typeFullName"));
@@ -203,6 +218,114 @@ namespace UJMW.TestClient.Bridge {
     #endregion
 
     #region " DLLs and types "
+
+    /// <summary>
+    /// Sets the DLL which was passed as command line argument ('open with').
+    /// It is added to the list (if not yet present) and selected by the UI after startup.
+    /// </summary>
+    public void SetStartupDll(string dllPath) {
+      if (string.IsNullOrWhiteSpace(dllPath)) {
+        return;
+      }
+      string fullPath = Path.GetFullPath(dllPath.Trim().Trim('"'));
+      this.AddDlls(new string[] { fullPath });
+      _StartupDllPath = fullPath;
+    }
+
+    /// <summary>
+    /// Returns the startup DLL path once (null afterwards), so that it is selected only after the start.
+    /// </summary>
+    private JToken TakeStartupDll() {
+      string path = _StartupDllPath;
+      _StartupDllPath = null;
+      if (path == null) {
+        return JValue.CreateNull();
+      }
+      DllEntry dll = this.Settings.Dlls.FirstOrDefault((d) => string.Equals(d.Path, path, StringComparison.OrdinalIgnoreCase));
+      if (dll == null) {
+        return JValue.CreateNull();
+      }
+      return new JValue(dll.Path);
+    }
+
+    /// <summary>
+    /// Registers a type of an added DLL as store provider (the registration survives the removal of the DLL).
+    /// </summary>
+    private void RegisterProvider(string path, string typeFullName) {
+      if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(typeFullName)) {
+        throw new InvalidOperationException("DLL path and type name are required.");
+      }
+      NamespaceDescriptor[] namespaces = AssemblyInspector.GetNamespaces(path);
+      bool isProvider = namespaces.SelectMany((n) => n.Types).Any((t) => t.FullName == typeFullName && t.IsInfrastructureProvider);
+      if (!isProvider) {
+        throw new InvalidOperationException($"'{typeFullName}' is no usable IUjmwManagedInfrastructure implementation.");
+      }
+      List<RegisteredProvider> providers = this.Settings.Infrastructure.RegisteredProviders
+        .Where((p) => p.TypeFullName != typeFullName)
+        .ToList();
+      RegisteredProvider provider = new RegisteredProvider();
+      provider.DllPath = Path.GetFullPath(path);
+      provider.TypeFullName = typeFullName;
+      providers.Add(provider);
+      this.Settings.Infrastructure.RegisteredProviders = providers.OrderBy((p) => p.TypeFullName, StringComparer.OrdinalIgnoreCase).ToArray();
+      _Store.Save();
+    }
+
+    /// <summary>
+    /// Removes a provider registration (falls back to the local store when it was the active one).
+    /// </summary>
+    private void UnregisterProvider(string typeFullName) {
+      InfrastructureSettings infrastructureSettings = this.Settings.Infrastructure;
+      infrastructureSettings.RegisteredProviders = infrastructureSettings.RegisteredProviders
+        .Where((p) => p.TypeFullName != typeFullName)
+        .ToArray();
+      if (infrastructureSettings.Mode == InfrastructureSettings._ModeProvider && infrastructureSettings.ProviderTypeName == typeFullName) {
+        infrastructureSettings.Mode = InfrastructureSettings._ModeLocal;
+        infrastructureSettings.ProviderTypeName = string.Empty;
+        lock (_InfrastructureLock) {
+          _Infrastructure = null;
+        }
+      }
+      _Store.Save();
+    }
+
+    /// <summary>
+    /// Returns the user-specific pinned endpoints of a contract.
+    /// </summary>
+    private JArray BuildPinnedEndpoints(string typeFullName) {
+      PinnedEndpoint[] pins = this.Settings.PinnedEndpoints.Where((p) => p.TypeFullName == typeFullName).ToArray();
+      return (JArray)JToken.FromObject(pins, _Serializer);
+    }
+
+    /// <summary>
+    /// Adds or replaces (when 'oldUrl' is given) a user-specific pinned endpoint.
+    /// </summary>
+    private void SavePinnedEndpoint(PinnedEndpoint pin, string oldUrl) {
+      if (pin == null || string.IsNullOrWhiteSpace(pin.TypeFullName) || string.IsNullOrWhiteSpace(pin.Url)) {
+        throw new InvalidOperationException("Contract and url are required.");
+      }
+      pin.Url = pin.Url.Trim();
+      string replacedUrl = pin.Url;
+      if (!string.IsNullOrWhiteSpace(oldUrl)) {
+        replacedUrl = oldUrl.Trim();
+      }
+      List<PinnedEndpoint> pins = this.Settings.PinnedEndpoints.Where(
+        (p) => !(p.TypeFullName == pin.TypeFullName && (string.Equals(p.Url, replacedUrl, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Url, pin.Url, StringComparison.OrdinalIgnoreCase)))
+      ).ToList();
+      pins.Add(pin);
+      this.Settings.PinnedEndpoints = pins.ToArray();
+      _Store.Save();
+    }
+
+    /// <summary>
+    /// Removes a user-specific pinned endpoint.
+    /// </summary>
+    private void DeletePinnedEndpoint(string typeFullName, string url) {
+      this.Settings.PinnedEndpoints = this.Settings.PinnedEndpoints.Where(
+        (p) => !(p.TypeFullName == typeFullName && string.Equals(p.Url, url, StringComparison.OrdinalIgnoreCase))
+      ).ToArray();
+      _Store.Save();
+    }
 
     /// <summary>
     /// Shows the file open dialog and adds the selected assemblies.
@@ -288,6 +411,10 @@ namespace UJMW.TestClient.Bridge {
         detail["warning"] = $"The file '{path}' does not exist (anymore) - methods can not be listed.";
       }
       detail["urlHistory"] = this.BuildUrlHistory(typeFullName);
+      bool isInterface = this.Settings.Dlls
+        .SelectMany((d) => d.CheckedTypes)
+        .Any((t) => t.FullName == typeFullName && t.Kind == AssemblyInspector._KindInterface);
+      detail["contractRouteName"] = UjmwContractNaming.GetContractName(typeFullName, isInterface);
       return detail;
     }
 
@@ -543,8 +670,11 @@ namespace UJMW.TestClient.Bridge {
       "getWellknownEndpoints",
       "saveWellknownEndpoint",
       "deleteWellknownEndpoint",
+      "promotePinnedEndpoint",
       "resolveUrls"
     };
+
+    private const string _SubRoutePlaceholder = "?????";
 
     private readonly object _InfrastructureLock = new object();
     private IUjmwManagedInfrastructure _Infrastructure = null;
@@ -638,6 +768,11 @@ namespace UJMW.TestClient.Bridge {
           string contractName = args.Value<string>("contractName");
           infrastructure.DeleteWellknownEndpoint(contractName, args.Value<string>("hostUrl"), args.Value<string>("webApplicationName"));
           return this.BuildWellknownEndpoints(infrastructure, contractName);
+        case "promotePinnedEndpoint":
+          EnsureWritable(infrastructure);
+          string promotedContractName = args.Value<string>("contractName");
+          infrastructure.SaveWellknownEndpoint(this.BuildWellknownEndpointFromUrl(infrastructure, promotedContractName, args.Value<string>("url")));
+          return this.BuildWellknownEndpoints(infrastructure, promotedContractName);
         case "resolveUrls":
           return this.ResolveUrls(infrastructure, args.Value<string>("contractName"), args.Value<string>("zone"));
         default:
@@ -679,6 +814,52 @@ namespace UJMW.TestClient.Bridge {
         result.Add(item);
       }
       return result;
+    }
+
+    /// <summary>
+    /// Splits a (pinned) url into host, web application and endpoint url by matching the longest
+    /// known '&lt;host&gt;/&lt;applicationBaseUrl&gt;' prefix of the store.
+    /// </summary>
+    private UjmwWellknownEndpoint BuildWellknownEndpointFromUrl(IUjmwManagedInfrastructure infrastructure, string contractName, string url) {
+      if (string.IsNullOrWhiteSpace(contractName) || string.IsNullOrWhiteSpace(url)) {
+        throw new InvalidOperationException("Contract and url are required.");
+      }
+      if (url.Contains(_SubRoutePlaceholder)) {
+        throw new InvalidOperationException($"Please replace the placeholder '{_SubRoutePlaceholder}' (sub route) before promoting the url.");
+      }
+      string trimmedUrl = TrimUrl(url);
+      UjmwWellknownEndpoint bestMatch = null;
+      int bestPrefixLength = -1;
+      foreach (UjmwInfrastructureHost host in EmptyIfNull(infrastructure.GetHosts())) {
+        List<KeyValuePair<string, string>> prefixes = new List<KeyValuePair<string, string>>();
+        prefixes.Add(new KeyValuePair<string, string>(string.Empty, ComposeUrl(host.HostUrl)));
+        if (host.WebApplications != null) {
+          foreach (UjmwWebApplication application in host.WebApplications) {
+            prefixes.Add(new KeyValuePair<string, string>(application.Name, ComposeUrl(host.HostUrl, application.ApplicationBaseUrl)));
+          }
+        }
+        foreach (KeyValuePair<string, string> prefix in prefixes) {
+          if (prefix.Value.Length == 0 || prefix.Value.Length <= bestPrefixLength) {
+            continue;
+          }
+          bool isPrefix = string.Equals(trimmedUrl, prefix.Value, StringComparison.OrdinalIgnoreCase) ||
+                          trimmedUrl.StartsWith(prefix.Value + "/", StringComparison.OrdinalIgnoreCase);
+          if (!isPrefix) {
+            continue;
+          }
+          UjmwWellknownEndpoint endpoint = new UjmwWellknownEndpoint();
+          endpoint.ContractName = contractName;
+          endpoint.HostUrl = host.HostUrl;
+          endpoint.WebApplicationName = prefix.Key;
+          endpoint.EndpointUrl = trimmedUrl.Substring(prefix.Value.Length).Trim('/');
+          bestMatch = endpoint;
+          bestPrefixLength = prefix.Value.Length;
+        }
+      }
+      if (bestMatch == null) {
+        throw new InvalidOperationException($"The url '{url}' does not belong to a host known by the infrastructure store.");
+      }
+      return bestMatch;
     }
 
     /// <summary>

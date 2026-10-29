@@ -19,6 +19,19 @@ namespace UJMW.TestClient.Model {
     private int _RequestTimeoutSeconds = 5;
     private string _CurrentZone = string.Empty;
     private InfrastructureSettings _Infrastructure = new InfrastructureSettings();
+    private PinnedEndpoint[] _PinnedEndpoints = new PinnedEndpoint[0];
+
+    /// <summary>
+    /// User-specific pinned endpoint URLs (not stored in the managed infrastructure).
+    /// </summary>
+    public PinnedEndpoint[] PinnedEndpoints {
+      get {
+        return _PinnedEndpoints;
+      }
+      set {
+        _PinnedEndpoints = value;
+      }
+    }
 
     /// <summary>
     /// Timeout for UJMW invocations (default: 5 seconds).
@@ -149,13 +162,26 @@ namespace UJMW.TestClient.Model {
 
     public const string _ModeLocal = "Local";
     public const string _ModeExternal = "External";
-    public const string _ModeReflection = "Reflection";
+    public const string _ModeProvider = "Provider";
 
     private string _Mode = _ModeLocal;
     private string _ExternalUrl = string.Empty;
     private string _ExternalAuthHeader = string.Empty;
-    private string _ReflectionTypeName = string.Empty;
+    private string _ProviderTypeName = string.Empty;
+    private RegisteredProvider[] _RegisteredProviders = new RegisteredProvider[0];
     private bool _LegacyDataMigrated = false;
+
+    /// <summary>
+    /// Store providers which were registered from types of added DLLs (stay available when the DLL is removed from the list).
+    /// </summary>
+    public RegisteredProvider[] RegisteredProviders {
+      get {
+        return _RegisteredProviders;
+      }
+      set {
+        _RegisteredProviders = value;
+      }
+    }
 
     public string Mode {
       get {
@@ -191,14 +217,14 @@ namespace UJMW.TestClient.Model {
     }
 
     /// <summary>
-    /// Assembly qualified name of an implementation found in a DLL next to the client (mode 'Reflection').
+    /// Full name of the selected registered provider type (mode 'Provider').
     /// </summary>
-    public string ReflectionTypeName {
+    public string ProviderTypeName {
       get {
-        return _ReflectionTypeName;
+        return _ProviderTypeName;
       }
       set {
-        _ReflectionTypeName = value;
+        _ProviderTypeName = value;
       }
     }
 
@@ -211,6 +237,88 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _LegacyDataMigrated = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// An 'IUjmwManagedInfrastructure' implementation which was registered as store provider.
+  /// </summary>
+  public sealed class RegisteredProvider {
+
+    private string _DllPath = string.Empty;
+    private string _TypeFullName = string.Empty;
+
+    public string DllPath {
+      get {
+        return _DllPath;
+      }
+      set {
+        _DllPath = value;
+      }
+    }
+
+    public string TypeFullName {
+      get {
+        return _TypeFullName;
+      }
+      set {
+        _TypeFullName = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// A user-specific pinned endpoint URL of a contract.
+  /// </summary>
+  public sealed class PinnedEndpoint {
+
+    private string _TypeFullName = string.Empty;
+    private string _Url = string.Empty;
+    private string _HostUrl = string.Empty;
+    private string _WebApplicationName = string.Empty;
+
+    public string TypeFullName {
+      get {
+        return _TypeFullName;
+      }
+      set {
+        _TypeFullName = value;
+      }
+    }
+
+    public string Url {
+      get {
+        return _Url;
+      }
+      set {
+        _Url = value;
+      }
+    }
+
+    /// <summary>
+    /// Host the pin was created for (needed to promote it into the store).
+    /// </summary>
+    public string HostUrl {
+      get {
+        return _HostUrl;
+      }
+      set {
+        _HostUrl = value;
+      }
+    }
+
+    /// <summary>
+    /// Web application the pin was created for (needed to promote it into the store).
+    /// </summary>
+    public string WebApplicationName {
+      get {
+        return _WebApplicationName;
+      }
+      set {
+        _WebApplicationName = value;
       }
     }
 

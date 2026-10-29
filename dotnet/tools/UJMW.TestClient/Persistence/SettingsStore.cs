@@ -110,6 +110,19 @@ namespace UJMW.TestClient.Persistence {
       if (settings.Infrastructure == null) {
         settings.Infrastructure = new InfrastructureSettings();
       }
+      if (settings.Infrastructure.RegisteredProviders == null) {
+        settings.Infrastructure.RegisteredProviders = new RegisteredProvider[0];
+      }
+      if (settings.Infrastructure.ProviderTypeName == null) {
+        settings.Infrastructure.ProviderTypeName = string.Empty;
+      }
+      if (settings.Infrastructure.Mode != InfrastructureSettings._ModeExternal && settings.Infrastructure.Mode != InfrastructureSettings._ModeProvider) {
+        //unknown or outdated modes (e.g. the former 'Reflection') fall back to the local store
+        settings.Infrastructure.Mode = InfrastructureSettings._ModeLocal;
+      }
+      if (settings.PinnedEndpoints == null) {
+        settings.PinnedEndpoints = new PinnedEndpoint[0];
+      }
       if (settings.CurrentZone == null) {
         settings.CurrentZone = string.Empty;
       }

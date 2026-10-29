@@ -3,6 +3,7 @@
 
   const KIND_INTERFACE = 'Interface';
   const KIND_STATIC = 'Static';
+  const PIN_SUBROUTE_PLACEHOLDER = '?????';
 
   // ======================================================================
   //  host bridge (requests: {id, cmd, args} / replies: {id, ok, result, error})
@@ -482,6 +483,21 @@
     });
 
     level.types.forEach((type) => {
+      if (type.isInfrastructureProvider) {
+        list.appendChild(createTreeNode(new Set(), {
+          key: makeKey(['dt', dll.path, type.fullName]),
+          label: type.displayName,
+          icon: '\u2699',
+          iconClass: 'check',
+          cssClass: 'store-provider',
+          title: type.fullName + ' (IUjmwManagedInfrastructure implementation - click to register it as store provider)',
+          hasChildren: false,
+          onSelect: () => {
+            openRegisterProviderDialog(dll, type);
+          }
+        }).li);
+        return;
+      }
       const isStatic = type.kind === KIND_STATIC;
       let title = type.fullName + ' (' + type.kind + ')';
       if (isStatic) {
@@ -505,6 +521,44 @@
     });
   }
 
+  function openRegisterProviderDialog(dll, type) {
+    const providers = ui.state.infrastructureSettings.registeredProviders || [];
+    const existing = providers.find((p) => p.typeFullName === type.fullName);
+    const body = el('div');
+    body.appendChild(el('div', 'info', 'The class "' + type.fullName + '" implements IUjmwManagedInfrastructure and has a public parameterless constructor.'));
+    body.appendChild(el('div', 'info', 'Do you want to register it as store provider? Afterwards it can be selected as source in "\u2699 Settings" \u2192 "Source" (also when the DLL is removed from the list again).'));
+    if (existing) {
+      body.appendChild(el('div', 'warning', 'This provider is already registered (' + existing.dllPath + '). Registering it again updates the DLL path.'));
+    }
+    const activate = bindCheckbox('Use as current source immediately', { value: true }, 'value');
+    const activateInput = activate.querySelector('input');
+    body.appendChild(activate);
+    openModal('Register store provider', body, [
+      {
+        label: 'Register',
+        className: 'primary',
+        action: (close) => {
+          callHost('registerProvider', { path: dll.path, typeFullName: type.fullName }).then((state) => {
+            applyState(state);
+            if (!activateInput.checked) {
+              return null;
+            }
+            const settings = deepCopy(ui.state.infrastructureSettings);
+            settings.mode = 'Provider';
+            settings.providerTypeName = type.fullName;
+            return callHost('saveInfrastructureSettings', { infrastructure: settings }).then((newState) => {
+              applyState(newState);
+              return loadInfrastructure();
+            });
+          }).then(() => {
+            close();
+          }).catch(showError);
+        }
+      },
+      { label: 'Cancel', action: (close) => close() }
+    ]);
+  }
+
   function checkIcon(checked, isStatic) {
     if (isStatic) {
       return '\u2012';
@@ -526,24 +580,46 @@
   //  detail: type (URL, auth, sidechannel, test client)
   // ======================================================================
 
-  function createHistoryCombo(placeholder) {
+  /**
+   * Editable combobox (text input + dropdown button + list). Items are either plain strings or
+   * objects { value, label, indent, title } (indent = tree depth for compact tree rendering).
+   */
+  function createHistoryCombo(placeholder, emptyText) {
     const wrapper = el('div', 'combo');
     const input = textInput('', placeholder);
     const list = el('div', 'combo-list hidden');
     let items = [];
+    if (!emptyText) {
+      emptyText = '(no history)';
+    }
 
     const render = () => {
       list.innerHTML = '';
       if (items.length === 0) {
-        list.appendChild(el('div', 'combo-empty', '(no history)'));
+        list.appendChild(el('div', 'combo-empty', emptyText));
       }
       items.forEach((item) => {
-        const entry = el('div', 'combo-item', item);
+        let value = item;
+        let label = item;
+        let indent = 0;
+        let title = '';
+        if (typeof item === 'object') {
+          value = item.value;
+          label = item.label || item.value;
+          indent = item.indent || 0;
+          title = item.title || '';
+        }
+        const entry = el('div', 'combo-item', label);
+        if (indent > 0) {
+          entry.style.paddingLeft = (6 + indent * 14) + 'px';
+        }
+        entry.title = title || value;
         entry.addEventListener('mousedown', (event) => {
           event.preventDefault();
-          input.value = item;
+          input.value = value;
           list.classList.add('hidden');
           input.dispatchEvent(new Event('input'));
+          input.dispatchEvent(new Event('change'));
         });
         list.appendChild(entry);
       });
@@ -567,7 +643,7 @@
       }
     });
 
-    wrapper.append(input, button('\u25BE', toggleList, 'combo-toggle', 'Show history (Alt+Down)'), list);
+    wrapper.append(input, button('\u25BE', toggleList, 'combo-toggle', 'Show list (Alt+Down)'), list);
     return {
       wrapper: wrapper,
       input: input,
@@ -614,25 +690,16 @@
 
     // zone
     const zoneRow = fieldRow('Zone');
-    e.zoneInput = textInput(ui.state.currentZone, 'Infrastructure zone (select or type), replaces {zone} in the SideChannel');
-    e.zoneInput.setAttribute('list', 'zoneOptions');
+    e.zoneCombo = createHistoryCombo('Infrastructure zone (select or type), replaces {zone} in the SideChannel', '(no zones defined)');
+    e.zoneInput = e.zoneCombo.input;
+    e.zoneInput.value = ui.state.currentZone;
     e.zoneInput.addEventListener('change', () => {
       ui.state.currentZone = e.zoneInput.value.trim();
       callHost('setCurrentZone', { zone: ui.state.currentZone }).catch(showError);
     });
-    e.resolveButton = button('Resolve\u2026', openResolveDialog, null, 'Resolve the URL via the managed infrastructure');
-    e.resolveButton.disabled = !infrastructureCanResolve();
-    zoneRow.append(e.zoneInput, e.resolveButton);
+    zoneRow.appendChild(e.zoneCombo.wrapper);
     panel.appendChild(zoneRow);
-
-    // wellknown
-    const wellknownRow = fieldRow('Wellknown');
-    e.wellknownSelect = el('select');
-    e.wellknownSelect.addEventListener('change', applySelectedWellknown);
-    e.wellknownAddButton = button('New\u2026', openWellknownDialog, null, 'Add a wellknown endpoint for this contract');
-    e.wellknownDeleteButton = button('Delete', deleteSelectedWellknown, null, 'Delete the selected wellknown endpoint');
-    wellknownRow.append(e.wellknownSelect, e.wellknownAddButton, e.wellknownDeleteButton);
-    panel.appendChild(wellknownRow);
+    refreshZoneOptions();
 
     // URL
     const urlRow = fieldRow('URL');
@@ -641,6 +708,7 @@
     e.urlInput.addEventListener('input', updateAfterUrlVisibility);
     urlRow.append(
       e.urlCombo.wrapper,
+      button('\u2026', openUrlLookupDialog, 'icon', 'Look up the URL (resolve, wellknown endpoints, pinned entries)'),
       button('\u{1F310}', openUrlInBrowser, 'icon', 'Open URL in browser')
     );
     panel.appendChild(urlRow);
@@ -712,13 +780,13 @@
     e.afterUrl.appendChild(testClient);
 
     refreshTemplateSelect();
-    loadWellknownEndpoints();
 
     callHost('getTypeDetail', { path: dll.path, typeFullName: checkedType.fullName }).then((result) => {
       if (ui.detail !== detail) {
         return;
       }
       detail.methods = result.methods;
+      detail.contractRouteName = result.contractRouteName;
       detail.loaded = true;
       e.methodSelect.innerHTML = '';
       result.methods.forEach((method, index) => {
@@ -1294,102 +1362,35 @@
     });
   }
 
-  function flattenZones(zones, prefix, target) {
+  function flattenZones(zones, prefix, depth, target) {
     (zones || []).forEach((zone) => {
       let path = zone.name;
       if (prefix) {
-        path = prefix + ' / ' + zone.name;
+        path = prefix + '/' + zone.name;
       }
-      target.push({ name: zone.name, path: path, description: zone.description });
-      flattenZones(zone.childZones, path, target);
+      target.push({ name: zone.name, path: path, depth: depth, description: zone.description });
+      flattenZones(zone.childZones, path, depth + 1, target);
     });
     return target;
   }
 
   function refreshZoneOptions() {
-    const dataList = document.getElementById('zoneOptions');
-    dataList.innerHTML = '';
-    flattenZones(ui.infrastructure.zones, null, []).forEach((zone) => {
-      const option = el('option');
-      option.value = zone.name;
-      option.label = zone.path;
-      dataList.appendChild(option);
+    const detail = ui.detail;
+    if (!detail || !detail.elements.zoneCombo || !ui.infrastructure) {
+      return;
+    }
+    const items = flattenZones(ui.infrastructure.zones, null, 0, []).map((zone) => {
+      let title = zone.path;
+      if (zone.description) {
+        title = zone.path + ' \u2013 ' + zone.description;
+      }
+      return { value: zone.path, label: zone.name, indent: zone.depth, title: title };
     });
+    detail.elements.zoneCombo.setItems(items);
   }
 
   function refreshInfrastructureDependentControls() {
-    const detail = ui.detail;
-    if (!detail) {
-      return;
-    }
-    const e = detail.elements;
-    e.resolveButton.disabled = !infrastructureCanResolve();
-    if (infrastructureCanResolve()) {
-      e.resolveButton.title = 'Resolve the URL via the managed infrastructure';
-    } else {
-      e.resolveButton.title = 'The current infrastructure store does not support url resolution';
-    }
-    e.wellknownAddButton.disabled = infrastructureIsReadOnly();
-    e.wellknownDeleteButton.disabled = infrastructureIsReadOnly() || !e.wellknownSelect.value;
-  }
-
-  function loadWellknownEndpoints() {
-    const detail = ui.detail;
-    if (!detail) {
-      return Promise.resolve();
-    }
-    return callHost('getWellknownEndpoints', { contractName: detail.typeFullName }).then((endpoints) => {
-      if (ui.detail === detail) {
-        renderWellknownEndpoints(endpoints);
-      }
-    }).catch((error) => {
-      if (ui.detail === detail) {
-        renderWellknownEndpoints([]);
-        detail.elements.wellknownSelect.title = error.message;
-      }
-    });
-  }
-
-  function renderWellknownEndpoints(endpoints) {
-    const detail = ui.detail;
-    const e = detail.elements;
-    detail.wellknownEndpoints = endpoints;
-    e.wellknownSelect.innerHTML = '';
-    let placeholderText = '(select a wellknown endpoint)';
-    if (endpoints.length === 0) {
-      placeholderText = '(no wellknown endpoints for this contract)';
-    }
-    const placeholder = el('option', null, placeholderText);
-    placeholder.value = '';
-    e.wellknownSelect.appendChild(placeholder);
-    endpoints.forEach((endpoint, index) => {
-      let label = endpoint.url;
-      if (endpoint.webApplicationName) {
-        label = endpoint.webApplicationName + '  \u2013  ' + endpoint.url;
-      }
-      const option = el('option', null, label);
-      option.value = String(index);
-      e.wellknownSelect.appendChild(option);
-    });
-    refreshInfrastructureDependentControls();
-  }
-
-  function selectedWellknownEndpoint() {
-    const detail = ui.detail;
-    const index = parseInt(detail.elements.wellknownSelect.value, 10);
-    if (isNaN(index)) {
-      return null;
-    }
-    return detail.wellknownEndpoints[index];
-  }
-
-  function applySelectedWellknown() {
-    const endpoint = selectedWellknownEndpoint();
-    refreshInfrastructureDependentControls();
-    if (!endpoint) {
-      return;
-    }
-    applyResolvedUrl(endpoint.url);
+    refreshZoneOptions();
   }
 
   function applyResolvedUrl(url) {
@@ -1398,161 +1399,231 @@
     touchCurrentUrl().catch(showError);
   }
 
-  function deleteSelectedWellknown() {
-    const endpoint = selectedWellknownEndpoint();
-    if (!endpoint) {
-      return;
-    }
-    if (!confirm('Delete the wellknown endpoint "' + endpoint.url + '"?')) {
-      return;
-    }
-    callHost('deleteWellknownEndpoint', {
-      contractName: endpoint.contractName,
-      hostUrl: endpoint.hostUrl,
-      webApplicationName: endpoint.webApplicationName
-    }).then(renderWellknownEndpoints).catch(showError);
+  function joinUrlSegments(segments) {
+    const parts = [];
+    segments.forEach((segment) => {
+      if (!segment || !segment.trim()) {
+        return;
+      }
+      if (parts.length === 0) {
+        parts.push(segment.trim().replace(/\/+$/, ''));
+      } else {
+        parts.push(segment.trim().replace(/^\/+|\/+$/g, ''));
+      }
+    });
+    return parts.filter((p) => p.length > 0).join('/');
   }
 
-  function openWellknownDialog() {
+  /**
+   * URL lookup dialog: resolve (if supported by the store), wellknown endpoints of the store
+   * and user specific pinned entries (which can be promoted into the store).
+   */
+  function openUrlLookupDialog() {
     const detail = ui.detail;
-    const endpoint = {
-      contractName: detail.typeFullName,
-      hostUrl: '',
-      webApplicationName: '',
-      endpointUrl: ''
-    };
-    const hosts = (ui.infrastructure && ui.infrastructure.hosts) || [];
-    const body = el('div');
-    body.appendChild(el('div', 'info', 'Maps the contract "' + detail.typeFullName + '" to a known host / web application. The resulting URL is <host>/<applicationBaseUrl>/<endpointUrl>.'));
-
-    const hostRow = fieldRow('Host');
-    const hostSelect = el('select');
-    hosts.forEach((host) => {
-      const option = el('option', null, host.hostUrl);
-      option.value = host.hostUrl;
-      hostSelect.appendChild(option);
-    });
-    hostRow.appendChild(hostSelect);
-
-    const applicationRow = fieldRow('Web application');
-    const applicationSelect = el('select');
-    applicationRow.appendChild(applicationSelect);
-
-    const endpointRow = fieldRow('Endpoint URL');
-    const endpointInput = textInput('', 'relative endpoint url of the contract, e.g. MyService');
-    endpointRow.appendChild(endpointInput);
-
-    const preview = el('div', 'info code');
-
-    const findHost = () => hosts.find((h) => h.hostUrl === hostSelect.value);
-    const findApplication = () => {
-      const host = findHost();
-      if (!host) {
-        return null;
-      }
-      return (host.webApplications || []).find((a) => a.name === applicationSelect.value);
-    };
-    const updatePreview = () => {
-      const parts = [];
-      if (hostSelect.value) {
-        parts.push(hostSelect.value.trim().replace(/\/+$/, ''));
-      }
-      const application = findApplication();
-      if (application && application.applicationBaseUrl) {
-        parts.push(application.applicationBaseUrl.trim().replace(/^\/+|\/+$/g, ''));
-      }
-      if (endpointInput.value.trim()) {
-        parts.push(endpointInput.value.trim().replace(/^\/+|\/+$/g, ''));
-      }
-      preview.textContent = parts.filter((p) => p.length > 0).join('/');
-    };
-    const renderApplications = () => {
-      applicationSelect.innerHTML = '';
-      const none = el('option', null, '(none)');
-      none.value = '';
-      applicationSelect.appendChild(none);
-      const host = findHost();
-      if (host) {
-        (host.webApplications || []).forEach((application) => {
-          const option = el('option', null, application.name + '  (' + application.applicationBaseUrl + ')');
-          option.value = application.name;
-          applicationSelect.appendChild(option);
-        });
-      }
-      updatePreview();
-    };
-    hostSelect.addEventListener('change', renderApplications);
-    applicationSelect.addEventListener('change', updatePreview);
-    endpointInput.addEventListener('input', updatePreview);
-    renderApplications();
-
-    if (hosts.length === 0) {
-      body.appendChild(el('div', 'warning', 'No hosts are defined yet. Use "\u2699 Settings" \u2192 "Hosts" to define them.'));
+    if (!detail) {
+      return;
     }
-    body.append(hostRow, applicationRow, endpointRow, el('div', 'info', 'Resulting URL'), preview);
+    const readOnly = infrastructureIsReadOnly();
+    const lookup = { resolved: [], wellknown: [], pins: [], wellknownError: null };
+    const body = el('div', 'url-lookup');
 
-    openModal('New wellknown endpoint', body, [
-      {
-        label: 'Save',
-        className: 'primary',
-        action: (close) => {
-          endpoint.hostUrl = hostSelect.value;
-          endpoint.webApplicationName = applicationSelect.value;
-          endpoint.endpointUrl = endpointInput.value.trim();
-          if (!endpoint.hostUrl) {
-            alert('Please select a host.');
+    // resolve
+    const resolveRow = el('div', 'lookup-toolbar');
+    const zone = detail.elements.zoneInput.value.trim();
+    if (infrastructureCanResolve()) {
+      let resolveLabel = 'Resolve';
+      if (zone) {
+        resolveLabel = 'Resolve in zone "' + zone + '"';
+      }
+      const resolveButton = button(resolveLabel, () => {
+        if (!zone) {
+          alert('Please select or enter a zone in the main window first.');
+          return;
+        }
+        resolveButton.disabled = true;
+        callHost('resolveUrls', { contractName: detail.typeFullName, zone: zone }).then((urls) => {
+          lookup.resolved = urls;
+          if (urls.length === 0) {
+            alert('No URL was resolved for "' + detail.typeFullName + '" within zone "' + zone + '".');
+          }
+          renderList();
+        }).catch(showError).finally(() => {
+          resolveButton.disabled = false;
+        });
+      }, 'primary', 'Resolve the URL via the managed infrastructure (uses the zone of the main window)');
+      resolveRow.appendChild(resolveButton);
+    } else {
+      resolveRow.appendChild(el('span', 'info', 'The current infrastructure store does not support url resolution.'));
+    }
+    body.appendChild(resolveRow);
+
+    // add pin from server / web application
+    const hosts = (ui.infrastructure && ui.infrastructure.hosts) || [];
+    const targets = [];
+    hosts.forEach((host) => {
+      targets.push({ hostUrl: host.hostUrl, webApplicationName: '', applicationBaseUrl: '' });
+      (host.webApplications || []).forEach((application) => {
+        targets.push({ hostUrl: host.hostUrl, webApplicationName: application.name, applicationBaseUrl: application.applicationBaseUrl });
+      });
+    });
+    const addRow = fieldRow('Add pin for');
+    const targetSelect = el('select');
+    const placeholder = el('option', null, '(select server / web application)');
+    placeholder.value = '';
+    targetSelect.appendChild(placeholder);
+    targets.forEach((target, index) => {
+      let label = target.hostUrl;
+      if (target.webApplicationName) {
+        label = joinUrlSegments([target.hostUrl, target.applicationBaseUrl]) + '   (' + target.webApplicationName + ')';
+      }
+      const option = el('option', null, label);
+      option.value = String(index);
+      targetSelect.appendChild(option);
+    });
+    if (targets.length === 0) {
+      placeholder.textContent = '(no servers defined - see \u2699 Settings \u2192 Hosts)';
+    }
+    targetSelect.addEventListener('change', () => {
+      const index = parseInt(targetSelect.value, 10);
+      targetSelect.value = '';
+      if (isNaN(index)) {
+        return;
+      }
+      const target = targets[index];
+      const pin = {
+        typeFullName: detail.typeFullName,
+        url: joinUrlSegments([target.hostUrl, target.applicationBaseUrl, PIN_SUBROUTE_PLACEHOLDER, detail.contractRouteName || shortTypeName(detail.typeFullName)]),
+        hostUrl: target.hostUrl,
+        webApplicationName: target.webApplicationName
+      };
+      callHost('savePinnedEndpoint', { pin: pin }).then((pins) => {
+        lookup.pins = pins;
+        renderList();
+      }).catch(showError);
+    });
+    addRow.appendChild(targetSelect);
+    body.appendChild(addRow);
+    body.appendChild(el('div', 'info', 'Pins are stored for the current user only. "' + PIN_SUBROUTE_PLACEHOLDER + '" marks a possible sub route which has to be replaced (or removed) before use. Click an URL to take it over.'));
+
+    const list = el('div', 'lookup-list');
+    body.appendChild(list);
+
+    let closeDialog = null;
+    const takeOver = (url) => {
+      applyResolvedUrl(url);
+      closeDialog();
+    };
+
+    const pinUrl = (url, hostUrl, webApplicationName) => {
+      const pin = { typeFullName: detail.typeFullName, url: url, hostUrl: hostUrl || '', webApplicationName: webApplicationName || '' };
+      return callHost('savePinnedEndpoint', { pin: pin }).then((pins) => {
+        lookup.pins = pins;
+        renderList();
+      });
+    };
+
+    const addEntry = (url, badge, badgeTitle, actions) => {
+      const row = el('div', 'lookup-item');
+      const urlText = el('span', 'lookup-url', url);
+      urlText.title = 'Take over this URL';
+      urlText.addEventListener('click', () => takeOver(url));
+      row.append(el('span', 'lookup-badge lookup-badge-' + badge, badge), urlText);
+      row.firstChild.title = badgeTitle;
+      actions.forEach((action) => row.appendChild(action));
+      list.appendChild(row);
+    };
+
+    const renderList = () => {
+      list.innerHTML = '';
+      lookup.pins.forEach((pin) => {
+        const unpin = button('\u{1F4CC}', () => {
+          callHost('deletePinnedEndpoint', { typeFullName: detail.typeFullName, url: pin.url }).then((pins) => {
+            lookup.pins = pins;
+            renderList();
+          }).catch(showError);
+        }, 'icon pin-active', 'Remove pin');
+        const edit = button('\u270E', () => {
+          const newUrl = prompt('URL', pin.url);
+          if (!newUrl || newUrl.trim() === pin.url) {
             return;
           }
-          callHost('saveWellknownEndpoint', { endpoint: endpoint }).then((endpoints) => {
-            close();
-            if (ui.detail === detail) {
-              renderWellknownEndpoints(endpoints);
-            }
+          const changed = { typeFullName: pin.typeFullName, url: newUrl.trim(), hostUrl: pin.hostUrl, webApplicationName: pin.webApplicationName };
+          callHost('savePinnedEndpoint', { pin: changed, oldUrl: pin.url }).then((pins) => {
+            lookup.pins = pins;
+            renderList();
           }).catch(showError);
+        }, 'icon', 'Edit URL');
+        const actions = [edit];
+        if (!readOnly) {
+          actions.push(button('\u2B06 Store', () => {
+            callHost('promotePinnedEndpoint', { contractName: detail.typeFullName, url: pin.url }).then((endpoints) => {
+              lookup.wellknown = endpoints;
+              return callHost('deletePinnedEndpoint', { typeFullName: detail.typeFullName, url: pin.url });
+            }).then((pins) => {
+              lookup.pins = pins;
+              renderList();
+            }).catch(showError);
+          }, null, 'Promote this pin into the infrastructure store (wellknown endpoint)'));
         }
-      },
-      { label: 'Cancel', action: (close) => close() }
-    ]);
-  }
-
-  function openResolveDialog() {
-    const detail = ui.detail;
-    const zone = detail.elements.zoneInput.value.trim();
-    if (!zone) {
-      alert('Please select or enter a zone first.');
-      return;
-    }
-    detail.elements.resolveButton.disabled = true;
-    callHost('resolveUrls', { contractName: detail.typeFullName, zone: zone }).then((urls) => {
-      if (ui.detail !== detail) {
-        return;
-      }
-      if (urls.length === 0) {
-        alert('No URL was resolved for "' + detail.typeFullName + '" within zone "' + zone + '".');
-        return;
-      }
-      if (urls.length === 1) {
-        applyResolvedUrl(urls[0]);
-        return;
-      }
-      const body = el('div');
-      body.appendChild(el('div', 'info', 'Multiple URLs were resolved - please select one:'));
-      const urlList = el('div', 'url-list');
-      let closeDialog = null;
-      urls.forEach((url) => {
-        const item = el('div', 'url-item', url);
-        item.addEventListener('click', () => {
-          applyResolvedUrl(url);
-          closeDialog();
-        });
-        urlList.appendChild(item);
+        actions.push(unpin);
+        addEntry(pin.url, 'pin', 'User specific pin (not stored in the infrastructure store)', actions);
       });
-      body.appendChild(urlList);
-      closeDialog = openModal('Resolve URL \u2013 ' + shortTypeName(detail.typeFullName) + ' @ ' + zone, body, [
-        { label: 'Cancel', action: (close) => close() }
-      ]);
-    }).catch(showError).finally(() => {
-      refreshInfrastructureDependentControls();
+      lookup.wellknown.forEach((endpoint) => {
+        const actions = [];
+        if (!readOnly) {
+          actions.push(button('\u2716', () => {
+            if (!confirm('Delete the wellknown endpoint "' + endpoint.url + '" from the store?')) {
+              return;
+            }
+            callHost('deleteWellknownEndpoint', {
+              contractName: endpoint.contractName,
+              hostUrl: endpoint.hostUrl,
+              webApplicationName: endpoint.webApplicationName
+            }).then((endpoints) => {
+              lookup.wellknown = endpoints;
+              renderList();
+            }).catch(showError);
+          }, 'icon', 'Delete from the store'));
+        }
+        let title = 'Wellknown endpoint from the infrastructure store';
+        if (endpoint.webApplicationName) {
+          title = title + ' (' + endpoint.webApplicationName + ')';
+        }
+        addEntry(endpoint.url, 'store', title, actions);
+      });
+      lookup.resolved.forEach((url) => {
+        const alreadyPinned = lookup.pins.some((p) => p.url.toLowerCase() === url.toLowerCase());
+        const actions = [];
+        if (!alreadyPinned) {
+          actions.push(button('\u{1F4CD}', () => {
+            pinUrl(url, '', '').catch(showError);
+          }, 'icon', 'Pin this URL'));
+        }
+        addEntry(url, 'resolved', 'Resolved within zone "' + zone + '"', actions);
+      });
+      if (lookup.wellknownError) {
+        list.appendChild(el('div', 'warning', 'Wellknown endpoints are not available: ' + lookup.wellknownError));
+      }
+      if (list.childNodes.length === 0) {
+        list.appendChild(el('div', 'info', '(no entries yet)'));
+      }
+    };
+
+    closeDialog = openModal('Look up URL \u2013 ' + shortTypeName(detail.typeFullName), body, [
+      { label: 'Close', action: (close) => close() }
+    ]);
+    renderList();
+
+    callHost('getPinnedEndpoints', { typeFullName: detail.typeFullName }).then((pins) => {
+      lookup.pins = pins;
+      renderList();
+    }).catch(showError);
+    callHost('getWellknownEndpoints', { contractName: detail.typeFullName }).then((endpoints) => {
+      lookup.wellknown = endpoints;
+      renderList();
+    }).catch((error) => {
+      lookup.wellknownError = error.message;
+      renderList();
     });
   }
 
@@ -1603,18 +1674,28 @@
     const pane = el('div');
     pane.appendChild(el('div', 'info', 'Zones, hosts, OAuth configurations and wellknown endpoints are provided by an infrastructure store (IUjmwManagedInfrastructure). User specific data (presets, templates, JWT inputs) always stays local.'));
 
+    // registered store providers are offered as additional sources ('Provider:<type>')
+    const providerPrefix = 'Provider:';
+    const providers = settings.registeredProviders || [];
     const modeRow = fieldRow('Source');
     const modeSelect = el('select');
-    [
+    const modeEntries = [
       ['Local', 'Local (stored on this machine)'],
-      ['External', 'Externally managed (UJMW service)'],
-      ['Reflection', 'Implementation from a DLL next to the client']
-    ].forEach((entry) => {
+      ['External', 'Externally managed (UJMW service)']
+    ];
+    providers.forEach((provider) => {
+      modeEntries.push([providerPrefix + provider.typeFullName, 'Store provider: ' + provider.typeFullName]);
+    });
+    modeEntries.forEach((entry) => {
       const option = el('option', null, entry[1]);
       option.value = entry[0];
       modeSelect.appendChild(option);
     });
-    modeSelect.value = settings.mode || 'Local';
+    if (settings.mode === 'Provider') {
+      modeSelect.value = providerPrefix + settings.providerTypeName;
+    } else {
+      modeSelect.value = settings.mode || 'Local';
+    }
     modeRow.appendChild(modeSelect);
 
     const externalPane = el('div');
@@ -1624,47 +1705,38 @@
     authRow.appendChild(bindText(textInput('', 'Bearer token or plain token'), settings, 'externalAuthHeader'));
     externalPane.append(urlRow, authRow);
 
-    const reflectionPane = el('div');
-    const typeRow = fieldRow('Implementation');
-    const typeSelect = el('select');
-    typeRow.append(typeSelect, button('Search', () => searchImplementations(), null, 'Search DLLs next to the client for implementations'));
-    reflectionPane.appendChild(typeRow);
-    const searchImplementations = () => {
-      typeSelect.innerHTML = '';
-      callHost('findInfrastructureImplementations').then((candidates) => {
-        if (candidates.length === 0) {
-          const option = el('option', null, '(no implementations found)');
-          option.value = '';
-          typeSelect.appendChild(option);
-        }
-        candidates.forEach((candidate) => {
-          const option = el('option', null, candidate.split(',')[0]);
-          option.value = candidate;
-          option.title = candidate;
-          typeSelect.appendChild(option);
-        });
-        if (settings.reflectionTypeName && candidates.indexOf(settings.reflectionTypeName) >= 0) {
-          typeSelect.value = settings.reflectionTypeName;
-        }
+    const providerPane = el('div');
+    const providerInfo = el('div', 'info code');
+    const unregisterButton = button('Unregister provider', () => {
+      const typeFullName = modeSelect.value.substring(providerPrefix.length);
+      if (!confirm('Unregister the store provider "' + typeFullName + '"?')) {
+        return;
+      }
+      callHost('unregisterProvider', { typeFullName: typeFullName }).then((state) => {
+        applyState(state);
+        return loadInfrastructure();
+      }).then(() => {
+        onSourceChanged();
       }).catch(showError);
-    };
-    if (settings.reflectionTypeName) {
-      const option = el('option', null, settings.reflectionTypeName.split(',')[0]);
-      option.value = settings.reflectionTypeName;
-      typeSelect.appendChild(option);
-    }
+    });
+    providerPane.append(providerInfo, unregisterButton);
 
     const updateModeVisibility = () => {
+      const isProvider = modeSelect.value.indexOf(providerPrefix) === 0;
       externalPane.classList.toggle('hidden', modeSelect.value !== 'External');
-      reflectionPane.classList.toggle('hidden', modeSelect.value !== 'Reflection');
-    };
-    modeSelect.addEventListener('change', () => {
-      updateModeVisibility();
-      if (modeSelect.value === 'Reflection' && typeSelect.options.length === 0) {
-        searchImplementations();
+      providerPane.classList.toggle('hidden', !isProvider);
+      if (isProvider) {
+        const typeFullName = modeSelect.value.substring(providerPrefix.length);
+        const provider = providers.find((p) => p.typeFullName === typeFullName);
+        if (provider) {
+          providerInfo.textContent = provider.typeFullName + '\n' + provider.dllPath;
+        }
       }
-    });
+    };
+    modeSelect.addEventListener('change', updateModeVisibility);
     updateModeVisibility();
+
+    const providerHint = el('div', 'info', 'Further store providers can be registered by adding a DLL (left panel) and clicking a green highlighted IUjmwManagedInfrastructure implementation in its type list.');
 
     const status = el('div', 'info');
     const capabilities = ui.infrastructure.capabilities;
@@ -1686,17 +1758,20 @@
       status.textContent = text;
     }
 
-    pane.append(modeRow, externalPane, reflectionPane, saveButton('Apply', () => {
-      settings.mode = modeSelect.value;
-      settings.reflectionTypeName = typeSelect.value;
+    pane.append(modeRow, externalPane, providerPane, saveButton('Apply', () => {
+      if (modeSelect.value.indexOf(providerPrefix) === 0) {
+        settings.mode = 'Provider';
+        settings.providerTypeName = modeSelect.value.substring(providerPrefix.length);
+      } else {
+        settings.mode = modeSelect.value;
+      }
       callHost('saveInfrastructureSettings', { infrastructure: settings }).then((state) => {
         applyState(state);
         return loadInfrastructure();
       }).then(() => {
-        loadWellknownEndpoints();
         onSourceChanged();
       }).catch(showError);
-    }), status);
+    }), status, providerHint);
     return pane;
   }
 
@@ -2187,6 +2262,20 @@
       document.getElementById('leftPanel').style.width = state.leftPanelWidth + 'px';
       applyState(state);
       return loadInfrastructure();
+    }).then(() => {
+      return callHost('takeStartupDll');
+    }).then((startupDllPath) => {
+      if (!startupDllPath) {
+        return;
+      }
+      const dll = ui.state.dlls.find((d) => d.path === startupDllPath);
+      if (dll) {
+        selectDll(dll);
+        const row = document.querySelector('#mainTree .tree-row.selected');
+        if (row) {
+          row.scrollIntoView({ block: 'nearest' });
+        }
+      }
     }).catch(showError);
   }
 

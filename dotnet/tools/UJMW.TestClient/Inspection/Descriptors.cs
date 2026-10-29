@@ -37,6 +37,20 @@ namespace UJMW.TestClient.Inspection {
     private string _FullName = string.Empty;
     private string _DisplayName = string.Empty;
     private string _Kind = string.Empty;
+    private bool _IsInfrastructureProvider = false;
+
+    /// <summary>
+    /// True for public, non-abstract classes with a public parameterless constructor which implement
+    /// 'IUjmwManagedInfrastructure' (can be registered as store provider).
+    /// </summary>
+    public bool IsInfrastructureProvider {
+      get {
+        return _IsInfrastructureProvider;
+      }
+      set {
+        _IsInfrastructureProvider = value;
+      }
+    }
 
     public string FullName {
       get {

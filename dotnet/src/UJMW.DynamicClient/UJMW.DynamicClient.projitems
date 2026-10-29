@@ -22,5 +22,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)IAbstractCallInvoker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\IUjmwManagedInfrastructure.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\LocalUjmwManagedInfrastructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)%28Infrastructure%29\UjmwContractNaming.cs" />
   </ItemGroup>
 </Project>
