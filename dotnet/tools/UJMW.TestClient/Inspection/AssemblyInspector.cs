@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace UJMW.TestClient.Inspection {
 
@@ -141,6 +143,8 @@ namespace UJMW.TestClient.Inspection {
         ContractDescriptor contract = new ContractDescriptor();
         contract.HasDocumentationFile = File.Exists(Path.ChangeExtension(assemblyPath, ".xml"));
         contract.Summary = typeDocs.GetTypeSummary(type);
+        contract.Warning = GetBaseTypeResolutionWarning(type);
+        contract.FuseEntity = FuseRepositoryDetector.TryDetect(type);
 
         List<MethodDescriptor> result = new List<MethodDescriptor>();
         foreach (MethodInfo method in CollectMethods(type)) {
@@ -162,6 +166,32 @@ namespace UJMW.TestClient.Inspection {
         contract.Methods = result.ToArray();
         return contract;
       }
+    }
+
+    /// <summary>
+    /// Returns a warning text if the inherited interfaces / base types of the type can not be resolved
+    /// (in this case inherited methods and the FUSE data mode are not available), otherwise null.
+    /// </summary>
+    private static string GetBaseTypeResolutionWarning(Type type) {
+
+      try {
+        type.GetInterfaces();
+        Type baseType = type.BaseType;
+        while (baseType != null) {
+          baseType = baseType.BaseType;
+        }
+      } catch (FileNotFoundException ex) {
+        //expected: a referenced assembly is neither next to the DLL nor listed in its deps.json / the NuGet cache
+        return (
+          "Not all inherited interfaces/base types could be resolved (missing assembly: '" + ex.FileName + "'). " +
+          "Inherited methods (and the FUSE data mode) are therefore not available. " +
+          "Place the missing assembly next to the DLL or restore the NuGet packages of the contract project."
+        );
+      } catch (TypeLoadException ex) {
+        return "Not all inherited interfaces/base types could be resolved: " + ex.Message;
+      }
+
+      return null;
     }
 
     /// <summary>
@@ -322,6 +352,7 @@ namespace UJMW.TestClient.Inspection {
 
       string assemblyDirectory = Path.GetDirectoryName(assemblyPath);
       candidatePaths.AddRange(Directory.GetFiles(assemblyDirectory, "*.dll"));
+      candidatePaths.AddRange(GetPackageAssemblyPathsFromDepsFiles(assemblyDirectory));
 
       DirectoryInfo runtimeDirectory = new DirectoryInfo(RuntimeEnvironment.GetRuntimeDirectory().TrimEnd('\\', '/'));
       candidatePaths.AddRange(Directory.GetFiles(runtimeDirectory.FullName, "*.dll"));
@@ -341,6 +372,81 @@ namespace UJMW.TestClient.Inspection {
 
       PathAssemblyResolver resolver = new PathAssemblyResolver(candidatePaths.Distinct(StringComparer.OrdinalIgnoreCase));
       return new MetadataLoadContext(resolver, typeof(object).Assembly.GetName().Name);
+    }
+
+    /// <summary>
+    /// Returns the paths of all NuGet package assemblies which are listed in the '*.deps.json' files of the
+    /// given folder and exist within the global NuGet packages folder. This makes references resolvable which
+    /// are not copied next to the inspected assembly (e.g. the 'dist' output of a class library).
+    /// </summary>
+    private static string[] GetPackageAssemblyPathsFromDepsFiles(string assemblyDirectory) {
+
+      List<string> result = new List<string>();
+      string packagesRoot = GetNuGetPackagesRoot();
+      if (!Directory.Exists(packagesRoot)) {
+        return result.ToArray();
+      }
+
+      foreach (string depsFile in Directory.GetFiles(assemblyDirectory, "*.deps.json")) {
+
+        JObject deps;
+        try {
+          deps = JObject.Parse(File.ReadAllText(depsFile));
+        } catch (JsonReaderException) {
+          //an invalid deps file is simply ignored (it is only a resolution hint)
+          continue;
+        }
+
+        JObject libraries = deps["libraries"] as JObject;
+        JObject targets = deps["targets"] as JObject;
+        if (libraries == null || targets == null) {
+          continue;
+        }
+
+        foreach (JProperty target in targets.Properties()) {
+
+          JObject targetLibraries = target.Value as JObject;
+          if (targetLibraries == null) {
+            continue;
+          }
+
+          foreach (JProperty targetLibrary in targetLibraries.Properties()) {
+
+            JObject library = libraries[targetLibrary.Name] as JObject;
+            if (library == null || library.Value<string>("type") != "package") {
+              continue;
+            }
+
+            string libraryPath = library.Value<string>("path");
+            JObject runtime = targetLibrary.Value["runtime"] as JObject;
+            if (string.IsNullOrEmpty(libraryPath) || runtime == null) {
+              continue;
+            }
+
+            foreach (JProperty runtimeAssembly in runtime.Properties()) {
+              string candidate = Path.Combine(packagesRoot, libraryPath, runtimeAssembly.Name.Replace('/', Path.DirectorySeparatorChar));
+              if (File.Exists(candidate)) {
+                result.Add(candidate);
+              }
+            }
+          }
+        }
+      }
+
+      return result.ToArray();
+    }
+
+    /// <summary>
+    /// Returns the global NuGet packages folder ('NUGET_PACKAGES' or '%USERPROFILE%\.nuget\packages').
+    /// </summary>
+    private static string GetNuGetPackagesRoot() {
+
+      string configuredRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+      if (!string.IsNullOrWhiteSpace(configuredRoot)) {
+        return configuredRoot;
+      }
+
+      return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
     }
 
     /// <summary>

@@ -435,11 +435,17 @@ namespace UJMW.TestClient.Bridge {
         detail["methods"] = JToken.FromObject(contract.Methods, _Serializer);
         detail["summary"] = contract.Summary;
         detail["hasDocumentationFile"] = contract.HasDocumentationFile;
-        detail["warning"] = null;
+        detail["warning"] = contract.Warning;
+        if (contract.FuseEntity != null) {
+          detail["fuseEntity"] = JToken.FromObject(contract.FuseEntity, _Serializer);
+        } else {
+          detail["fuseEntity"] = JValue.CreateNull();
+        }
       } else {
         detail["methods"] = new JArray();
         detail["summary"] = string.Empty;
         detail["hasDocumentationFile"] = false;
+        detail["fuseEntity"] = JValue.CreateNull();
         detail["warning"] = $"The file '{path}' does not exist (anymore) - methods can not be listed.";
       }
       detail["urlHistory"] = this.BuildUrlHistory(typeFullName);

@@ -92,6 +92,20 @@ namespace UJMW.TestClient.Persistence {
       if (settings.Presets == null) {
         settings.Presets = new Preset[0];
       }
+      foreach (Preset preset in settings.Presets) {
+        if (preset.Kind != Preset._KindFuseData) {
+          preset.Kind = Preset._KindMethod;
+        }
+        if (preset.DataSorting == null) {
+          preset.DataSorting = new string[0];
+        }
+        if (preset.DataFilterJson == null) {
+          preset.DataFilterJson = string.Empty;
+        }
+        if (preset.DataPageSize <= 0) {
+          preset.DataPageSize = 50;
+        }
+      }
       if (settings.SideChannelTemplates == null) {
         settings.SideChannelTemplates = new SideChannelTemplate[0];
       }

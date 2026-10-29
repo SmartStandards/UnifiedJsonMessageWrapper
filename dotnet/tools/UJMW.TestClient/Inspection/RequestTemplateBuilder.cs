@@ -53,6 +53,16 @@ namespace UJMW.TestClient.Inspection {
     };
 
     /// <summary>
+    /// Builds an empty (default-valued) JSON object for the given complex type, e.g. as template for a new entity.
+    /// </summary>
+    public static string BuildEmptyObjectJson(Type type) {
+
+      JToken value = BuildSampleValue(type, 0, new HashSet<string>());
+
+      return value.ToString(Formatting.Indented);
+    }
+
+    /// <summary>
     /// Builds the request JSON text for the given method. The sidechannel property is always
     /// emitted as '"_": {AUTO}' (which is intentionally no valid JSON until it is replaced).
     /// </summary>

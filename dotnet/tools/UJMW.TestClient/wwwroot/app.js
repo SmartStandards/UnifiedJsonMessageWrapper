@@ -4,6 +4,8 @@
   const KIND_INTERFACE = 'Interface';
   const KIND_STATIC = 'Static';
   const PIN_SUBROUTE_PLACEHOLDER = '?????';
+  const METHOD_PRESET_KIND = 'Method';
+  const DATA_PRESET_KIND = 'FuseData';
 
   // ======================================================================
   //  host bridge (requests: {id, cmd, args} / replies: {id, ok, result, error})
@@ -382,7 +384,7 @@
       const presetNode = createTreeNode(ui.collapsedKeys, {
         key: makeKey(['preset', dll.path, checkedType.fullName, entry.preset.name]),
         label: entry.leafName,
-        icon: '\u2B50',
+        icon: presetIcon(entry.preset),
         cssClass: 'preset',
         title: entry.preset.name,
         hasChildren: false,
@@ -678,6 +680,9 @@
       methods: [],
       loaded: false,
       loadedPresetName: null,
+      loadedPresetKind: null,
+      fuseEntity: null,
+      data: null,
       elements: {}
     };
     ui.detail = detail;
@@ -761,8 +766,21 @@
     sideChannelSection.appendChild(sideChannelBody);
     e.afterUrl.appendChild(sideChannelSection);
 
+    // FUSE data mode (only visible if the type serves a concrete entity via the FUSE repository contract)
+    e.dataModeRow = el('label', 'data-mode-toggle hidden');
+    e.dataModeCheckbox = el('input');
+    e.dataModeCheckbox.type = 'checkbox';
+    e.dataModeCheckbox.addEventListener('change', onDataModeToggled);
+    e.dataModeLabel = el('span', null, 'Data mode');
+    e.dataModeRow.append(e.dataModeCheckbox, e.dataModeLabel);
+    e.dataModeRow.title = 'Uncheck to switch back to the raw JSON mode (single method calls)';
+    e.afterUrl.appendChild(e.dataModeRow);
+    e.dataPanel = el('section', 'data-mode hidden');
+    e.afterUrl.appendChild(e.dataPanel);
+
     // test client
     const testClient = el('section', 'test-client');
+    e.testClient = testClient;
     testClient.appendChild(el('h3', null, 'Test client'));
     const methodRow = fieldRow('Method');
     e.methodSelect = el('select');
@@ -804,6 +822,10 @@
       }
       detail.methods = result.methods;
       detail.contractRouteName = result.contractRouteName;
+      detail.fuseEntity = null;
+      if (result.fuseEntity) {
+        detail.fuseEntity = result.fuseEntity;
+      }
       detail.loaded = true;
       e.methodSelect.innerHTML = '';
       result.methods.forEach((method, index) => {
@@ -818,6 +840,9 @@
       }
       setDocText(e.typeSummary, result.summary);
       e.urlCombo.setItems(result.urlHistory);
+      if (detail.fuseEntity) {
+        initDataMode(detail);
+      }
       if (presetToLoad) {
         applyPreset(presetToLoad);
       } else {
@@ -827,6 +852,9 @@
         applyMethodTemplate();
       }
       updateAfterUrlVisibility();
+      if (!presetToLoad || presetToLoad.kind !== DATA_PRESET_KIND) {
+        reloadDataIfActive();
+      }
     }).catch((error) => {
       e.warningBox.textContent = error.message;
       e.warningBox.classList.remove('hidden');
@@ -850,6 +878,7 @@
     afterUrl.querySelectorAll('input, select, textarea, button').forEach((control) => {
       control.disabled = !hasUrl;
     });
+    updateDataCapabilityStates();
   }
 
   function currentMethod() {
@@ -960,6 +989,25 @@
     e.authInput.value = preset.authHeader || '';
     e.sideChannelInput.value = preset.sideChannel || '';
 
+    if (preset.kind === DATA_PRESET_KIND) {
+      detail.loadedPresetKind = DATA_PRESET_KIND;
+      if (!detail.data) {
+        e.warningBox.textContent = 'The favorite "' + preset.name + '" is a FUSE data mode favorite, but the type does not (or no longer) serve an entity via the FUSE repository contract.';
+        e.warningBox.classList.remove('hidden');
+        updateAfterUrlVisibility();
+        return;
+      }
+      applyDataPreset(preset);
+      setDataModeActive(true);
+      updateAfterUrlVisibility();
+      reloadDataIfActive();
+      return;
+    }
+    detail.loadedPresetKind = METHOD_PRESET_KIND;
+    if (detail.data) {
+      setDataModeActive(false);
+    }
+
     const methodIndex = detail.methods.findIndex((m) => m.name === preset.methodName);
     if (methodIndex >= 0) {
       e.methodSelect.value = String(methodIndex);
@@ -1066,7 +1114,7 @@
     }
 
     let suggestion = detail.loadedPresetName;
-    if (!suggestion) {
+    if (!suggestion || detail.loadedPresetKind === DATA_PRESET_KIND) {
       suggestion = urlToPresetPath(e.urlInput.value.trim(), methodName);
     }
     const enteredName = prompt('Preset name ("/" creates folders):', suggestion);
@@ -1090,13 +1138,1609 @@
       authHeader: e.authInput.value,
       sideChannel: e.sideChannelInput.value,
       methodName: methodName,
-      requestJson: e.requestInput.value
+      requestJson: e.requestInput.value,
+      kind: METHOD_PRESET_KIND
     };
     callHost('savePreset', { preset: preset }).then((state) => {
       detail.loadedPresetName = name;
+      detail.loadedPresetKind = METHOD_PRESET_KIND;
       ui.selectedKey = makeKey(['preset', detail.dllPath, detail.typeFullName, name]);
       applyState(state);
     }).catch(showError);
+  }
+
+  function presetIcon(preset) {
+    if (preset.kind === DATA_PRESET_KIND) {
+      return '\u25A6';
+    }
+    return '\u2B50';
+  }
+
+  // ======================================================================
+  //  FUSE data mode
+  //  (projection of the FUSE-fx 'IRepository<TEntity, TKey>' contract onto a data table;
+  //   snapshot knowledge only - no FUSE assemblies are referenced, EntityRef methods are not projected)
+  // ======================================================================
+
+  const DATA_PAGE_SIZES = [10, 25, 50, 100, 250, 500];
+  const DATA_FILTER_MODE_COLUMNS = 'columns';
+  const DATA_FILTER_MODE_SEARCH = 'search';
+  const DATA_FAVORITE_LEAF_NAME = '(ENTITY-TABLE)';
+
+  // FUSE 'FieldOperators' (note: for strings '>=' means 'Contains' and '<=' means 'SubstringOf')
+  const OPERATORS_BY_KIND = {
+    String: [['>=', 'contains'], ['|*', 'starts with'], ['*|', 'ends with'], ['<=', 'substring of'], ['==', '='], ['!=', '\u2260'], ['in', 'in (a;b;c)']],
+    Number: [['==', '='], ['!=', '\u2260'], ['<', '<'], ['<=', '\u2264'], ['>', '>'], ['>=', '\u2265'], ['in', 'in (a;b;c)']],
+    Date: [['==', '='], ['!=', '\u2260'], ['<', '<'], ['<=', '\u2264'], ['>', '>'], ['>=', '\u2265'], ['in', 'in (a;b;c)']],
+    Boolean: [['==', '='], ['!=', '\u2260']],
+    Guid: [['==', '='], ['!=', '\u2260'], ['in', 'in (a;b;c)']],
+    Enum: [['==', '='], ['!=', '\u2260'], ['in', 'in (a;b;c)']],
+    Complex: []
+  };
+
+  function getProp(obj, name) {
+    if (!obj || typeof obj !== 'object') {
+      return undefined;
+    }
+    if (Object.prototype.hasOwnProperty.call(obj, name)) {
+      return obj[name];
+    }
+    const lowerName = name.toLowerCase();
+    const key = Object.keys(obj).find((k) => k.toLowerCase() === lowerName);
+    if (key === undefined) {
+      return undefined;
+    }
+    return obj[key];
+  }
+
+  function setProp(obj, name, value) {
+    const lowerName = name.toLowerCase();
+    let key = Object.keys(obj).find((k) => k.toLowerCase() === lowerName);
+    if (key === undefined) {
+      key = name;
+    }
+    obj[key] = value;
+  }
+
+  function createEmptyFilterState() {
+    return { mode: DATA_FILTER_MODE_COLUMNS, columns: {}, expressionTree: '', searchExpression: '' };
+  }
+
+  function initDataMode(detail) {
+    const e = detail.elements;
+    const entity = detail.fuseEntity;
+    const data = {
+      entity: entity,
+      filterState: createEmptyFilterState(),
+      sorting: [],
+      pageSize: 50,
+      page: 0,
+      totalCount: null,
+      rows: [],
+      rowsAreFieldDictionaries: false,
+      hiddenColumns: new Set(),
+      selectedKeys: new Map(),
+      capabilities: null,
+      originIdentity: null,
+      repositoryInfoLoaded: false,
+      loading: false,
+      elements: {}
+    };
+    detail.data = data;
+
+    e.dataModeLabel.textContent = 'Data mode \u2013 ' + entity.entityName + ' (FUSE repository, key: ' + entity.keyTypeName + ')';
+    e.dataModeRow.classList.remove('hidden');
+    e.urlInput.addEventListener('change', reloadDataIfActive);
+
+    buildDataPanel(detail);
+    setDataModeActive(true);
+  }
+
+  function isDataModeActive() {
+    const detail = ui.detail;
+    return !!(detail && detail.data && detail.elements.dataModeCheckbox.checked);
+  }
+
+  function setDataModeActive(active) {
+    const e = ui.detail.elements;
+    e.dataModeCheckbox.checked = active;
+    if (active) {
+      e.dataPanel.classList.remove('hidden');
+      e.testClient.classList.add('hidden');
+    } else {
+      e.dataPanel.classList.add('hidden');
+      e.testClient.classList.remove('hidden');
+    }
+  }
+
+  function onDataModeToggled() {
+    setDataModeActive(ui.detail.elements.dataModeCheckbox.checked);
+    reloadDataIfActive();
+  }
+
+  function reloadDataIfActive() {
+    if (!isDataModeActive()) {
+      return;
+    }
+    if (!ui.detail.elements.urlInput.value.trim()) {
+      return;
+    }
+    loadData();
+  }
+
+  function hasRepositoryMethod(name) {
+    return ui.detail.methods.some((m) => m.name === name);
+  }
+
+  // invokes a repository method via the regular UJMW execute bridge and returns the 'return' value
+  function callRepository(methodName, args) {
+    const detail = ui.detail;
+    const e = detail.elements;
+    if (!hasRepositoryMethod(methodName)) {
+      return Promise.reject(new Error('The contract does not offer the method \'' + methodName + '\'.'));
+    }
+    const autoPlaceholder = '__UJMW_DATA_MODE_AUTO__';
+    const request = Object.assign({ _: autoPlaceholder }, args);
+    const requestText = JSON.stringify(request, null, 2).replace('"' + autoPlaceholder + '"', '{AUTO}');
+
+    return callHost('execute', {
+      typeFullName: detail.typeFullName,
+      url: e.urlInput.value.trim(),
+      methodName: methodName,
+      authHeader: e.authInput.value,
+      sideChannel: e.sideChannelInput.value,
+      zone: e.zoneInput.value.trim(),
+      requestText: requestText
+    }).then((result) => {
+      ui.state.sideChannelText = e.sideChannelInput.value;
+      if (result.kind !== 'Success') {
+        throw new Error(methodName + ' failed:\n\n' + result.text);
+      }
+      const separatorIndex = result.text.indexOf('\r\n\r\n');
+      let responseObject = null;
+      if (separatorIndex >= 0) {
+        responseObject = JSON.parse(result.text.substring(separatorIndex + 4));
+      }
+      return getProp(responseObject, 'return');
+    });
+  }
+
+  function buildDataPanel(detail) {
+    const data = detail.data;
+    const d = data.elements;
+    const panel = detail.elements.dataPanel;
+    panel.innerHTML = '';
+
+    const heading = el('h3', null, '\u25A6 ' + data.entity.entityName);
+    panel.appendChild(heading);
+    d.entitySummary = el('div', 'doc-summary hidden');
+    setDocText(d.entitySummary, data.entity.entitySummary);
+    panel.appendChild(d.entitySummary);
+
+    // toolbar
+    const toolbar = el('div', 'data-toolbar');
+    d.reloadButton = button('\u21BB Reload', () => {
+      loadData();
+    }, 'primary', 'Reload the current page (Count + GetEntities)');
+    d.newButton = button('\u271A New\u2026', () => {
+      openEntityDialog(null);
+    }, null, 'Create a new entity (TryAddEntity / AddOrUpdateEntity)');
+    d.deleteSelectedButton = button('\u{1F5D1} Delete selected', deleteSelectedEntities, null, 'Delete all selected entities (TryDeleteEntities)');
+    d.massupdateButton = button('Mass update\u2026', openMassupdateDialog, null, 'Update fields of the selected or all filtered entities (MassupdateByKeys / Massupdate / MassupdateBySearchExpression)');
+    d.byKeyButton = button('By key\u2026', openByKeyDialog, null, 'GetEntitiesByKey / GetEntityFieldsByKey / ContainsKey');
+    d.columnsButton = button('Columns\u2026', openColumnsDialog, null, 'Choose visible columns (hidden columns switch the read access to GetEntityFields*)');
+    d.infoButton = button('\u2139 Repository', openRepositoryInfoDialog, null, 'GetCapabilities / GetOriginIdentity and entity metadata');
+    d.starButton = button('\u2605', saveCurrentDataAsPreset, 'btn-star', 'Save this data view (URL, authorization, sidechannel, filter, sorting and page size) as favorite');
+    toolbar.append(d.reloadButton, d.newButton, d.deleteSelectedButton, d.massupdateButton, d.byKeyButton, d.columnsButton, d.infoButton, d.starButton);
+    panel.appendChild(toolbar);
+
+    // filter
+    const filterSection = el('details', 'section data-filter');
+    filterSection.appendChild(el('summary', null, 'Filter'));
+    const filterBody = el('div', 'section-body');
+    const modeRow = fieldRow('Mode');
+    d.filterModeSelect = el('select');
+    const columnsOption = el('option', null, 'Column filters (+ optional ExpressionTree)');
+    columnsOption.value = DATA_FILTER_MODE_COLUMNS;
+    const searchOption = el('option', null, 'String based search expression');
+    searchOption.value = DATA_FILTER_MODE_SEARCH;
+    d.filterModeSelect.append(columnsOption, searchOption);
+    d.filterModeSelect.addEventListener('change', () => {
+      data.filterState.mode = d.filterModeSelect.value;
+      updateFilterModeVisibility();
+    });
+    modeRow.append(
+      d.filterModeSelect,
+      button('Apply', () => {
+        applyFilterFromInputs();
+      }, null, 'Apply the filter and reload from page 1'),
+      button('Clear', clearDataFilter, null, 'Remove all filters')
+    );
+    d.expressionTreeBlock = el('div');
+    d.expressionTreeBlock.appendChild(el('div', 'info', 'Optional additional FUSE ExpressionTree (JSON) which is combined (AND) with the column filters, e.g. {"matchAll": true, "negate": false, "predicates": [{"fieldName": "Name", "operator": ">=", "valueSerialized": "\\"abc\\""}], "subTree": null}'));
+    d.expressionTreeInput = el('textarea', 'code');
+    d.expressionTreeInput.spellcheck = false;
+    d.expressionTreeBlock.appendChild(d.expressionTreeInput);
+    d.searchBlock = el('div');
+    d.searchExpressionInput = textInput('', 'Search expression (requires the capability SupportsStringBasedSearchExpressions)');
+    d.searchExpressionInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        applyFilterFromInputs();
+      }
+    });
+    const searchRow = fieldRow('Expression');
+    searchRow.appendChild(d.searchExpressionInput);
+    d.searchBlock.appendChild(searchRow);
+    filterBody.append(modeRow, d.expressionTreeBlock, d.searchBlock);
+    filterSection.appendChild(filterBody);
+    panel.appendChild(filterSection);
+
+    // status + table + pagination
+    d.status = el('div', 'data-status');
+    panel.appendChild(d.status);
+    const tableContainer = el('div', 'data-table-container');
+    d.table = el('table', 'data-table');
+    d.thead = el('thead');
+    d.tbody = el('tbody');
+    d.table.append(d.thead, d.tbody);
+    tableContainer.appendChild(d.table);
+    panel.appendChild(tableContainer);
+
+    const pager = el('div', 'data-pager');
+    d.firstPageButton = button('\u23EE', () => {
+      goToPage(0);
+    }, 'icon', 'First page');
+    d.previousPageButton = button('\u25C0', () => {
+      goToPage(data.page - 1);
+    }, 'icon', 'Previous page');
+    d.pageInfo = el('span', 'page-info');
+    d.nextPageButton = button('\u25B6', () => {
+      goToPage(data.page + 1);
+    }, 'icon', 'Next page');
+    d.lastPageButton = button('\u23ED', () => {
+      goToPage(getPageCount() - 1);
+    }, 'icon', 'Last page');
+    d.pageSizeSelect = el('select');
+    DATA_PAGE_SIZES.forEach((size) => {
+      const option = el('option', null, String(size) + ' / page');
+      option.value = String(size);
+      d.pageSizeSelect.appendChild(option);
+    });
+    d.pageSizeSelect.addEventListener('change', () => {
+      data.pageSize = parseInt(d.pageSizeSelect.value, 10);
+      data.page = 0;
+      loadData();
+    });
+    pager.append(d.firstPageButton, d.previousPageButton, d.pageInfo, d.nextPageButton, d.lastPageButton, d.pageSizeSelect);
+    panel.appendChild(pager);
+
+    applyDataStateToInputs();
+    renderDataTableHead();
+    renderDataTableBody();
+  }
+
+  function updateFilterModeVisibility() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    const isSearch = data.filterState.mode === DATA_FILTER_MODE_SEARCH;
+    d.searchBlock.classList.toggle('hidden', !isSearch);
+    d.expressionTreeBlock.classList.toggle('hidden', isSearch);
+    d.thead.querySelectorAll('tr.filter-row').forEach((row) => {
+      row.classList.toggle('hidden', isSearch);
+    });
+  }
+
+  function applyDataStateToInputs() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    d.filterModeSelect.value = data.filterState.mode;
+    d.expressionTreeInput.value = data.filterState.expressionTree;
+    d.searchExpressionInput.value = data.filterState.searchExpression;
+    let pageSizeText = String(data.pageSize);
+    if (!DATA_PAGE_SIZES.includes(data.pageSize)) {
+      const option = el('option', null, pageSizeText + ' / page');
+      option.value = pageSizeText;
+      d.pageSizeSelect.appendChild(option);
+    }
+    d.pageSizeSelect.value = pageSizeText;
+    updateFilterModeVisibility();
+  }
+
+  function visibleFields() {
+    const data = ui.detail.data;
+    return data.entity.fields.filter((f) => !data.hiddenColumns.has(f.propertyName));
+  }
+
+  function renderDataTableHead() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    d.thead.innerHTML = '';
+
+    const headRow = el('tr');
+    const selectAllCell = el('th', 'select-cell');
+    d.selectAllCheckbox = el('input');
+    d.selectAllCheckbox.type = 'checkbox';
+    d.selectAllCheckbox.title = 'Select / unselect all rows of this page';
+    d.selectAllCheckbox.addEventListener('change', () => {
+      data.rows.forEach((row) => {
+        const key = getRowKey(row);
+        if (key === undefined) {
+          return;
+        }
+        if (d.selectAllCheckbox.checked) {
+          data.selectedKeys.set(JSON.stringify(key), key);
+        } else {
+          data.selectedKeys.delete(JSON.stringify(key));
+        }
+      });
+      renderDataTableBody();
+    });
+    selectAllCell.appendChild(d.selectAllCheckbox);
+    headRow.append(selectAllCell, el('th', 'action-cell'));
+
+    const filterRow = el('tr', 'filter-row');
+    filterRow.append(el('th'), el('th'));
+
+    visibleFields().forEach((field) => {
+      const headerCell = el('th', 'sortable');
+      let headerText = field.name;
+      if (field.isKey) {
+        headerText = '\u{1F511} ' + headerText;
+      }
+      const sortIndex = data.sorting.findIndex((s) => s === field.propertyName || s === '^' + field.propertyName);
+      headerCell.appendChild(el('span', null, headerText));
+      if (sortIndex >= 0) {
+        let indicator = ' \u25B2';
+        if (data.sorting[sortIndex].startsWith('^')) {
+          indicator = ' \u25BC';
+        }
+        if (data.sorting.length > 1) {
+          indicator = indicator + (sortIndex + 1);
+        }
+        headerCell.appendChild(el('span', 'sort-indicator', indicator));
+      }
+      let title = field.typeName;
+      if (field.description) {
+        title = title + '\n' + field.description;
+      }
+      headerCell.title = title + '\n\nClick: sort (asc \u2192 desc \u2192 none), Shift+Click: add to sorting';
+      headerCell.addEventListener('click', (event) => {
+        toggleSorting(field, event.shiftKey);
+      });
+      headRow.appendChild(headerCell);
+
+      filterRow.appendChild(buildColumnFilterCell(field));
+    });
+
+    d.thead.append(headRow, filterRow);
+    updateFilterModeVisibility();
+  }
+
+  function buildColumnFilterCell(field) {
+    const data = ui.detail.data;
+    const cell = el('th', 'filter-cell');
+    const operators = OPERATORS_BY_KIND[field.valueKind] || [];
+    if (operators.length === 0) {
+      return cell;
+    }
+    let state = data.filterState.columns[field.propertyName];
+    if (!state) {
+      state = { operator: operators[0][0], value: '' };
+    }
+
+    const operatorSelect = el('select', 'filter-operator');
+    operators.forEach((operator) => {
+      const option = el('option', null, operator[1]);
+      option.value = operator[0];
+      operatorSelect.appendChild(option);
+    });
+    operatorSelect.value = state.operator;
+
+    let valueInput;
+    if (field.valueKind === 'Boolean') {
+      valueInput = el('select', 'filter-value');
+      ['', 'true', 'false'].forEach((value) => {
+        const option = el('option', null, value);
+        option.value = value;
+        valueInput.appendChild(option);
+      });
+    } else {
+      valueInput = textInput('', 'filter\u2026');
+      valueInput.className = 'filter-value';
+      if (field.valueKind === 'Enum') {
+        valueInput.title = 'Values: ' + field.enumValues.join(', ');
+      }
+    }
+    valueInput.value = state.value;
+
+    const apply = () => {
+      const value = valueInput.value.trim();
+      if (value) {
+        data.filterState.columns[field.propertyName] = { operator: operatorSelect.value, value: value };
+      } else {
+        delete data.filterState.columns[field.propertyName];
+      }
+      cell.classList.toggle('active', value.length > 0);
+    };
+    cell.classList.toggle('active', String(state.value).length > 0);
+    operatorSelect.addEventListener('change', () => {
+      apply();
+      if (valueInput.value.trim()) {
+        reloadFirstPage();
+      }
+    });
+    valueInput.addEventListener('change', () => {
+      apply();
+      reloadFirstPage();
+    });
+    cell.append(operatorSelect, valueInput);
+    return cell;
+  }
+
+  function toggleSorting(field, additive) {
+    const data = ui.detail.data;
+    const ascending = field.propertyName;
+    const descending = '^' + field.propertyName;
+    const index = data.sorting.findIndex((s) => s === ascending || s === descending);
+    let next = ascending;
+    if (index >= 0 && data.sorting[index] === ascending) {
+      next = descending;
+    } else if (index >= 0) {
+      next = null;
+    }
+    if (additive) {
+      if (index >= 0) {
+        data.sorting.splice(index, 1);
+      }
+      if (next) {
+        data.sorting.push(next);
+      }
+    } else if (next) {
+      data.sorting = [next];
+    } else {
+      data.sorting = [];
+    }
+    renderDataTableHead();
+    reloadFirstPage();
+  }
+
+  function reloadFirstPage() {
+    ui.detail.data.page = 0;
+    loadData();
+  }
+
+  function applyFilterFromInputs() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    data.filterState.mode = d.filterModeSelect.value;
+    data.filterState.expressionTree = d.expressionTreeInput.value.trim();
+    data.filterState.searchExpression = d.searchExpressionInput.value.trim();
+    reloadFirstPage();
+  }
+
+  function clearDataFilter() {
+    const data = ui.detail.data;
+    data.filterState = createEmptyFilterState();
+    applyDataStateToInputs();
+    renderDataTableHead();
+    reloadFirstPage();
+  }
+
+  function convertFilterValue(field, text) {
+    if (field.valueKind === 'Number') {
+      const number = Number(text);
+      if (isNaN(number)) {
+        throw new Error('The filter value \'' + text + '\' of column \'' + field.name + '\' is no number.');
+      }
+      return number;
+    }
+    if (field.valueKind === 'Boolean') {
+      return text === 'true';
+    }
+    return text;
+  }
+
+  // builds the FUSE 'ExpressionTree' (MatchAll/Negate/Predicates/SubTree) of the column filters and the expert tree
+  function buildExpressionTree() {
+    const data = ui.detail.data;
+    const tree = { matchAll: true, negate: false, predicates: [], subTree: null };
+    data.entity.fields.forEach((field) => {
+      const state = data.filterState.columns[field.propertyName];
+      if (!state || !state.value) {
+        return;
+      }
+      let value;
+      if (state.operator === 'in') {
+        value = state.value.split(';').map((part) => part.trim()).filter((part) => part.length > 0).map((part) => convertFilterValue(field, part));
+      } else {
+        value = convertFilterValue(field, state.value);
+      }
+      tree.predicates.push({ fieldName: field.propertyName, operator: state.operator, valueSerialized: JSON.stringify(value) });
+    });
+    if (data.filterState.expressionTree) {
+      let expertTree;
+      try {
+        expertTree = JSON.parse(data.filterState.expressionTree);
+      } catch (error) {
+        throw new Error('The ExpressionTree is no valid JSON: ' + error.message);
+      }
+      tree.subTree = [expertTree];
+    }
+    return tree;
+  }
+
+  function isFilterEmpty() {
+    const data = ui.detail.data;
+    if (data.filterState.mode === DATA_FILTER_MODE_SEARCH) {
+      return !data.filterState.searchExpression;
+    }
+    const hasColumnFilter = Object.keys(data.filterState.columns).some((name) => data.filterState.columns[name].value);
+    return !hasColumnFilter && !data.filterState.expressionTree;
+  }
+
+  function getPageCount() {
+    const data = ui.detail.data;
+    if (data.totalCount === null || data.totalCount <= 0) {
+      return 1;
+    }
+    return Math.ceil(data.totalCount / data.pageSize);
+  }
+
+  function goToPage(page) {
+    const data = ui.detail.data;
+    let target = page;
+    if (target >= getPageCount()) {
+      target = getPageCount() - 1;
+    }
+    if (target < 0) {
+      target = 0;
+    }
+    data.page = target;
+    loadData();
+  }
+
+  function setDataStatus(text, isError) {
+    const d = ui.detail.data.elements;
+    d.status.textContent = text;
+    d.status.classList.toggle('result-error', !!isError);
+  }
+
+  function loadRepositoryInfo() {
+    const detail = ui.detail;
+    const data = detail.data;
+    if (data.repositoryInfoLoaded) {
+      return Promise.resolve();
+    }
+    data.repositoryInfoLoaded = true;
+    let chain = Promise.resolve();
+    if (hasRepositoryMethod('GetCapabilities')) {
+      chain = chain.then(() => callRepository('GetCapabilities', {})).then((capabilities) => {
+        data.capabilities = capabilities;
+      }).catch(() => {
+        data.capabilities = null;
+      });
+    }
+    if (hasRepositoryMethod('GetOriginIdentity')) {
+      chain = chain.then(() => callRepository('GetOriginIdentity', {})).then((originIdentity) => {
+        data.originIdentity = originIdentity;
+      }).catch(() => {
+        data.originIdentity = null;
+      });
+    }
+    return chain.then(() => {
+      if (ui.detail === detail) {
+        updateDataCapabilityStates();
+      }
+    });
+  }
+
+  function hasCapability(name) {
+    const data = ui.detail.data;
+    if (!data.capabilities) {
+      // unknown capabilities: everything is offered (the service will reject unsupported calls)
+      return true;
+    }
+    return getProp(data.capabilities, name) === true;
+  }
+
+  function updateDataCapabilityStates() {
+    const detail = ui.detail;
+    if (!detail || !detail.data || !detail.data.elements.newButton) {
+      return;
+    }
+    const data = detail.data;
+    const d = data.elements;
+    if (!detail.elements.urlInput.value.trim()) {
+      return;
+    }
+    const hasKey = data.entity.keyFieldNames.length > 0;
+    setCapabilityState(d.newButton, hasCapability('CanAddNewEntities'), 'CanAddNewEntities');
+    setCapabilityState(d.deleteSelectedButton, hasCapability('CanDeleteEntities') && hasKey, 'CanDeleteEntities');
+    setCapabilityState(d.massupdateButton, hasCapability('SupportsMassupdate'), 'SupportsMassupdate');
+    setCapabilityState(d.byKeyButton, hasKey, null);
+    const searchOption = d.filterModeSelect.querySelector('option[value="' + DATA_FILTER_MODE_SEARCH + '"]');
+    searchOption.disabled = !hasCapability('SupportsStringBasedSearchExpressions');
+    renderDataTableBody();
+  }
+
+  function setCapabilityState(control, enabled, capabilityName) {
+    control.disabled = !enabled;
+    if (!enabled && capabilityName) {
+      control.dataset.originalTitle = control.dataset.originalTitle || control.title;
+      control.title = 'Not available: the repository does not have the capability \'' + capabilityName + '\'.';
+    } else if (control.dataset.originalTitle) {
+      control.title = control.dataset.originalTitle;
+    }
+  }
+
+  // loads Count + one page (GetEntities* or GetEntityFields* if columns are hidden)
+  function loadData() {
+    const detail = ui.detail;
+    const data = detail.data;
+    if (!detail.elements.urlInput.value.trim()) {
+      setDataStatus('Enter a URL first.', true);
+      return;
+    }
+
+    let filter = null;
+    try {
+      if (data.filterState.mode === DATA_FILTER_MODE_COLUMNS) {
+        filter = buildExpressionTree();
+      }
+    } catch (error) {
+      setDataStatus(error.message, true);
+      return;
+    }
+
+    const useSearch = data.filterState.mode === DATA_FILTER_MODE_SEARCH && data.filterState.searchExpression;
+    const filterEmpty = isFilterEmpty();
+    const useFields = data.hiddenColumns.size > 0;
+    const includedFieldNames = visibleFields().map((f) => f.propertyName);
+    data.entity.fields.filter((f) => f.isKey).forEach((keyField) => {
+      if (!includedFieldNames.includes(keyField.propertyName)) {
+        includedFieldNames.push(keyField.propertyName);
+      }
+    });
+    const paging = { sortedBy: data.sorting.slice(), limit: data.pageSize, skip: data.page * data.pageSize };
+
+    let countCall;
+    if (filterEmpty) {
+      countCall = () => callRepository('CountAll', {});
+    } else if (useSearch) {
+      countCall = () => callRepository('CountBySearchExpression', { searchExpression: data.filterState.searchExpression });
+    } else {
+      countCall = () => callRepository('Count', { filter: filter });
+    }
+
+    let readMethod;
+    let readArgs;
+    if (useSearch) {
+      readArgs = { searchExpression: data.filterState.searchExpression };
+      readMethod = 'GetEntitiesBySearchExpression';
+      if (useFields) {
+        readMethod = 'GetEntityFieldsBySearchExpression';
+      }
+    } else {
+      readArgs = { filter: filter };
+      readMethod = 'GetEntities';
+      if (useFields) {
+        readMethod = 'GetEntityFields';
+      }
+    }
+    if (useFields) {
+      readArgs.includedFieldNames = includedFieldNames;
+    }
+    readArgs = Object.assign(readArgs, paging);
+
+    data.loading = true;
+    detail.data.elements.reloadButton.disabled = true;
+    setDataStatus('Loading\u2026', false);
+
+    touchCurrentUrl()
+      .then(() => loadRepositoryInfo())
+      .then(() => countCall())
+      .then((count) => {
+        data.totalCount = count;
+        return callRepository(readMethod, readArgs);
+      })
+      .then((rows) => {
+        if (ui.detail !== detail) {
+          return;
+        }
+        data.rows = rows || [];
+        data.rowsAreFieldDictionaries = useFields;
+        renderDataTableBody();
+        let statusText = String(data.totalCount) + ' entities';
+        if (!filterEmpty) {
+          statusText = statusText + ' (filtered)';
+        }
+        statusText = statusText + '  \u00B7  ' + readMethod;
+        if (data.originIdentity) {
+          statusText = statusText + '  \u00B7  origin: ' + data.originIdentity;
+        }
+        setDataStatus(statusText, false);
+      })
+      .catch((error) => {
+        if (ui.detail === detail) {
+          setDataStatus(error.message, true);
+        }
+      })
+      .finally(() => {
+        data.loading = false;
+        if (ui.detail === detail) {
+          detail.data.elements.reloadButton.disabled = false;
+          updateDataPager();
+        }
+      });
+  }
+
+  function updateDataPager() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    const pageCount = getPageCount();
+    d.pageInfo.textContent = 'Page ' + String(data.page + 1) + ' of ' + String(pageCount);
+    d.firstPageButton.disabled = data.page <= 0;
+    d.previousPageButton.disabled = data.page <= 0;
+    d.nextPageButton.disabled = data.page >= pageCount - 1;
+    d.lastPageButton.disabled = data.page >= pageCount - 1;
+  }
+
+  // returns the key value of a row (scalar or FUSE 'CompositeKeyN' object), undefined if the key is unknown
+  function getRowKey(row) {
+    const entity = ui.detail.data.entity;
+    if (entity.keyFieldNames.length === 0) {
+      return undefined;
+    }
+    if (entity.keyKind === 'Composite') {
+      const compositeKey = {};
+      entity.keyFieldNames.forEach((name, index) => {
+        compositeKey['field' + String(index + 1)] = getProp(row, name);
+      });
+      return compositeKey;
+    }
+    return getProp(row, entity.keyFieldNames[0]);
+  }
+
+  function formatCellValue(value) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (typeof value === 'object') {
+      const text = JSON.stringify(value);
+      if (text.length > 120) {
+        return text.substring(0, 117) + '\u2026';
+      }
+      return text;
+    }
+    return String(value);
+  }
+
+  function renderDataTableBody() {
+    const data = ui.detail.data;
+    const d = data.elements;
+    d.tbody.innerHTML = '';
+    const fields = visibleFields();
+
+    if (data.rows.length === 0) {
+      const emptyRow = el('tr', 'empty-row');
+      const emptyCell = el('td', null, 'No entities.');
+      emptyCell.colSpan = fields.length + 2;
+      emptyRow.appendChild(emptyCell);
+      d.tbody.appendChild(emptyRow);
+    }
+
+    let allSelected = data.rows.length > 0;
+    data.rows.forEach((row) => {
+      const key = getRowKey(row);
+      const keyText = JSON.stringify(key);
+      const tr = el('tr');
+
+      const selectCell = el('td', 'select-cell');
+      const checkbox = el('input');
+      checkbox.type = 'checkbox';
+      checkbox.disabled = key === undefined;
+      checkbox.checked = key !== undefined && data.selectedKeys.has(keyText);
+      if (!checkbox.checked) {
+        allSelected = false;
+      }
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          data.selectedKeys.set(keyText, key);
+        } else {
+          data.selectedKeys.delete(keyText);
+        }
+        tr.classList.toggle('selected', checkbox.checked);
+      });
+      tr.classList.toggle('selected', checkbox.checked);
+      selectCell.appendChild(checkbox);
+
+      const actionCell = el('td', 'action-cell');
+      const editButton = button('\u270E', () => {
+        openEntityDialogForRow(row);
+      }, 'icon', 'Edit (TryUpdateEntity / TryUpdateEntityFields / AddOrUpdateEntity)');
+      const deleteButton = button('\u{1F5D1}', () => {
+        deleteEntities([key]);
+      }, 'icon', 'Delete (TryDeleteEntities)');
+      deleteButton.disabled = key === undefined || !hasCapability('CanDeleteEntities');
+      actionCell.append(editButton, deleteButton);
+      if (hasCapability('SupportsKeyUpdate') && hasRepositoryMethod('TryUpdateKey') && key !== undefined) {
+        actionCell.appendChild(button('\u{1F511}', () => {
+          openChangeKeyDialog(key);
+        }, 'icon', 'Change the key (TryUpdateKey)'));
+      }
+      tr.append(selectCell, actionCell);
+
+      fields.forEach((field) => {
+        const value = getProp(row, field.name);
+        const cell = el('td', null, formatCellValue(value));
+        if (value === null || value === undefined) {
+          cell.classList.add('null');
+        }
+        if (field.valueKind === 'Number') {
+          cell.classList.add('number');
+        }
+        if (typeof value === 'object' && value !== null) {
+          cell.title = JSON.stringify(value, null, 2);
+        }
+        tr.appendChild(cell);
+      });
+
+      tr.addEventListener('dblclick', (event) => {
+        if (event.target.closest('button, input')) {
+          return;
+        }
+        openEntityDialogForRow(row);
+      });
+      d.tbody.appendChild(tr);
+    });
+
+    if (d.selectAllCheckbox) {
+      d.selectAllCheckbox.checked = allSelected;
+    }
+    updateDataPager();
+  }
+
+  // ----------------------------------------------------------------------
+  //  value editors (used by the entity and the mass update dialog)
+  // ----------------------------------------------------------------------
+
+  function createValueEditor(field, initialValue, readOnly) {
+    let element;
+    let read;
+
+    if (field.valueKind === 'Boolean' && !field.isNullable) {
+      element = el('input');
+      element.type = 'checkbox';
+      element.checked = initialValue === true;
+      read = () => element.checked;
+    } else if (field.valueKind === 'Boolean' || field.valueKind === 'Enum') {
+      element = el('select');
+      let values = ['true', 'false'];
+      if (field.valueKind === 'Enum') {
+        values = field.enumValues.slice();
+      }
+      if (field.isNullable) {
+        values.unshift('');
+      }
+      let initialText = '';
+      if (initialValue !== null && initialValue !== undefined) {
+        initialText = String(initialValue);
+      }
+      if (!values.includes(initialText)) {
+        values.push(initialText);
+      }
+      values.forEach((value) => {
+        const option = el('option', null, value);
+        option.value = value;
+        element.appendChild(option);
+      });
+      element.value = initialText;
+      const initialWasNumber = typeof initialValue === 'number';
+      read = () => {
+        const text = element.value;
+        if (text === '') {
+          return null;
+        }
+        if (field.valueKind === 'Boolean') {
+          return text === 'true';
+        }
+        if (initialWasNumber && text === initialText) {
+          return initialValue;
+        }
+        return text;
+      };
+    } else if (field.valueKind === 'Complex') {
+      element = el('textarea', 'code');
+      element.spellcheck = false;
+      if (initialValue !== undefined) {
+        element.value = JSON.stringify(initialValue, null, 2);
+      }
+      read = () => {
+        const text = element.value.trim();
+        if (!text) {
+          return null;
+        }
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error('The value of \'' + field.name + '\' is no valid JSON: ' + error.message);
+        }
+      };
+    } else {
+      element = textInput('', field.typeName);
+      if (initialValue !== null && initialValue !== undefined) {
+        element.value = String(initialValue);
+      }
+      read = () => {
+        const text = element.value;
+        if (field.valueKind === 'Number') {
+          if (!text.trim()) {
+            if (field.isNullable) {
+              return null;
+            }
+            throw new Error('The value of \'' + field.name + '\' must not be empty.');
+          }
+          const number = Number(text);
+          if (isNaN(number)) {
+            throw new Error('The value of \'' + field.name + '\' is no number.');
+          }
+          return number;
+        }
+        if (field.valueKind === 'String') {
+          if (!text && (initialValue === null || initialValue === undefined)) {
+            return null;
+          }
+          return text;
+        }
+        if (!text.trim()) {
+          return null;
+        }
+        return text.trim();
+      };
+    }
+
+    if (readOnly) {
+      element.disabled = true;
+    }
+    return { element: element, read: read };
+  }
+
+  function buildFieldLabel(field) {
+    let text = field.name;
+    if (field.isKey) {
+      text = '\u{1F511} ' + text;
+    }
+    const label = el('label', null, text);
+    let title = field.typeName;
+    if (field.description) {
+      title = title + '\n' + field.description;
+    }
+    label.title = title;
+    return label;
+  }
+
+  // ----------------------------------------------------------------------
+  //  entity dialog (create new / edit)
+  // ----------------------------------------------------------------------
+
+  function openEntityDialogForRow(row) {
+    const data = ui.detail.data;
+    if (!data.rowsAreFieldDictionaries) {
+      openEntityDialog(row);
+      return;
+    }
+    // only a subset of fields was loaded -> load the complete entity first
+    const key = getRowKey(row);
+    if (key === undefined) {
+      openEntityDialog(row);
+      return;
+    }
+    callRepository('GetEntitiesByKey', { keysToLoad: [key] }).then((entities) => {
+      if (entities && entities.length > 0) {
+        openEntityDialog(entities[0]);
+      } else {
+        alert('The entity does not exist (anymore).');
+      }
+    }).catch(showError);
+  }
+
+  function openEntityDialog(existingEntity) {
+    const data = ui.detail.data;
+    const entity = data.entity;
+    const isNew = existingEntity === null;
+
+    let original;
+    if (isNew) {
+      original = JSON.parse(entity.entityTemplateJson);
+    } else {
+      original = JSON.parse(JSON.stringify(existingEntity));
+    }
+
+    const body = el('div', 'entity-form');
+    if (isNew && hasCapability('RequiresExternalKeys')) {
+      body.appendChild(el('div', 'info', 'This repository requires external keys (RequiresExternalKeys): the key fields must be filled in.'));
+    }
+    const editors = [];
+    const grid = el('div', 'entity-grid');
+    entity.fields.forEach((field) => {
+      const initialValue = getProp(original, field.name);
+      const readOnly = field.isKey && !isNew;
+      const editor = createValueEditor(field, initialValue, readOnly);
+      editors.push({ field: field, editor: editor, initialValue: initialValue });
+      grid.append(buildFieldLabel(field), editor.element);
+    });
+    body.appendChild(grid);
+
+    const readEntity = () => {
+      const result = JSON.parse(JSON.stringify(original));
+      editors.forEach((entry) => {
+        setProp(result, entry.field.name, entry.editor.read());
+      });
+      return result;
+    };
+
+    const readChangedFields = () => {
+      const fields = {};
+      editors.forEach((entry) => {
+        const value = entry.editor.read();
+        if (entry.field.isKey || JSON.stringify(value) !== JSON.stringify(entry.initialValue)) {
+          fields[entry.field.propertyName] = value;
+        }
+      });
+      return fields;
+    };
+
+    const runAndClose = (close, promiseFactory, successMessage) => {
+      let promise;
+      try {
+        promise = promiseFactory();
+      } catch (error) {
+        showError(error);
+        return;
+      }
+      promise.then((result) => {
+        const message = successMessage(result);
+        if (message) {
+          alert(message);
+          return;
+        }
+        close();
+        loadData();
+      }).catch(showError);
+    };
+
+    const buttons = [];
+    if (isNew) {
+      buttons.push({
+        label: 'Create (TryAddEntity)',
+        className: 'primary',
+        disabled: !hasCapability('CanAddNewEntities'),
+        action: (close) => {
+          runAndClose(close, () => callRepository('TryAddEntity', { entity: readEntity() }), (key) => {
+            if (key === null || key === undefined) {
+              return 'The entity was not added (TryAddEntity returned null - it may already exist).';
+            }
+            return null;
+          });
+        }
+      });
+    } else {
+      buttons.push({
+        label: 'Save (TryUpdateEntity)',
+        className: 'primary',
+        disabled: !hasCapability('CanUpdateContent'),
+        action: (close) => {
+          runAndClose(close, () => callRepository('TryUpdateEntity', { entity: readEntity() }), (updated) => {
+            if (updated === null || updated === undefined) {
+              return 'The entity was not updated (TryUpdateEntity returned null - it may not exist anymore).';
+            }
+            return null;
+          });
+        }
+      });
+      buttons.push({
+        label: 'Save changed fields (TryUpdateEntityFields)',
+        title: 'Sends only the key fields and the changed fields',
+        disabled: !hasCapability('CanUpdateContent') || !hasRepositoryMethod('TryUpdateEntityFields'),
+        action: (close) => {
+          runAndClose(close, () => callRepository('TryUpdateEntityFields', { fields: readChangedFields() }), (updated) => {
+            if (updated === null || updated === undefined) {
+              return 'The entity was not updated (TryUpdateEntityFields returned null - it may not exist anymore).';
+            }
+            return null;
+          });
+        }
+      });
+    }
+    buttons.push({
+      label: 'Add or update (AddOrUpdateEntity)',
+      disabled: !hasRepositoryMethod('AddOrUpdateEntity'),
+      action: (close) => {
+        runAndClose(close, () => callRepository('AddOrUpdateEntity', { entity: readEntity() }), (result) => {
+          if (result === null || result === undefined) {
+            return 'AddOrUpdateEntity returned null - nothing was changed.';
+          }
+          return null;
+        });
+      }
+    });
+    buttons.push({
+      label: 'Add or update fields (AddOrUpdateEntityFields)',
+      title: 'Sends only the key fields and the changed fields',
+      disabled: !hasRepositoryMethod('AddOrUpdateEntityFields'),
+      action: (close) => {
+        runAndClose(close, () => callRepository('AddOrUpdateEntityFields', { fields: readChangedFields() }), (result) => {
+          if (result === null || result === undefined) {
+            return 'AddOrUpdateEntityFields returned null - nothing was changed.';
+          }
+          return null;
+        });
+      }
+    });
+    if (!isNew) {
+      const key = getRowKey(existingEntity);
+      buttons.push({
+        label: 'Delete',
+        disabled: key === undefined || !hasCapability('CanDeleteEntities'),
+        action: (close) => {
+          deleteEntities([key], close);
+        }
+      });
+    }
+    buttons.push({
+      label: 'Cancel',
+      action: (close) => {
+        close();
+      }
+    });
+
+    let title = 'New ' + entity.entityName;
+    if (!isNew) {
+      title = 'Edit ' + entity.entityName + '  ' + JSON.stringify(getRowKey(existingEntity));
+    }
+    openModal(title, body, buttons);
+  }
+
+  // ----------------------------------------------------------------------
+  //  delete / change key / mass update / by key / columns / repository info
+  // ----------------------------------------------------------------------
+
+  function deleteSelectedEntities() {
+    const keys = Array.from(ui.detail.data.selectedKeys.values());
+    if (keys.length === 0) {
+      alert('Please select the entities to delete (checkbox in the first column).');
+      return;
+    }
+    deleteEntities(keys);
+  }
+
+  function deleteEntities(keys, closeDialog) {
+    const data = ui.detail.data;
+    let question = 'Delete the entity ' + JSON.stringify(keys[0]) + '?';
+    if (keys.length > 1) {
+      question = 'Delete ' + String(keys.length) + ' entities?';
+    }
+    if (!confirm(question)) {
+      return;
+    }
+    callRepository('TryDeleteEntities', { keysToDelete: keys }).then((deletedKeys) => {
+      let deletedCount = 0;
+      if (deletedKeys) {
+        deletedCount = deletedKeys.length;
+        deletedKeys.forEach((key) => {
+          data.selectedKeys.delete(JSON.stringify(key));
+        });
+      }
+      if (deletedCount < keys.length) {
+        alert(String(deletedCount) + ' of ' + String(keys.length) + ' entities were deleted.');
+      }
+      if (closeDialog) {
+        closeDialog();
+      }
+      loadData();
+    }).catch(showError);
+  }
+
+  function openChangeKeyDialog(currentKey) {
+    const body = el('div');
+    body.appendChild(el('div', 'info', 'Current key: ' + JSON.stringify(currentKey)));
+    const newKeyInput = el('textarea', 'code');
+    newKeyInput.spellcheck = false;
+    newKeyInput.value = JSON.stringify(currentKey, null, 2);
+    body.append(el('div', null, 'New key (JSON):'), newKeyInput);
+    openModal('Change key (TryUpdateKey)', body, [
+      {
+        label: 'Change key',
+        className: 'primary',
+        action: (close) => {
+          let newKey;
+          try {
+            newKey = JSON.parse(newKeyInput.value);
+          } catch (error) {
+            alert('The new key is no valid JSON: ' + error.message);
+            return;
+          }
+          callRepository('TryUpdateKey', { currentKey: currentKey, newKey: newKey }).then((success) => {
+            if (success !== true) {
+              alert('The key was not changed (TryUpdateKey returned false).');
+              return;
+            }
+            ui.detail.data.selectedKeys.delete(JSON.stringify(currentKey));
+            close();
+            loadData();
+          }).catch(showError);
+        }
+      },
+      {
+        label: 'Cancel',
+        action: (close) => {
+          close();
+        }
+      }
+    ]);
+  }
+
+  function openMassupdateDialog() {
+    const data = ui.detail.data;
+    const entity = data.entity;
+    const selectedKeys = Array.from(data.selectedKeys.values());
+
+    const body = el('div', 'entity-form');
+    const scopeRow = fieldRow('Scope');
+    const scopeSelect = el('select');
+    const selectedOption = el('option', null, 'Selected entities (' + String(selectedKeys.length) + ') \u2013 MassupdateByKeys');
+    selectedOption.value = 'keys';
+    selectedOption.disabled = selectedKeys.length === 0;
+    const filterOption = el('option', null, 'All entities matching the current filter \u2013 Massupdate');
+    filterOption.value = 'filter';
+    if (data.filterState.mode === DATA_FILTER_MODE_SEARCH && data.filterState.searchExpression) {
+      filterOption.textContent = 'All entities matching the current search expression \u2013 MassupdateBySearchExpression';
+    }
+    scopeSelect.append(selectedOption, filterOption);
+    if (selectedKeys.length === 0) {
+      scopeSelect.value = 'filter';
+    }
+    scopeRow.appendChild(scopeSelect);
+    body.append(scopeRow, el('div', 'info', 'Check the fields which should be set (key fields can not be mass updated).'));
+
+    const editors = [];
+    const grid = el('div', 'entity-grid massupdate-grid');
+    entity.fields.filter((f) => !f.isKey).forEach((field) => {
+      const enabledCheckbox = el('input');
+      enabledCheckbox.type = 'checkbox';
+      const label = buildFieldLabel(field);
+      label.prepend(enabledCheckbox);
+      const editor = createValueEditor(field, null, false);
+      editor.element.addEventListener('input', () => {
+        enabledCheckbox.checked = true;
+      });
+      editor.element.addEventListener('change', () => {
+        enabledCheckbox.checked = true;
+      });
+      editors.push({ field: field, editor: editor, enabled: enabledCheckbox });
+      grid.append(label, editor.element);
+    });
+    body.appendChild(grid);
+
+    openModal('Mass update ' + entity.entityName, body, [
+      {
+        label: 'Update',
+        className: 'primary',
+        action: (close) => {
+          const fields = {};
+          let request;
+          try {
+            editors.filter((entry) => entry.enabled.checked).forEach((entry) => {
+              fields[entry.field.propertyName] = entry.editor.read();
+            });
+            if (Object.keys(fields).length === 0) {
+              throw new Error('Please check at least one field.');
+            }
+            if (scopeSelect.value === 'keys') {
+              request = callRepository('MassupdateByKeys', { keysToUpdate: selectedKeys, fields: fields });
+            } else if (data.filterState.mode === DATA_FILTER_MODE_SEARCH && data.filterState.searchExpression) {
+              request = callRepository('MassupdateBySearchExpression', { searchExpression: data.filterState.searchExpression, fields: fields });
+            } else {
+              if (isFilterEmpty() && !confirm('There is no filter - ALL entities will be updated.\n\nContinue?')) {
+                return;
+              }
+              request = callRepository('Massupdate', { filter: buildExpressionTree(), fields: fields });
+            }
+          } catch (error) {
+            showError(error);
+            return;
+          }
+          request.then((updatedKeys) => {
+            let count = 0;
+            if (updatedKeys) {
+              count = updatedKeys.length;
+            }
+            alert(String(count) + ' entities were updated.');
+            close();
+            loadData();
+          }).catch(showError);
+        }
+      },
+      {
+        label: 'Cancel',
+        action: (close) => {
+          close();
+        }
+      }
+    ]);
+  }
+
+  function buildSampleKey() {
+    const entity = ui.detail.data.entity;
+    if (entity.keyKind === 'Composite') {
+      const sample = {};
+      entity.keyFieldNames.forEach((name, index) => {
+        sample['field' + String(index + 1)] = null;
+      });
+      return sample;
+    }
+    const keyField = entity.fields.find((f) => f.name === entity.keyFieldNames[0]);
+    if (keyField && keyField.valueKind === 'Number') {
+      return 0;
+    }
+    return '';
+  }
+
+  function openByKeyDialog() {
+    const data = ui.detail.data;
+    let keys = Array.from(data.selectedKeys.values());
+    if (keys.length === 0) {
+      keys = [buildSampleKey()];
+    }
+
+    const body = el('div');
+    body.appendChild(el('div', null, 'Keys (JSON array, preset with the selected entities):'));
+    const keysInput = el('textarea', 'code');
+    keysInput.spellcheck = false;
+    keysInput.value = JSON.stringify(keys, null, 2);
+    const resultOutput = el('textarea', 'code');
+    resultOutput.readOnly = true;
+    resultOutput.spellcheck = false;
+    body.append(keysInput, el('div', null, 'Result:'), resultOutput);
+
+    const readKeys = () => {
+      const parsed = JSON.parse(keysInput.value);
+      if (!Array.isArray(parsed)) {
+        throw new Error('The keys must be a JSON array.');
+      }
+      return parsed;
+    };
+    const run = (methodName, argsFactory) => {
+      let args;
+      try {
+        args = argsFactory(readKeys());
+      } catch (error) {
+        showError(error);
+        return;
+      }
+      resultOutput.value = 'Executing ' + methodName + '\u2026';
+      callRepository(methodName, args).then((result) => {
+        resultOutput.value = JSON.stringify(result, null, 2);
+      }).catch((error) => {
+        resultOutput.value = error.message;
+      });
+    };
+
+    openModal('Access by key \u2013 ' + data.entity.entityName, body, [
+      {
+        label: 'GetEntitiesByKey',
+        className: 'primary',
+        action: () => {
+          run('GetEntitiesByKey', (parsedKeys) => ({ keysToLoad: parsedKeys }));
+        }
+      },
+      {
+        label: 'GetEntityFieldsByKey',
+        title: 'Loads only the visible columns (see Columns\u2026)',
+        disabled: !hasRepositoryMethod('GetEntityFieldsByKey'),
+        action: () => {
+          run('GetEntityFieldsByKey', (parsedKeys) => ({ keysToLoad: parsedKeys, includedFieldNames: visibleFields().map((f) => f.propertyName) }));
+        }
+      },
+      {
+        label: 'ContainsKey (first key)',
+        disabled: !hasRepositoryMethod('ContainsKey'),
+        action: () => {
+          run('ContainsKey', (parsedKeys) => {
+            if (parsedKeys.length === 0) {
+              throw new Error('Please enter at least one key.');
+            }
+            return { key: parsedKeys[0] };
+          });
+        }
+      },
+      {
+        label: 'Close',
+        action: (close) => {
+          close();
+        }
+      }
+    ]);
+  }
+
+  function openColumnsDialog() {
+    const data = ui.detail.data;
+    const body = el('div', 'columns-dialog');
+    body.appendChild(el('div', 'info', 'Hidden columns are not loaded: as soon as one column is hidden, the GetEntityFields* methods (with includedFieldNames) are used instead of GetEntities*. Key fields are always loaded.'));
+    const checkboxes = [];
+    data.entity.fields.forEach((field) => {
+      const row = el('label', 'column-option');
+      const checkbox = el('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !data.hiddenColumns.has(field.propertyName);
+      checkboxes.push({ field: field, checkbox: checkbox });
+      let text = field.name + '  (' + field.typeName + ')';
+      if (field.isKey) {
+        text = '\u{1F511} ' + text;
+      }
+      row.append(checkbox, el('span', null, text));
+      body.appendChild(row);
+    });
+    openModal('Columns \u2013 ' + data.entity.entityName, body, [
+      {
+        label: 'Apply',
+        className: 'primary',
+        action: (close) => {
+          data.hiddenColumns.clear();
+          checkboxes.forEach((entry) => {
+            if (!entry.checkbox.checked) {
+              data.hiddenColumns.add(entry.field.propertyName);
+            }
+          });
+          close();
+          renderDataTableHead();
+          loadData();
+        }
+      },
+      {
+        label: 'Cancel',
+        action: (close) => {
+          close();
+        }
+      }
+    ]);
+  }
+
+  function openRepositoryInfoDialog() {
+    const detail = ui.detail;
+    const data = detail.data;
+    const entity = data.entity;
+    const show = () => {
+      const body = el('div', 'repository-info');
+      const lines = [
+        ['Entity', entity.entityFullName],
+        ['Key type', entity.keyTypeName + ' (' + entity.keyKind + ')'],
+        ['Key fields', entity.keyFieldNames.join(', ') || '(unknown - edit/delete by key not possible)'],
+        ['Origin identity (GetOriginIdentity)', String(data.originIdentity)]
+      ];
+      const table = el('table', 'info-table');
+      lines.forEach((line) => {
+        const tr = el('tr');
+        tr.append(el('th', null, line[0]), el('td', null, line[1]));
+        table.appendChild(tr);
+      });
+      body.appendChild(table);
+      body.appendChild(el('h4', null, 'Capabilities (GetCapabilities)'));
+      if (data.capabilities) {
+        const capabilityTable = el('table', 'info-table');
+        Object.keys(data.capabilities).forEach((name) => {
+          const tr = el('tr');
+          let valueText = '\u2717';
+          if (data.capabilities[name] === true) {
+            valueText = '\u2713';
+          }
+          tr.append(el('th', null, name), el('td', null, valueText));
+          capabilityTable.appendChild(tr);
+        });
+        body.appendChild(capabilityTable);
+      } else {
+        body.appendChild(el('div', 'info', 'Capabilities are unknown (not loaded or GetCapabilities failed) - all functions are offered.'));
+      }
+      openModal('Repository \u2013 ' + entity.entityName, body, [
+        {
+          label: 'Refresh',
+          action: (close) => {
+            close();
+            data.repositoryInfoLoaded = false;
+            loadRepositoryInfo().then(() => {
+              if (ui.detail === detail) {
+                show();
+              }
+            });
+          }
+        },
+        {
+          label: 'Close',
+          className: 'primary',
+          action: (close) => {
+            close();
+          }
+        }
+      ]);
+    };
+    if (!detail.elements.urlInput.value.trim()) {
+      show();
+      return;
+    }
+    loadRepositoryInfo().then(show);
+  }
+
+  // ----------------------------------------------------------------------
+  //  data favorites (filter, sorting and page size - not the selected page)
+  // ----------------------------------------------------------------------
+
+  function saveCurrentDataAsPreset() {
+    const detail = ui.detail;
+    const data = detail.data;
+    const e = detail.elements;
+
+    data.filterState.expressionTree = data.elements.expressionTreeInput.value.trim();
+    data.filterState.searchExpression = data.elements.searchExpressionInput.value.trim();
+
+    let suggestion = detail.loadedPresetName;
+    if (!suggestion || detail.loadedPresetKind !== DATA_PRESET_KIND) {
+      suggestion = urlToPresetPath(e.urlInput.value.trim(), DATA_FAVORITE_LEAF_NAME);
+    }
+    const enteredName = prompt('Favorite name ("/" creates folders):', suggestion);
+    if (enteredName === null) {
+      return;
+    }
+    const name = normalizePresetName(enteredName);
+    if (!name) {
+      alert('The favorite name must not be empty.');
+      return;
+    }
+    const exists = ui.state.presets.some((p) => p.typeFullName === detail.typeFullName && p.name === name);
+    if (exists && !confirm('The favorite "' + name + '" already exists.\n\nOverwrite it?')) {
+      return;
+    }
+
+    const preset = {
+      name: name,
+      typeFullName: detail.typeFullName,
+      url: e.urlInput.value.trim(),
+      authHeader: e.authInput.value,
+      sideChannel: e.sideChannelInput.value,
+      methodName: '',
+      requestJson: '',
+      kind: DATA_PRESET_KIND,
+      dataFilterJson: JSON.stringify(data.filterState),
+      dataSorting: data.sorting.slice(),
+      dataPageSize: data.pageSize
+    };
+    callHost('savePreset', { preset: preset }).then((state) => {
+      detail.loadedPresetName = name;
+      detail.loadedPresetKind = DATA_PRESET_KIND;
+      ui.selectedKey = makeKey(['preset', detail.dllPath, detail.typeFullName, name]);
+      applyState(state);
+    }).catch(showError);
+  }
+
+  function applyDataPreset(preset) {
+    const data = ui.detail.data;
+    let filterState = createEmptyFilterState();
+    if (preset.dataFilterJson) {
+      try {
+        filterState = Object.assign(filterState, JSON.parse(preset.dataFilterJson));
+      } catch {
+        filterState = createEmptyFilterState();
+      }
+    }
+    if (!filterState.columns || typeof filterState.columns !== 'object') {
+      filterState.columns = {};
+    }
+    data.filterState = filterState;
+    data.sorting = (preset.dataSorting || []).slice();
+    data.pageSize = preset.dataPageSize || 50;
+    data.page = 0;
+    data.selectedKeys.clear();
+    applyDataStateToInputs();
+    renderDataTableHead();
   }
 
   function adjustLoadedPresetName(typeFullName, oldName, newName, isFolder) {
@@ -1304,9 +2948,13 @@
       layer.innerHTML = '';
     };
     buttons.forEach((definition) => {
-      buttonBar.appendChild(button(definition.label, () => {
+      const modalButton = button(definition.label, () => {
         definition.action(close);
-      }, definition.className));
+      }, definition.className, definition.title);
+      if (definition.disabled) {
+        modalButton.disabled = true;
+      }
+      buttonBar.appendChild(modalButton);
     });
     modal.append(el('div', 'modal-title', title), bodyContainer, buttonBar);
     layer.appendChild(modal);

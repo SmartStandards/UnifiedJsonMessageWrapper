@@ -314,6 +314,8 @@ namespace UJMW.TestClient.Inspection {
     private string _Summary = string.Empty;
     private bool _HasDocumentationFile = false;
     private MethodDescriptor[] _Methods = new MethodDescriptor[0];
+    private FuseEntityDescriptor _FuseEntity = null;
+    private string _Warning = null;
 
     /// <summary>
     /// XML documentation summary of the type.
@@ -345,6 +347,30 @@ namespace UJMW.TestClient.Inspection {
       }
       set {
         _Methods = value;
+      }
+    }
+
+    /// <summary>
+    /// Entity information if the type serves a concrete entity via the FUSE-fx repository contract, otherwise null.
+    /// </summary>
+    public FuseEntityDescriptor FuseEntity {
+      get {
+        return _FuseEntity;
+      }
+      set {
+        _FuseEntity = value;
+      }
+    }
+
+    /// <summary>
+    /// Inspection warning (e.g. unresolvable base interfaces) or null.
+    /// </summary>
+    public string Warning {
+      get {
+        return _Warning;
+      }
+      set {
+        _Warning = value;
       }
     }
 

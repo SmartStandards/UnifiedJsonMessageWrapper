@@ -94,6 +94,18 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 - Every `/` in a preset name creates a **virtual folder** level.
 - Clicking a folder does nothing (only the expander toggles); clicking a preset loads it into the detail view.
 - Context menu on folders and presets: **Rename** (folder: applied to all contained presets; preset: rename = move, full path editable) and **Delete**.
+- Presets have a `Kind`: `Method` (star icon, single call) or `FuseData` (table icon `▦`, FUSE data mode).
+
+### 3.6 FUSE data mode
+
+- Activated when the selected type closes the FUSE-fx contract `System.Data.Fuse.IRepository<TEntity, TKey>` (directly or via base types/interfaces) with concrete, resolvable generic arguments. Detection is done **by name** in `Inspection/FuseRepositoryDetector.cs` - the TestClient must **never** reference FUSE packages or DLLs (snapshot knowledge only).
+- A toggle **directly below the SideChannel** switches between data mode (default ON) and the raw JSON mode (opt-out).
+- Data table: column filters (FUSE `FieldOperators`, translated into an `ExpressionTree`), optional expert `ExpressionTree` JSON (combined as `subTree`), or a string search expression (`*BySearchExpression`, only if `SupportsStringBasedSearchExpressions`); multi-column sorting (click / Shift+click, `^` prefix = descending); pagination via `limit`/`skip` with `CountAll`/`Count`/`CountBySearchExpression`.
+- Hidden columns switch reads to `GetEntityFields*` (`includedFieldNames`, key fields are always loaded).
+- Projected functions: `GetCapabilities`, `GetOriginIdentity`, `GetEntities*`, `GetEntityFields*`, `Count*`, `ContainsKey`, `TryAddEntity`, `TryUpdateEntity`, `TryUpdateEntityFields`, `AddOrUpdateEntity`, `AddOrUpdateEntityFields`, `TryDeleteEntities`, `MassupdateByKeys`, `Massupdate`, `MassupdateBySearchExpression`, `TryUpdateKey`. `EntityRef` methods are intentionally **not** projected. Buttons are disabled according to the repository capabilities.
+- Key fields are resolved by `[PrimaryIdentity]` + `[(Unique)PropertyGroup]`, then `[Key]`, then `Id`/`<Entity>Id`, then the first property of the key type. Composite keys are sent as `{ "field1": ..., "field2": ... }` (FUSE `CompositeKeyN`).
+- All calls go through the regular `execute` bridge command (generated request wrappers incl. `{AUTO}` sidechannel).
+- The star in the data mode saves a `FuseData` favorite: URL, authorization, sidechannel, filter, sorting and page size (**not** the current page). Default name: full URL path translated into folders + `/(ENTITY-TABLE)` (no method name).
 
 ## 4. Implementation map
 
@@ -106,6 +118,7 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 | `Persistence/SettingsStore.cs` | load/save of `settings.json` (corrupt files are backed up and replaced by defaults) |
 | `Inspection/AssemblyInspector.cs` | display name, namespace/type listing, method listing via MetadataLoadContext |
 | `Inspection/RequestTemplateBuilder.cs` | sample request JSON generation incl. `{AUTO}` token |
+| `Inspection/FuseRepositoryDetector.cs`, `Inspection/FuseEntityDescriptor.cs` | name-based detection of closed FUSE `IRepository<TEntity, TKey>` contracts and entity/field/key metadata for the data mode |
 | `Invocation/UjmwInvoker.cs` | `{AUTO}` replacement, HTTP call, result classification (`Success` / `Fault` / `Error`) |
 | `Auth/JwtTokenGenerator.cs` | JWT creation via jose-jwt (HS*, RS*, PS*, ES*, none) |
 | `Auth/OAuthCodeFlowDialog.cs` | WebView2-based authorization code flow incl. PKCE and token exchange |

@@ -13,6 +13,13 @@ namespace UJMW.TestClient.Model {
     private string _SideChannel = string.Empty;
     private string _MethodName = string.Empty;
     private string _RequestJson = string.Empty;
+    private string _Kind = _KindMethod;
+    private string _DataFilterJson = string.Empty;
+    private string[] _DataSorting = new string[0];
+    private int _DataPageSize = 50;
+
+    public const string _KindMethod = "Method";
+    public const string _KindFuseData = "FuseData";
 
     public string Name {
       get {
@@ -74,6 +81,54 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _RequestJson = value;
+      }
+    }
+
+    /// <summary>
+    /// 'Method' (a single call) or 'FuseData' (the FUSE data mode for the whole entity table).
+    /// </summary>
+    public string Kind {
+      get {
+        return _Kind;
+      }
+      set {
+        _Kind = value;
+      }
+    }
+
+    /// <summary>
+    /// Data mode only: the filter as JSON (column filters and/or the expert ExpressionTree).
+    /// </summary>
+    public string DataFilterJson {
+      get {
+        return _DataFilterJson;
+      }
+      set {
+        _DataFilterJson = value;
+      }
+    }
+
+    /// <summary>
+    /// Data mode only: the sorting (FUSE notation, '^' prefix = descending).
+    /// </summary>
+    public string[] DataSorting {
+      get {
+        return _DataSorting;
+      }
+      set {
+        _DataSorting = value;
+      }
+    }
+
+    /// <summary>
+    /// Data mode only: the page size (the selected page is intentionally not persisted).
+    /// </summary>
+    public int DataPageSize {
+      get {
+        return _DataPageSize;
+      }
+      set {
+        _DataPageSize = value;
       }
     }
 
