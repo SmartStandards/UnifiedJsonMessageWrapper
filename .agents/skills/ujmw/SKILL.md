@@ -545,6 +545,8 @@ Its conceptual type is:
 Dictionary<string, string>
 ```
 
+Sidechannel values such as a tenant are a **scope selection, not a privileged setter**: whether the caller may enter the selected scope is always decided server-side against the client's token (for every client, not only for AI agents or MCP). Exposing the sidechannel to AI agents is therefore not a security risk per se, and is desirable when its entries are described semantically.
+
 ### 5.10 Response sidechannel through `_`
 
 Example:

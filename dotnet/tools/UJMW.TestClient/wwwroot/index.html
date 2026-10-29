@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>UJMW Test Client</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="leftPanel">
+      <div class="toolbar">
+        <button id="btnAddDll" title="Add assemblies (or drop them from Windows Explorer)">Add DLL&hellip;</button>
+        <span class="spacer"></span>
+        <button id="btnZones" title="Manage infrastructure zones">&#9881; Zones</button>
+      </div>
+      <div id="mainTree" class="tree" tabindex="0"></div>
+      <div class="hint">Drop DLLs here &middot; <kbd>Del</kbd> removes the selected DLL</div>
+    </aside>
+    <div id="splitter" title="Drag to resize"></div>
+    <main id="detailPanel">
+      <div class="placeholder">Select a DLL or a type on the left.</div>
+    </main>
+  </div>
+  <div id="contextMenu" class="context-menu hidden"></div>
+  <div id="modalLayer" class="modal-layer hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
