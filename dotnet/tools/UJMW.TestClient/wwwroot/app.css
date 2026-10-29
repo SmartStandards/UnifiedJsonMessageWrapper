@@ -525,6 +525,20 @@ details.section > .section-body {
   color: #666;
 }
 
+.doc-member {
+  margin: 4px 0 0 14px;
+  padding-left: 8px;
+  border-left: 2px solid #e0e0e0;
+}
+
+.sub-modal-layer {
+  z-index: 950;
+}
+
+.sub-modal {
+  width: 680px;
+}
+
 /* ---------- context menu ---------- */
 
 .context-menu {

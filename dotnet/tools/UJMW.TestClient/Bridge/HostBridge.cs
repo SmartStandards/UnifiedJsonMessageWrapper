@@ -127,6 +127,10 @@ namespace UJMW.TestClient.Bridge {
           return this.BuildState();
         case "takeStartupDll":
           return this.TakeStartupDll();
+        case "selectFileBasedStorePath":
+          return this.SelectFileBasedStorePath(args.Value<string>("currentPath"));
+        case "getDefaultFileBasedStorePath":
+          return new JValue(InfrastructureProvider.DefaultFileBasedStorePath);
         case "registerProvider":
           this.RegisterProvider(args.Value<string>("path"), args.Value<string>("typeFullName"));
           return this.BuildState();
@@ -280,7 +284,7 @@ namespace UJMW.TestClient.Bridge {
         .Where((p) => p.TypeFullName != typeFullName)
         .ToArray();
       if (infrastructureSettings.Mode == InfrastructureSettings._ModeProvider && infrastructureSettings.ProviderTypeName == typeFullName) {
-        infrastructureSettings.Mode = InfrastructureSettings._ModeLocal;
+        infrastructureSettings.Mode = InfrastructureSettings._ModeFileBased;
         infrastructureSettings.ProviderTypeName = string.Empty;
         lock (_InfrastructureLock) {
           _Infrastructure = null;
@@ -325,6 +329,34 @@ namespace UJMW.TestClient.Bridge {
         (p) => !(p.TypeFullName == typeFullName && string.Equals(p.Url, url, StringComparison.OrdinalIgnoreCase))
       ).ToArray();
       _Store.Save();
+    }
+
+    /// <summary>
+    /// Lets the user choose the JSON file of the file based store (e.g. on a network share).
+    /// Returns the selected path or null if the dialog was cancelled.
+    /// </summary>
+    private JToken SelectFileBasedStorePath(string currentPath) {
+
+      string initialPath = InfrastructureProvider.DefaultFileBasedStorePath;
+      if (!string.IsNullOrWhiteSpace(currentPath)) {
+        initialPath = Environment.ExpandEnvironmentVariables(currentPath.Trim());
+      }
+
+      using (SaveFileDialog dialog = new SaveFileDialog()) {
+        dialog.Title = "Location of the file based infrastructure store";
+        dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+        dialog.OverwritePrompt = false;
+        dialog.CheckPathExists = true;
+        dialog.FileName = Path.GetFileName(initialPath);
+        string initialDirectory = Path.GetDirectoryName(initialPath);
+        if (!string.IsNullOrEmpty(initialDirectory) && Directory.Exists(initialDirectory)) {
+          dialog.InitialDirectory = initialDirectory;
+        }
+        if (dialog.ShowDialog(_Owner) != DialogResult.OK) {
+          return JValue.CreateNull();
+        }
+        return new JValue(dialog.FileName);
+      }
     }
 
     /// <summary>
@@ -691,7 +723,7 @@ namespace UJMW.TestClient.Bridge {
     }
 
     /// <summary>
-    /// Switches the source of the managed infrastructure (Local, External or Reflection).
+    /// Switches the source of the managed infrastructure (FileBased, External or a registered provider).
     /// </summary>
     private void SaveInfrastructureSettings(InfrastructureSettings infrastructureSettings) {
       if (infrastructureSettings == null) {
@@ -771,6 +803,16 @@ namespace UJMW.TestClient.Bridge {
         case "promotePinnedEndpoint":
           EnsureWritable(infrastructure);
           string promotedContractName = args.Value<string>("contractName");
+          JObject newHost = args["newHost"] as JObject;
+          if (newHost != null) {
+            this.CreateOrMergeHost(
+              infrastructure,
+              newHost.Value<string>("hostUrl"),
+              newHost.Value<string>("zone"),
+              newHost.Value<string>("webApplicationName"),
+              newHost.Value<string>("applicationBaseUrl")
+            );
+          }
           infrastructure.SaveWellknownEndpoint(this.BuildWellknownEndpointFromUrl(infrastructure, promotedContractName, args.Value<string>("url")));
           return this.BuildWellknownEndpoints(infrastructure, promotedContractName);
         case "resolveUrls":
@@ -863,6 +905,53 @@ namespace UJMW.TestClient.Bridge {
     }
 
     /// <summary>
+    /// Creates a host (within the given zone) in the store, or merges the zone and web application
+    /// into an already existing host with the same url.
+    /// </summary>
+    private void CreateOrMergeHost(IUjmwManagedInfrastructure infrastructure, string hostUrl, string zone, string webApplicationName, string applicationBaseUrl) {
+
+      string trimmedHostUrl = TrimUrl(hostUrl);
+      if (string.IsNullOrWhiteSpace(trimmedHostUrl)) {
+        throw new InvalidOperationException("The host url is required.");
+      }
+
+      string normalizedZone = string.Empty;
+      if (zone != null) {
+        normalizedZone = zone.Trim().Trim('/');
+      }
+
+      List<UjmwInfrastructureHost> hosts = EmptyIfNull(infrastructure.GetHosts()).ToList();
+      UjmwInfrastructureHost host = hosts.FirstOrDefault((h) => string.Equals(TrimUrl(h.HostUrl), trimmedHostUrl, StringComparison.OrdinalIgnoreCase));
+      if (host == null) {
+        host = new UjmwInfrastructureHost();
+        host.HostUrl = trimmedHostUrl;
+        hosts.Add(host);
+      }
+
+      if (string.IsNullOrWhiteSpace(host.Zone)) {
+        host.Zone = normalizedZone;
+      }
+      if (host.WebApplications == null) {
+        host.WebApplications = new UjmwWebApplication[0];
+      }
+
+      if (!string.IsNullOrWhiteSpace(webApplicationName)) {
+        bool applicationExists = host.WebApplications.Any((a) => string.Equals(a.Name, webApplicationName.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (!applicationExists) {
+          UjmwWebApplication application = new UjmwWebApplication();
+          application.Name = webApplicationName.Trim();
+          application.ApplicationBaseUrl = string.Empty;
+          if (applicationBaseUrl != null) {
+            application.ApplicationBaseUrl = applicationBaseUrl.Trim().Trim('/');
+          }
+          host.WebApplications = host.WebApplications.Concat(new UjmwWebApplication[] { application }).ToArray();
+        }
+      }
+
+      infrastructure.SaveHosts(hosts.ToArray());
+    }
+
+    /// <summary>
     /// Resolves the urls of a contract within a zone (only if the store supports it).
     /// </summary>
     private JArray ResolveUrls(IUjmwManagedInfrastructure infrastructure, string contractName, string zone) {
@@ -881,7 +970,7 @@ namespace UJMW.TestClient.Bridge {
       if (infrastructureSettings.LegacyDataMigrated) {
         return;
       }
-      LocalUjmwManagedInfrastructure localStore = new LocalUjmwManagedInfrastructure(InfrastructureProvider.LocalStoreFilePath);
+      FileBasedUjmwManagedInfrastructure localStore = new FileBasedUjmwManagedInfrastructure(InfrastructureProvider.GetFileBasedStorePath(infrastructureSettings));
       if (localStore.GetZones().Length == 0 && this.Settings.Zones.Length > 0) {
         UjmwInfrastructureZone[] zones = this.Settings.Zones.Select((z) => {
           UjmwInfrastructureZone zone = new UjmwInfrastructureZone();

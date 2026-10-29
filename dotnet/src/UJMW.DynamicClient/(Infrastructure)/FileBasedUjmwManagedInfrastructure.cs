@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,12 +7,12 @@ namespace System.Web.UJMW {
 
   /// <summary>
   /// Default implementation of 'IUjmwManagedInfrastructure' which persists all information
-  /// within a local JSON file. It is editable and does not support 'Resolve'.
+  /// within a JSON file (by default in the roaming profile of the user, but it can also be located on a network share). It is editable and does not support 'Resolve'.
   /// </summary>
-  public class LocalUjmwManagedInfrastructure : IUjmwManagedInfrastructure {
+  public class FileBasedUjmwManagedInfrastructure : IUjmwManagedInfrastructure {
 
     /// <summary>
-    /// Persisted content of the local store.
+    /// Persisted content of the file based store.
     /// </summary>
     public class StoreContent {
 
@@ -65,13 +65,13 @@ namespace System.Web.UJMW {
     /// <summary>
     /// Creates a store using the default file '%APPDATA%\UJMW\ManagedInfrastructure.json'.
     /// </summary>
-    public LocalUjmwManagedInfrastructure() : this(GetDefaultFilePath()) {
+    public FileBasedUjmwManagedInfrastructure() : this(GetDefaultFilePath()) {
     }
 
     /// <summary>
     /// Creates a store using the given file (which will be created on first save).
     /// </summary>
-    public LocalUjmwManagedInfrastructure(string filePath) {
+    public FileBasedUjmwManagedInfrastructure(string filePath) {
       if (string.IsNullOrWhiteSpace(filePath)) {
         throw new ArgumentException("The file path must not be empty.", nameof(filePath));
       }
@@ -96,7 +96,7 @@ namespace System.Web.UJMW {
     }
 
     /// <summary>
-    /// The local store is editable but can not resolve urls.
+    /// The file based store is editable but can not resolve urls.
     /// </summary>
     public UjmwInfrastructureCapabilities GetCapabilities() {
       UjmwInfrastructureCapabilities capabilities = new UjmwInfrastructureCapabilities();
@@ -139,6 +139,10 @@ namespace System.Web.UJMW {
         content.Hosts = hosts.Where((h) => h != null && !string.IsNullOrWhiteSpace(h.HostUrl)).ToArray();
         foreach (UjmwInfrastructureHost host in content.Hosts) {
           host.HostUrl = host.HostUrl.Trim().TrimEnd('/');
+          if (host.Zone == null) {
+            host.Zone = string.Empty;
+          }
+          host.Zone = host.Zone.Trim().Trim('/');
           if (host.WebApplications == null) {
             host.WebApplications = new UjmwWebApplication[0];
           }
@@ -201,10 +205,10 @@ namespace System.Web.UJMW {
     }
 
     /// <summary>
-    /// Not supported by the local store.
+    /// Not supported by the file based store.
     /// </summary>
     public string[] Resolve(string contractName, string zone) {
-      throw new NotSupportedException("The local infrastructure store does not support url resolution.");
+      throw new NotSupportedException("The file based infrastructure store does not support url resolution.");
     }
 
     /// <summary>

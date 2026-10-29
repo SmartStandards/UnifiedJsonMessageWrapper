@@ -1,11 +1,11 @@
-
+﻿
 namespace System.Web.UJMW {
 
   /// <summary>
   /// Store for infrastructure-related (NOT user-specific) information, which is required to
   /// address UJMW services: infrastructure zones, hosts with their web applications,
   /// OAuth configurations and 'wellknown' endpoints (mapping of contracts to hosted endpoints).
-  /// The store can be implemented locally (see 'LocalUjmwManagedInfrastructure'), be provided
+  /// The store can be implemented locally (see 'FileBasedUjmwManagedInfrastructure'), be provided
   /// by a remote service (consumed via UJMW) or by any custom implementation.
   /// </summary>
   public interface IUjmwManagedInfrastructure {
@@ -150,6 +150,7 @@ namespace System.Web.UJMW {
 
     private string _HostUrl = string.Empty;
     private string _Description = string.Empty;
+    private string _Zone = string.Empty;
     private UjmwWebApplication[] _WebApplications = new UjmwWebApplication[0];
 
     public string HostUrl {
@@ -158,6 +159,18 @@ namespace System.Web.UJMW {
       }
       set {
         _HostUrl = value;
+      }
+    }
+
+    /// <summary>
+    /// The zone (full area path joined by '/', e.g. 'Production/EU') where the host is located (optional).
+    /// </summary>
+    public string Zone {
+      get {
+        return _Zone;
+      }
+      set {
+        _Zone = value;
       }
     }
 

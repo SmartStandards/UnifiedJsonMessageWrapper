@@ -96,6 +96,20 @@ namespace UJMW.TestClient.Inspection {
     }
 
     /// <summary>
+    /// Returns the summary of a property or field (or an empty string).
+    /// </summary>
+    public string GetMemberSummary(MemberInfo member) {
+
+      string prefix = "P:";
+      if (member is FieldInfo) {
+        prefix = "F:";
+      }
+
+      XElement element = this.FindMember(prefix + GetTypeId(member.DeclaringType, false) + "." + member.Name);
+      return GetElementText(element, "summary");
+    }
+
+    /// <summary>
     /// Returns the description of a method parameter (or an empty string).
     /// </summary>
     public string GetParameterDescription(MethodInfo method, string parameterName) {

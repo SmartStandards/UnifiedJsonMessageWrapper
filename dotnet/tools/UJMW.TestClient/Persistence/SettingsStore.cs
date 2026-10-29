@@ -116,9 +116,12 @@ namespace UJMW.TestClient.Persistence {
       if (settings.Infrastructure.ProviderTypeName == null) {
         settings.Infrastructure.ProviderTypeName = string.Empty;
       }
+      if (settings.Infrastructure.FileBasedStorePath == null) {
+        settings.Infrastructure.FileBasedStorePath = string.Empty;
+      }
       if (settings.Infrastructure.Mode != InfrastructureSettings._ModeExternal && settings.Infrastructure.Mode != InfrastructureSettings._ModeProvider) {
-        //unknown or outdated modes (e.g. the former 'Reflection') fall back to the local store
-        settings.Infrastructure.Mode = InfrastructureSettings._ModeLocal;
+        //unknown or outdated modes (e.g. the former 'Local' or 'Reflection') fall back to the file based store
+        settings.Infrastructure.Mode = InfrastructureSettings._ModeFileBased;
       }
       if (settings.PinnedEndpoints == null) {
         settings.PinnedEndpoints = new PinnedEndpoint[0];

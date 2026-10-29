@@ -11,7 +11,7 @@ namespace UJMW.TestClient.Infrastructure {
 
 	/// <summary>
 	/// Creates the 'IUjmwManagedInfrastructure' which is selected in the settings:
-	/// 'Local' (JSON file per user), 'External' (UJMW client to a remote store)
+	/// 'FileBased' (JSON file, by default per user), 'External' (UJMW client to a remote store)
 	/// or 'Provider' (an implementation which was registered from a DLL added to the client).
 	/// </summary>
 	internal static class InfrastructureProvider {
@@ -20,13 +20,26 @@ namespace UJMW.TestClient.Infrastructure {
 		private static readonly object _LoadContextsLock = new object();
 
 		/// <summary>
-		/// The file which is used by the local store of the test client.
+		/// The default file of the file based store (located in the roaming profile of the user).
 		/// </summary>
-		public static string LocalStoreFilePath {
+		public static string DefaultFileBasedStorePath {
 			get {
 				string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 				return Path.Combine(appData, "UJMW.TestClient", "infrastructure.json");
 			}
+		}
+
+		/// <summary>
+		/// Returns the configured file of the file based store (the default file if nothing is configured).
+		/// Environment variables (e.g. '%APPDATA%') are expanded.
+		/// </summary>
+		public static string GetFileBasedStorePath(InfrastructureSettings settings) {
+
+			if (string.IsNullOrWhiteSpace(settings.FileBasedStorePath)) {
+				return DefaultFileBasedStorePath;
+			}
+
+			return Environment.ExpandEnvironmentVariables(settings.FileBasedStorePath.Trim().Trim('"'));
 		}
 
 		/// <summary>
@@ -50,7 +63,7 @@ namespace UJMW.TestClient.Infrastructure {
 				}
 				return CreateFromRegisteredProvider(provider);
 			}
-			return new LocalUjmwManagedInfrastructure(LocalStoreFilePath);
+			return new FileBasedUjmwManagedInfrastructure(GetFileBasedStorePath(settings));
 		}
 
 		/// <summary>

@@ -155,6 +155,7 @@ namespace UJMW.TestClient.Inspection {
           descriptor.Summary = methodDocs.GetMethodSummary(method);
           descriptor.ReturnTypeName = GetFriendlyTypeName(method.ReturnType);
           descriptor.ReturnsDescription = methodDocs.GetMethodReturns(method);
+          descriptor.ReturnMembers = BuildMembers(method.ReturnType);
           descriptor.Parameters = BuildParameters(method, methodDocs);
           result.Add(descriptor);
         }
@@ -181,9 +182,101 @@ namespace UJMW.TestClient.Inspection {
         }
         descriptor.IsOptional = parameter.HasDefaultValue;
         descriptor.Description = docs.GetParameterDescription(method, parameter.Name);
+        descriptor.Members = BuildMembers(parameter.ParameterType);
         parameters.Add(descriptor);
       }
       return parameters.ToArray();
+    }
+
+    /// <summary>
+    /// Builds the descriptors of the public properties/fields of a complex type (one level deep),
+    /// so that the documentation of wrapper types like 'MyMethodRequest' becomes visible.
+    /// Simple types, enums, interfaces and framework types return an empty array.
+    /// </summary>
+    private static MemberDescriptor[] BuildMembers(Type type) {
+
+      Type complexType = GetDocumentableComplexType(type);
+      if (complexType == null) {
+        return new MemberDescriptor[0];
+      }
+
+      XmlDocReader docs = XmlDocReader.ForAssembly(complexType.Assembly);
+      List<MemberDescriptor> members = new List<MemberDescriptor>();
+      HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+
+      PropertyInfo[] properties;
+      FieldInfo[] fields;
+      try {
+        properties = complexType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        fields = complexType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+      } catch (FileNotFoundException) {
+        //a base type lives in an assembly which is not available
+        properties = complexType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        fields = complexType.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+      }
+
+      foreach (PropertyInfo property in properties) {
+        if (property.GetIndexParameters().Length > 0 || property.GetGetMethod() == null) {
+          continue;
+        }
+        AddMember(members, names, property, property.PropertyType);
+      }
+
+      foreach (FieldInfo field in fields) {
+        AddMember(members, names, field, field.FieldType);
+      }
+
+      return members.ToArray();
+    }
+
+    /// <summary>
+    /// Adds the descriptor of a single property/field (documentation is read from the declaring assembly).
+    /// </summary>
+    private static void AddMember(List<MemberDescriptor> members, HashSet<string> names, MemberInfo member, Type memberType) {
+
+      string jsonName = RequestTemplateBuilder.GetJsonName(member.Name);
+      if (!names.Add(jsonName)) {
+        return;
+      }
+
+      XmlDocReader docs = XmlDocReader.ForAssembly(member.DeclaringType.Assembly);
+      MemberDescriptor descriptor = new MemberDescriptor();
+      descriptor.Name = jsonName;
+      descriptor.TypeName = GetFriendlyTypeName(memberType);
+      descriptor.Description = docs.GetMemberSummary(member);
+      members.Add(descriptor);
+    }
+
+    /// <summary>
+    /// Returns the complex type whose members should be documented (by-ref and array element types
+    /// are unwrapped), or null if the type is simple, an enum, an interface or a framework type.
+    /// </summary>
+    private static Type GetDocumentableComplexType(Type type) {
+
+      Type current = type;
+      while (current.IsByRef || current.IsArray) {
+        current = current.GetElementType();
+      }
+
+      if (current.IsGenericParameter || current.IsPrimitive || current.IsEnum || current.IsInterface || current.IsPointer) {
+        return null;
+      }
+
+      if (current.FullName == null) {
+        return null;
+      }
+
+      string assemblyName = current.Assembly.GetName().Name;
+      bool isFrameworkAssembly = (
+        assemblyName == "mscorlib" || assemblyName == "netstandard" ||
+        assemblyName.StartsWith("System.", StringComparison.Ordinal) || assemblyName == "System" ||
+        assemblyName.StartsWith("Microsoft.", StringComparison.Ordinal)
+      );
+      if (isFrameworkAssembly) {
+        return null;
+      }
+
+      return current;
     }
 
     /// <summary>

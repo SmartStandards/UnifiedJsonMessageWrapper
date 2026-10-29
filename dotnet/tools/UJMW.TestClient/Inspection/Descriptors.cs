@@ -96,6 +96,19 @@ namespace UJMW.TestClient.Inspection {
     private string _ReturnTypeName = string.Empty;
     private string _ReturnsDescription = string.Empty;
     private ParameterDescriptor[] _Parameters = new ParameterDescriptor[0];
+    private MemberDescriptor[] _ReturnMembers = new MemberDescriptor[0];
+
+    /// <summary>
+    /// Documented properties/fields of the return type (only for complex types).
+    /// </summary>
+    public MemberDescriptor[] ReturnMembers {
+      get {
+        return _ReturnMembers;
+      }
+      set {
+        _ReturnMembers = value;
+      }
+    }
 
     /// <summary>
     /// XML documentation summary of the method.
@@ -182,6 +195,19 @@ namespace UJMW.TestClient.Inspection {
     private string _Direction = _DirectionIn;
     private bool _IsOptional = false;
     private string _Description = string.Empty;
+    private MemberDescriptor[] _Members = new MemberDescriptor[0];
+
+    /// <summary>
+    /// Documented properties/fields of the parameter type (only for complex types like 'MyMethodRequest').
+    /// </summary>
+    public MemberDescriptor[] Members {
+      get {
+        return _Members;
+      }
+      set {
+        _Members = value;
+      }
+    }
 
     public string Name {
       get {
@@ -224,6 +250,50 @@ namespace UJMW.TestClient.Inspection {
 
     /// <summary>
     /// XML documentation of the parameter.
+    /// </summary>
+    public string Description {
+      get {
+        return _Description;
+      }
+      set {
+        _Description = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// A property or field of a complex parameter/return type including its XML documentation.
+  /// </summary>
+  public sealed class MemberDescriptor {
+
+    private string _Name = string.Empty;
+    private string _TypeName = string.Empty;
+    private string _Description = string.Empty;
+
+    /// <summary>
+    /// The JSON name of the member (as used within the request/response).
+    /// </summary>
+    public string Name {
+      get {
+        return _Name;
+      }
+      set {
+        _Name = value;
+      }
+    }
+
+    public string TypeName {
+      get {
+        return _TypeName;
+      }
+      set {
+        _TypeName = value;
+      }
+    }
+
+    /// <summary>
+    /// XML documentation summary of the member.
     /// </summary>
     public string Description {
       get {

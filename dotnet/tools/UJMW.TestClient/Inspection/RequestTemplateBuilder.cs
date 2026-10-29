@@ -24,6 +24,13 @@ namespace UJMW.TestClient.Inspection {
 
     private static readonly CamelCaseNamingStrategy _NamingStrategy = new CamelCaseNamingStrategy();
 
+    /// <summary>
+    /// Returns the JSON property name which is used for a .NET property or field name.
+    /// </summary>
+    public static string GetJsonName(string memberName) {
+      return _NamingStrategy.GetPropertyName(memberName, false);
+    }
+
     private static readonly HashSet<string> _CollectionDefinitions = new HashSet<string>() {
       "System.Collections.Generic.List`1",
       "System.Collections.Generic.IList`1",

@@ -156,15 +156,21 @@ namespace UJMW.TestClient.Model {
   }
 
   /// <summary>
-  /// Selects which 'IUjmwManagedInfrastructure' is used ('Local', 'External' or 'Reflection').
+  /// Selects which 'IUjmwManagedInfrastructure' is used ('FileBased', 'External' or 'Provider').
   /// </summary>
   public sealed class InfrastructureSettings {
 
-    public const string _ModeLocal = "Local";
+    public const string _ModeFileBased = "FileBased";
     public const string _ModeExternal = "External";
     public const string _ModeProvider = "Provider";
 
-    private string _Mode = _ModeLocal;
+    /// <summary>
+    /// Former name of the file based mode (migrated on load).
+    /// </summary>
+    public const string _ModeLegacyLocal = "Local";
+
+    private string _Mode = _ModeFileBased;
+    private string _FileBasedStorePath = string.Empty;
     private string _ExternalUrl = string.Empty;
     private string _ExternalAuthHeader = string.Empty;
     private string _ProviderTypeName = string.Empty;
@@ -189,6 +195,20 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _Mode = value;
+      }
+    }
+
+    /// <summary>
+    /// JSON file of the file based store (mode 'FileBased'). Empty means the default file in the
+    /// roaming profile of the user ('%APPDATA%\UJMW.TestClient\infrastructure.json'); it can be
+    /// changed to a network share to share the infrastructure within a team.
+    /// </summary>
+    public string FileBasedStorePath {
+      get {
+        return _FileBasedStorePath;
+      }
+      set {
+        _FileBasedStorePath = value;
       }
     }
 

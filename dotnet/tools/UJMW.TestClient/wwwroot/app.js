@@ -142,12 +142,27 @@
     return '\u{1F538}';
   }
 
-  function hostOf(url) {
+  // translates the full url (host, web application, sub route and endpoint) into preset folder names
+  // and appends the method name, e.g. 'server-a.example.com:8080/demo/eu/MyService/MyMethod'
+  function urlToPresetPath(url, methodName) {
+    let segments = [];
     try {
-      return new URL(url).hostname;
+      const parsed = new URL(url);
+      segments.push(parsed.host);
+      parsed.pathname.split('/').forEach((segment) => {
+        segments.push(decodeURIComponent(segment));
+      });
     } catch {
+      segments = url.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/);
+    }
+    if (methodName) {
+      segments.push(methodName);
+    }
+    const path = normalizePresetName(segments.join('/'));
+    if (!path) {
       return 'unknown-host';
     }
+    return path;
   }
 
   function clearDetailPanel() {
@@ -676,9 +691,7 @@
     }
     header.append(
       title,
-      el('span', 'sub', checkedType.fullName + '   \u00B7   ' + dll.displayName),
-      el('span', 'spacer'),
-      button('\u2605', saveCurrentAsPreset, 'btn-star', 'Save URL, authorization, sidechannel and request as preset')
+      el('span', 'sub', checkedType.fullName + '   \u00B7   ' + dll.displayName)
     );
     panel.appendChild(header);
 
@@ -764,7 +777,11 @@
     const executeRow = el('div', 'execute-row');
     e.executeButton = button('EXECUTE', executeRequest, 'primary');
     e.executeStatus = el('span', 'execute-status');
-    executeRow.append(e.executeButton, e.executeStatus);
+    executeRow.append(
+      e.executeButton,
+      button('\u2605', saveCurrentAsPreset, 'btn-star', 'Save this call (URL, authorization, sidechannel, method and request) as favorite'),
+      e.executeStatus
+    );
     e.resultOutput = el('textarea', 'code editor');
     e.resultOutput.id = 'resultOutput';
     e.resultOutput.readOnly = true;
@@ -880,16 +897,29 @@
     const inputParameters = parameters.filter((p) => p.direction !== 'out');
     const outputParameters = parameters.filter((p) => p.direction !== 'in');
 
-    const appendEntry = (container, name, typeName, description, suffix) => {
+    const appendEntry = (container, name, typeName, description, suffix, members) => {
       const entry = el('div', 'doc-entry');
       const head = el('div', 'doc-entry-head');
       head.append(el('span', 'doc-name', name), el('span', 'doc-type', typeName + (suffix || '')));
       entry.appendChild(head);
       if (description) {
         entry.appendChild(el('div', 'doc-text', description));
-      } else {
+      } else if (!members || members.length === 0) {
         entry.appendChild(el('div', 'doc-text doc-missing', '(no description)'));
       }
+      // properties of complex types (e.g. the 'MyMethodRequest' capsule) carry the interesting documentation
+      (members || []).forEach((member) => {
+        const memberEntry = el('div', 'doc-entry doc-member');
+        const memberHead = el('div', 'doc-entry-head');
+        memberHead.append(el('span', 'doc-name', '.' + member.name), el('span', 'doc-type', member.typeName));
+        memberEntry.appendChild(memberHead);
+        if (member.description) {
+          memberEntry.appendChild(el('div', 'doc-text', member.description));
+        } else {
+          memberEntry.appendChild(el('div', 'doc-text doc-missing', '(no description)'));
+        }
+        entry.appendChild(memberEntry);
+      });
       container.appendChild(entry);
     };
 
@@ -905,16 +935,16 @@
       } else if (p.isOptional) {
         suffix = ' (optional)';
       }
-      appendEntry(requestDocs, p.name, p.typeName, p.description, suffix);
+      appendEntry(requestDocs, p.name, p.typeName, p.description, suffix, p.members);
     });
 
     const responseDocs = el('div', 'doc-block');
     responseDocs.appendChild(el('div', 'doc-title', 'Response'));
     if (method.returnTypeName && method.returnTypeName !== 'void') {
-      appendEntry(responseDocs, 'return', method.returnTypeName, method.returnsDescription);
+      appendEntry(responseDocs, 'return', method.returnTypeName, method.returnsDescription, '', method.returnMembers);
     }
     outputParameters.forEach((p) => {
-      appendEntry(responseDocs, p.name, p.typeName, p.description, ' (' + p.direction + ')');
+      appendEntry(responseDocs, p.name, p.typeName, p.description, ' (' + p.direction + ')', p.members);
     });
     if (responseDocs.childNodes.length === 1) {
       responseDocs.appendChild(el('div', 'doc-text doc-missing', '(void)'));
@@ -1037,7 +1067,7 @@
 
     let suggestion = detail.loadedPresetName;
     if (!suggestion) {
-      suggestion = hostOf(e.urlInput.value.trim()) + '/' + methodName;
+      suggestion = urlToPresetPath(e.urlInput.value.trim(), methodName);
     }
     const enteredName = prompt('Preset name ("/" creates folders):', suggestion);
     if (enteredName === null) {
@@ -1284,6 +1314,29 @@
     return close;
   }
 
+  // opens a dialog on top of the current modal dialog (the underlying dialog stays open)
+  function openSubModal(title, body, buttons) {
+    const layer = el('div', 'modal-layer sub-modal-layer');
+    const modal = el('div', 'modal sub-modal');
+    const bodyContainer = el('div', 'modal-body');
+    bodyContainer.appendChild(body);
+    const buttonBar = el('div', 'modal-buttons');
+    const close = () => {
+      if (layer.parentNode) {
+        layer.parentNode.removeChild(layer);
+      }
+    };
+    buttons.forEach((definition) => {
+      buttonBar.appendChild(button(definition.label, () => {
+        definition.action(close);
+      }, definition.className));
+    });
+    modal.append(el('div', 'modal-title', title), bodyContainer, buttonBar);
+    layer.appendChild(modal);
+    document.body.appendChild(layer);
+    return close;
+  }
+
   function isModalOpen() {
     return !document.getElementById('modalLayer').classList.contains('hidden');
   }
@@ -1499,6 +1552,8 @@
       callHost('savePinnedEndpoint', { pin: pin }).then((pins) => {
         lookup.pins = pins;
         renderList();
+        // the new url always contains the sub route placeholder, so it has to be edited right away
+        editPin(pin);
       }).catch(showError);
     });
     addRow.appendChild(targetSelect);
@@ -1512,6 +1567,113 @@
     const takeOver = (url) => {
       applyResolvedUrl(url);
       closeDialog();
+    };
+
+    const editPin = (pin) => {
+      const editBody = el('div');
+      const urlRow = fieldRow('URL');
+      const urlInput = textInput(pin.url);
+      urlInput.style.minWidth = '560px';
+      urlRow.appendChild(urlInput);
+      editBody.append(urlRow, el('div', 'info', 'Replace "' + PIN_SUBROUTE_PLACEHOLDER + '" with the sub route (or remove it).'));
+      const save = (closeEdit) => {
+        const newUrl = urlInput.value.trim();
+        if (!newUrl) {
+          alert('The URL must not be empty.');
+          return;
+        }
+        if (newUrl === pin.url) {
+          closeEdit();
+          return;
+        }
+        const changed = { typeFullName: pin.typeFullName, url: newUrl, hostUrl: pin.hostUrl, webApplicationName: pin.webApplicationName };
+        callHost('savePinnedEndpoint', { pin: changed, oldUrl: pin.url }).then((pins) => {
+          lookup.pins = pins;
+          renderList();
+          closeEdit();
+        }).catch(showError);
+      };
+      const closeEdit = openSubModal('Edit pinned URL', editBody, [
+        { label: 'OK', className: 'primary', action: save },
+        { label: 'Cancel', action: (close) => close() }
+      ]);
+      urlInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          save(closeEdit);
+        } else if (event.key === 'Escape') {
+          closeEdit();
+        }
+      });
+      urlInput.focus();
+      const placeholderIndex = urlInput.value.indexOf(PIN_SUBROUTE_PLACEHOLDER);
+      if (placeholderIndex >= 0) {
+        urlInput.setSelectionRange(placeholderIndex, placeholderIndex + PIN_SUBROUTE_PLACEHOLDER.length);
+      } else {
+        urlInput.select();
+      }
+    };
+
+    const promotePin = (pin) => {
+      const promoteBody = el('div');
+      const urlRow = fieldRow('URL');
+      const urlInput = textInput(pin.url);
+      urlInput.style.minWidth = '560px';
+      urlRow.appendChild(urlInput);
+
+      let hostSuggestion = pin.hostUrl || '';
+      if (!hostSuggestion) {
+        try {
+          hostSuggestion = new URL(pin.url).origin;
+        } catch {
+          hostSuggestion = '';
+        }
+      }
+      const createBox = el('div', 'host-box');
+      createBox.appendChild(el('div', 'info', 'If the host is not yet known by the store, it can be created directly within a zone:'));
+      const hostRow = fieldRow('Host');
+      const hostInput = textInput(hostSuggestion, 'https://server:port');
+      hostRow.appendChild(hostInput);
+      const zoneRow = fieldRow('Zone');
+      const zoneInput = textInput(detail.elements.zoneInput.value.trim(), 'e.g. Production/EU');
+      zoneRow.appendChild(zoneInput);
+      createBox.append(hostRow, zoneRow);
+      promoteBody.append(urlRow, createBox);
+
+      const promote = (closePromote, newHost) => {
+        const url = urlInput.value.trim();
+        const args = { contractName: detail.typeFullName, url: url };
+        if (newHost) {
+          args.newHost = newHost;
+        }
+        callHost('promotePinnedEndpoint', args).then((endpoints) => {
+          lookup.wellknown = endpoints;
+          return callHost('deletePinnedEndpoint', { typeFullName: detail.typeFullName, url: pin.url });
+        }).then((pins) => {
+          lookup.pins = pins;
+          renderList();
+          closePromote();
+          if (newHost) {
+            loadInfrastructure().catch(showError);
+          }
+        }).catch(showError);
+      };
+
+      openSubModal('Promote pin into the store', promoteBody, [
+        {
+          label: 'Create in Zone',
+          action: (closePromote) => {
+            const hostUrl = hostInput.value.trim();
+            if (!hostUrl) {
+              alert('Please enter the host URL.');
+              return;
+            }
+            promote(closePromote, { hostUrl: hostUrl, zone: zoneInput.value.trim() });
+          }
+        },
+        { label: 'Promote', className: 'primary', action: (closePromote) => promote(closePromote, null) },
+        { label: 'Cancel', action: (close) => close() }
+      ]);
+      urlInput.focus();
     };
 
     const pinUrl = (url, hostUrl, webApplicationName) => {
@@ -1543,26 +1705,12 @@
           }).catch(showError);
         }, 'icon pin-active', 'Remove pin');
         const edit = button('\u270E', () => {
-          const newUrl = prompt('URL', pin.url);
-          if (!newUrl || newUrl.trim() === pin.url) {
-            return;
-          }
-          const changed = { typeFullName: pin.typeFullName, url: newUrl.trim(), hostUrl: pin.hostUrl, webApplicationName: pin.webApplicationName };
-          callHost('savePinnedEndpoint', { pin: changed, oldUrl: pin.url }).then((pins) => {
-            lookup.pins = pins;
-            renderList();
-          }).catch(showError);
+          editPin(pin);
         }, 'icon', 'Edit URL');
         const actions = [edit];
         if (!readOnly) {
           actions.push(button('\u2B06 Store', () => {
-            callHost('promotePinnedEndpoint', { contractName: detail.typeFullName, url: pin.url }).then((endpoints) => {
-              lookup.wellknown = endpoints;
-              return callHost('deletePinnedEndpoint', { typeFullName: detail.typeFullName, url: pin.url });
-            }).then((pins) => {
-              lookup.pins = pins;
-              renderList();
-            }).catch(showError);
+            promotePin(pin);
           }, null, 'Promote this pin into the infrastructure store (wellknown endpoint)'));
         }
         actions.push(unpin);
@@ -1680,7 +1828,7 @@
     const modeRow = fieldRow('Source');
     const modeSelect = el('select');
     const modeEntries = [
-      ['Local', 'Local (stored on this machine)'],
+      ['FileBased', 'File based (JSON file, local or on a network share)'],
       ['External', 'Externally managed (UJMW service)']
     ];
     providers.forEach((provider) => {
@@ -1694,9 +1842,32 @@
     if (settings.mode === 'Provider') {
       modeSelect.value = providerPrefix + settings.providerTypeName;
     } else {
-      modeSelect.value = settings.mode || 'Local';
+      modeSelect.value = settings.mode || 'FileBased';
     }
     modeRow.appendChild(modeSelect);
+
+    const fileBasedPane = el('div');
+    const filePathRow = fieldRow('Store file');
+    const filePathInput = bindText(textInput('', '(default: own roaming profile)'), settings, 'fileBasedStorePath');
+    callHost('getDefaultFileBasedStorePath', {}).then((defaultPath) => {
+      filePathInput.placeholder = defaultPath + '   (default)';
+    }).catch(showError);
+    filePathRow.append(
+      filePathInput,
+      button('\u2026', () => {
+        callHost('selectFileBasedStorePath', { currentPath: filePathInput.value }).then((path) => {
+          if (path) {
+            filePathInput.value = path;
+            settings.fileBasedStorePath = path;
+          }
+        }).catch(showError);
+      }, 'icon', 'Choose the JSON file (e.g. on a network share)'),
+      button('Default', () => {
+        filePathInput.value = '';
+        settings.fileBasedStorePath = '';
+      }, null, 'Use the default location within the roaming profile of the current user')
+    );
+    fileBasedPane.append(filePathRow, el('div', 'info', 'The file is shared by everyone who points to the same location (e.g. a network share). Leave it empty to use the roaming profile of the current user. Environment variables like %APPDATA% are supported.'));
 
     const externalPane = el('div');
     const urlRow = fieldRow('Service URL');
@@ -1723,6 +1894,7 @@
 
     const updateModeVisibility = () => {
       const isProvider = modeSelect.value.indexOf(providerPrefix) === 0;
+      fileBasedPane.classList.toggle('hidden', modeSelect.value !== 'FileBased');
       externalPane.classList.toggle('hidden', modeSelect.value !== 'External');
       providerPane.classList.toggle('hidden', !isProvider);
       if (isProvider) {
@@ -1758,7 +1930,7 @@
       status.textContent = text;
     }
 
-    pane.append(modeRow, externalPane, providerPane, saveButton('Apply', () => {
+    pane.append(modeRow, fileBasedPane, externalPane, providerPane, saveButton('Apply', () => {
       if (modeSelect.value.indexOf(providerPrefix) === 0) {
         settings.mode = 'Provider';
         settings.providerTypeName = modeSelect.value.substring(providerPrefix.length);
@@ -1840,6 +2012,7 @@
         const hostRow = el('div', 'zone-row');
         hostRow.append(
           bindText(textInput('', 'https://server:port'), host, 'hostUrl'),
+          bindText(textInput('', 'Zone, e.g. Production/EU'), host, 'zone'),
           bindText(textInput('', 'Description'), host, 'description'),
           button('\u2715', () => {
             hosts.splice(hostIndex, 1);
