@@ -316,6 +316,20 @@ namespace UJMW.TestClient.Inspection {
     private MethodDescriptor[] _Methods = new MethodDescriptor[0];
     private FuseEntityDescriptor _FuseEntity = null;
     private string _Warning = null;
+    private string _QualifyingContractName = string.Empty;
+
+    /// <summary>
+    /// Contract name as used within UJMW endpoint qualifying names (generic arguments are joined via '_'),
+    /// which is the name to resolve the contract via an infrastructure.
+    /// </summary>
+    public string QualifyingContractName {
+      get {
+        return _QualifyingContractName;
+      }
+      set {
+        _QualifyingContractName = value;
+      }
+    }
 
     /// <summary>
     /// XML documentation summary of the type.
@@ -371,6 +385,155 @@ namespace UJMW.TestClient.Inspection {
       }
       set {
         _Warning = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// Information about a class which should be served as FUSE entity (used to choose the key).
+  /// </summary>
+  public sealed class EntityClassDescriptor {
+
+    private string _FullName = string.Empty;
+    private string _DisplayName = string.Empty;
+    private EntityPropertyDescriptor[] _Properties = new EntityPropertyDescriptor[0];
+    private BaseTypeDescriptor[] _BaseTypes = new BaseTypeDescriptor[0];
+    private string[] _AutoKeyPropertyNames = new string[0];
+    private string _AutoKeyTypeFullName = string.Empty;
+
+    public string FullName {
+      get {
+        return _FullName;
+      }
+      set {
+        _FullName = value;
+      }
+    }
+
+    public string DisplayName {
+      get {
+        return _DisplayName;
+      }
+      set {
+        _DisplayName = value;
+      }
+    }
+
+    /// <summary>
+    /// Readable public instance properties of the entity.
+    /// </summary>
+    public EntityPropertyDescriptor[] Properties {
+      get {
+        return _Properties;
+      }
+      set {
+        _Properties = value;
+      }
+    }
+
+    /// <summary>
+    /// Base type hierarchy of the entity (nearest first, without 'System.Object').
+    /// </summary>
+    public BaseTypeDescriptor[] BaseTypes {
+      get {
+        return _BaseTypes;
+      }
+      set {
+        _BaseTypes = value;
+      }
+    }
+
+    /// <summary>
+    /// Key properties which were resolved automatically (FUSE annotations, [Key], 'Id', 'Uid'...).
+    /// </summary>
+    public string[] AutoKeyPropertyNames {
+      get {
+        return _AutoKeyPropertyNames;
+      }
+      set {
+        _AutoKeyPropertyNames = value;
+      }
+    }
+
+    /// <summary>
+    /// Type of the automatically resolved key property (only for a single key property, otherwise empty).
+    /// </summary>
+    public string AutoKeyTypeFullName {
+      get {
+        return _AutoKeyTypeFullName;
+      }
+      set {
+        _AutoKeyTypeFullName = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// A property of an entity class.
+  /// </summary>
+  public sealed class EntityPropertyDescriptor {
+
+    private string _Name = string.Empty;
+    private string _TypeName = string.Empty;
+    private string _TypeFullName = string.Empty;
+
+    public string Name {
+      get {
+        return _Name;
+      }
+      set {
+        _Name = value;
+      }
+    }
+
+    public string TypeName {
+      get {
+        return _TypeName;
+      }
+      set {
+        _TypeName = value;
+      }
+    }
+
+    /// <summary>
+    /// Full name of the property type (nullable value types are unwrapped).
+    /// </summary>
+    public string TypeFullName {
+      get {
+        return _TypeFullName;
+      }
+      set {
+        _TypeFullName = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// A base type of an entity class.
+  /// </summary>
+  public sealed class BaseTypeDescriptor {
+
+    private string _FullName = string.Empty;
+    private string _DisplayName = string.Empty;
+
+    public string FullName {
+      get {
+        return _FullName;
+      }
+      set {
+        _FullName = value;
+      }
+    }
+
+    public string DisplayName {
+      get {
+        return _DisplayName;
+      }
+      set {
+        _DisplayName = value;
       }
     }
 

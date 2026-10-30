@@ -17,6 +17,12 @@ namespace UJMW.TestClient.Inspection {
 
     private const string _RepositoryDefinitionFullName = "System.Data.Fuse.IRepository`2";
     private const string _CompositeKeyPrefix = "System.Data.Fuse.CompositeKey";
+    private const int _MaxCompositeKeyFieldCount = 5;
+
+    /// <summary>
+    /// Name of the FUSE-fx assembly which contains 'IRepository&lt;TEntity, TKey&gt;' and 'CompositeKeyN'.
+    /// </summary>
+    public const string _RepositoryContractAssemblyName = "FUSE-fx.RepositoryContract";
     private const string _PrimaryIdentityAttributeName = "PrimaryIdentityAttribute";
     private const string _PropertyGroupAttributeName = "PropertyGroupAttribute";
     private const string _UniquePropertyGroupAttributeName = "UniquePropertyGroupAttribute";
@@ -26,6 +32,14 @@ namespace UJMW.TestClient.Inspection {
     /// Returns the entity descriptor if the type closes the FUSE repository contract with a resolvable entity, otherwise null.
     /// </summary>
     public static FuseEntityDescriptor TryDetect(Type type) {
+      return TryDetect(type, null);
+    }
+
+    /// <summary>
+    /// Returns the entity descriptor if the type closes the FUSE repository contract with a resolvable entity, otherwise null.
+    /// When key property names are given, they are used instead of the automatic key resolution.
+    /// </summary>
+    public static FuseEntityDescriptor TryDetect(Type type, string[] keyPropertyNamesOverride) {
 
       Type repositoryInterface = FindClosedRepositoryInterface(type);
       if (repositoryInterface == null) {
@@ -37,7 +51,7 @@ namespace UJMW.TestClient.Inspection {
       Type keyType = arguments[1];
 
       try {
-        return BuildDescriptor(entityType, keyType);
+        return BuildDescriptor(entityType, keyType, keyPropertyNamesOverride);
       } catch (FileNotFoundException) {
         //the entity type (or one of its base types) lives in an assembly which is not resolvable
         return null;
@@ -82,7 +96,7 @@ namespace UJMW.TestClient.Inspection {
     /// <summary>
     /// Builds the descriptor (fields, key fields and an empty entity template).
     /// </summary>
-    private static FuseEntityDescriptor BuildDescriptor(Type entityType, Type keyType) {
+    private static FuseEntityDescriptor BuildDescriptor(Type entityType, Type keyType, string[] keyPropertyNamesOverride) {
 
       XmlDocReader docs = XmlDocReader.ForAssembly(entityType.Assembly);
 
@@ -94,7 +108,12 @@ namespace UJMW.TestClient.Inspection {
       descriptor.EntityTemplateJson = RequestTemplateBuilder.BuildEmptyObjectJson(entityType);
 
       List<PropertyInfo> properties = GetEntityProperties(entityType);
-      string[] keyPropertyNames = ResolveKeyPropertyNames(entityType, keyType, properties);
+      string[] keyPropertyNames;
+      if (keyPropertyNamesOverride != null && keyPropertyNamesOverride.Length > 0) {
+        keyPropertyNames = keyPropertyNamesOverride;
+      } else {
+        keyPropertyNames = ResolveKeyPropertyNames(entityType, keyType, properties);
+      }
 
       bool isComposite = (keyType.FullName != null && keyType.FullName.StartsWith(_CompositeKeyPrefix, StringComparison.Ordinal));
       if (isComposite) {
@@ -128,7 +147,7 @@ namespace UJMW.TestClient.Inspection {
     /// <summary>
     /// Returns the readable, non-indexed public instance properties of the entity in declaration order.
     /// </summary>
-    private static List<PropertyInfo> GetEntityProperties(Type entityType) {
+    internal static List<PropertyInfo> GetEntityProperties(Type entityType) {
 
       PropertyInfo[] properties;
       try {
@@ -158,8 +177,8 @@ namespace UJMW.TestClient.Inspection {
     /// Resolves the names of the key properties:
     /// (1) [PrimaryIdentity(group)] + [PropertyGroup]/[UniquePropertyGroup] with the same group name,
     /// (2) properties annotated with [Key],
-    /// (3) a property named 'Id' or '&lt;Entity&gt;Id',
-    /// (4) for scalar keys: the first property whose type matches the key type.
+    /// (3) a property named 'Id' or '&lt;Entity&gt;Id' or 'Uid',
+    /// (4) for scalar keys: the first property whose type matches the key type (only if a key type is given).
     /// </summary>
     private static string[] ResolveKeyPropertyNames(Type entityType, Type keyType, List<PropertyInfo> properties) {
 
@@ -180,8 +199,15 @@ namespace UJMW.TestClient.Inspection {
       if (idProperty == null) {
         idProperty = properties.FirstOrDefault((p) => string.Equals(p.Name, entityType.Name + "Id", StringComparison.OrdinalIgnoreCase));
       }
+      if (idProperty == null) {
+        idProperty = properties.FirstOrDefault((p) => string.Equals(p.Name, "Uid", StringComparison.OrdinalIgnoreCase));
+      }
       if (idProperty != null) {
         return new string[] { idProperty.Name };
+      }
+
+      if (keyType == null) {
+        return new string[0];
       }
 
       PropertyInfo typeMatch = properties.FirstOrDefault((p) => p.PropertyType == keyType);
@@ -190,6 +216,139 @@ namespace UJMW.TestClient.Inspection {
       }
 
       return new string[0];
+    }
+
+    /// <summary>
+    /// Resolves the key properties of an entity class without a given key type ('AUTO' key selection):
+    /// FUSE key annotations first, then a property named 'Id', '&lt;Entity&gt;Id' or 'Uid'.
+    /// </summary>
+    public static string[] ResolveAutoKeyPropertyNames(Type entityType, List<PropertyInfo> properties) {
+      return ResolveKeyPropertyNames(entityType, null, properties);
+    }
+
+    /// <summary>
+    /// Builds the closed type 'IRepository&lt;TEntity, TKey&gt;' for an entity class (synthetic repository contract).
+    /// More than one key property results in a FUSE 'CompositeKeyN' key, otherwise the given key type is used.
+    /// </summary>
+    public static Type MakeRepositoryType(MetadataLoadContext context, Type entityType, string keyTypeFullName, string[] keyPropertyNames) {
+
+      Assembly contractAssembly;
+      try {
+        contractAssembly = context.LoadFromAssemblyName(_RepositoryContractAssemblyName);
+      } catch (FileNotFoundException) {
+        //expected: neither the DLL folder, its deps.json nor the NuGet cache provides FUSE-fx
+        throw new InvalidOperationException(
+          $"The assembly '{_RepositoryContractAssemblyName}' could not be found (neither next to the DLL nor in the NuGet cache). " +
+          "Restore the NuGet package 'FUSE-fx.RepositoryContract' once (e.g. in any project) to use entity repositories."
+        );
+      }
+
+      Type repositoryDefinition = contractAssembly.GetType(_RepositoryDefinitionFullName, false);
+      if (repositoryDefinition == null) {
+        throw new InvalidOperationException($"'{_RepositoryDefinitionFullName}' was not found in '{contractAssembly.FullName}'.");
+      }
+
+      List<PropertyInfo> properties = GetEntityProperties(entityType);
+      Type keyType;
+
+      if (keyPropertyNames != null && keyPropertyNames.Length > 1) {
+
+        if (keyPropertyNames.Length > _MaxCompositeKeyFieldCount) {
+          throw new InvalidOperationException($"A composite key can consist of at most {_MaxCompositeKeyFieldCount} properties.");
+        }
+
+        string compositeName = _CompositeKeyPrefix + keyPropertyNames.Length + "`" + keyPropertyNames.Length;
+        Type compositeDefinition = contractAssembly.GetType(compositeName, false);
+        if (compositeDefinition == null) {
+          throw new InvalidOperationException($"'{compositeName}' was not found in '{contractAssembly.FullName}'.");
+        }
+
+        Type[] fieldTypes = new Type[keyPropertyNames.Length];
+        for (int i = 0; i < keyPropertyNames.Length; i++) {
+          string propertyName = keyPropertyNames[i];
+          PropertyInfo property = properties.FirstOrDefault((p) => p.Name == propertyName);
+          if (property == null) {
+            throw new InvalidOperationException($"The entity '{entityType.FullName}' has no property '{propertyName}'.");
+          }
+          fieldTypes[i] = property.PropertyType;
+        }
+
+        keyType = compositeDefinition.MakeGenericType(fieldTypes);
+
+      } else {
+        keyType = ResolveKeyType(context, entityType, properties, keyTypeFullName);
+      }
+
+      return repositoryDefinition.MakeGenericType(entityType, keyType);
+    }
+
+    /// <summary>
+    /// Resolves a scalar key type by full name: types of entity properties, base types of the entity,
+    /// the core library and finally the assembly of the entity.
+    /// </summary>
+    private static Type ResolveKeyType(MetadataLoadContext context, Type entityType, List<PropertyInfo> properties, string keyTypeFullName) {
+
+      if (string.IsNullOrWhiteSpace(keyTypeFullName)) {
+        throw new InvalidOperationException("No key type was selected.");
+      }
+
+      foreach (PropertyInfo property in properties) {
+        Type propertyType = GetUnderlyingType(property.PropertyType);
+        if (propertyType.FullName == keyTypeFullName) {
+          return propertyType;
+        }
+      }
+
+      foreach (Type baseType in GetBaseTypes(entityType)) {
+        if (baseType.FullName == keyTypeFullName) {
+          return baseType;
+        }
+      }
+
+      Type coreType = context.CoreAssembly.GetType(keyTypeFullName, false);
+      if (coreType != null) {
+        return coreType;
+      }
+
+      Type entityAssemblyType = entityType.Assembly.GetType(keyTypeFullName, false);
+      if (entityAssemblyType != null) {
+        return entityAssemblyType;
+      }
+
+      throw new InvalidOperationException($"The key type '{keyTypeFullName}' could not be resolved.");
+    }
+
+    /// <summary>
+    /// Returns the base types of a class (nearest first, without 'System.Object'). Unresolvable base types end the chain.
+    /// </summary>
+    public static Type[] GetBaseTypes(Type type) {
+
+      List<Type> result = new List<Type>();
+      try {
+        Type current = type.BaseType;
+        while (current != null && current.FullName != "System.Object") {
+          result.Add(current);
+          current = current.BaseType;
+        }
+      } catch (FileNotFoundException) {
+        //a base type lives in an assembly which is not available -> the chain ends here
+      } catch (TypeLoadException) {
+        //same as above
+      }
+
+      return result.ToArray();
+    }
+
+    /// <summary>
+    /// Returns the underlying type of 'Nullable&lt;T&gt;' or the type itself.
+    /// </summary>
+    public static Type GetUnderlyingType(Type type) {
+
+      if (type.IsGenericType && type.GetGenericTypeDefinition().FullName == "System.Nullable`1") {
+        return type.GetGenericArguments()[0];
+      }
+
+      return type;
     }
 
     /// <summary>

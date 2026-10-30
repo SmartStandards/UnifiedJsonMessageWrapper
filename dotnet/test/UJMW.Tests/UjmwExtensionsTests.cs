@@ -29,6 +29,24 @@ namespace System.Web.UJMW {
     }
 
     [TestMethod]
+    public void QualifyingContractName_MatchesEndpointQualifyingNameWithoutPrefixAndVersion() {
+
+      Type contractType = typeof(IFoo<FooEntity, FooKey, BarEntity>);
+
+      string qualifyingContractName = UjmwContractNaming.GetQualifyingContractName(contractType);
+
+      Assert.AreEqual(
+        "System.Web.UJMW.SomeNamespace1.IFoo_FooEntity_Keys.FooKey_System.Web.UJMW.SomeNamespace2.BarEntity",
+        qualifyingContractName
+      );
+      Assert.AreEqual(
+        "UJMW:" + qualifyingContractName,
+        GetEndpointQualifyingNameWithoutVersion(contractType.BuildUjmwEndpointQualifyingName())
+      );
+
+    }
+
+    [TestMethod]
     public void ContractAliasTest_Simplified() {
 
       Type contractType = typeof(IFoo<FooEntity, FooKey, BarEntity>);

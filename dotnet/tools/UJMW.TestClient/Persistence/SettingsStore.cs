@@ -85,9 +85,20 @@ namespace UJMW.TestClient.Persistence {
         if (dll.CheckedTypes == null) {
           dll.CheckedTypes = new CheckedType[0];
         }
+        foreach (CheckedType checkedType in dll.CheckedTypes) {
+          if (checkedType.RepositoryKeyPropertyNames == null) {
+            checkedType.RepositoryKeyPropertyNames = new string[0];
+          }
+        }
       }
       if (settings.UrlHistory == null) {
         settings.UrlHistory = new UrlHistoryEntry[0];
+      }
+      if (settings.ContractSessions == null) {
+        settings.ContractSessions = new ContractSession[0];
+      }
+      if (settings.SharedAuthHeader == null) {
+        settings.SharedAuthHeader = string.Empty;
       }
       if (settings.Presets == null) {
         settings.Presets = new Preset[0];

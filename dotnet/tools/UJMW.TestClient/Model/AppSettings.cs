@@ -20,6 +20,33 @@ namespace UJMW.TestClient.Model {
     private string _CurrentZone = string.Empty;
     private InfrastructureSettings _Infrastructure = new InfrastructureSettings();
     private PinnedEndpoint[] _PinnedEndpoints = new PinnedEndpoint[0];
+    private ContractSession[] _ContractSessions = new ContractSession[0];
+    private string _SharedAuthHeader = string.Empty;
+
+    /// <summary>
+    /// The 'shared' authorization header (e.g. 'Bearer eyJ...') which is issued via the token dialog and
+    /// used wherever the auth textbox contains the '{shared}' placeholder (persisted across restarts).
+    /// </summary>
+    public string SharedAuthHeader {
+      get {
+        return _SharedAuthHeader;
+      }
+      set {
+        _SharedAuthHeader = value;
+      }
+    }
+
+    /// <summary>
+    /// Last used URL per contract (restored when the contract is selected again).
+    /// </summary>
+    public ContractSession[] ContractSessions {
+      get {
+        return _ContractSessions;
+      }
+      set {
+        _ContractSessions = value;
+      }
+    }
 
     /// <summary>
     /// User-specific pinned endpoint URLs (not stored in the managed infrastructure).
@@ -380,6 +407,10 @@ namespace UJMW.TestClient.Model {
 
     private string _FullName = string.Empty;
     private string _Kind = string.Empty;
+    private string _DisplayName = string.Empty;
+    private string _RepositoryEntityFullName = string.Empty;
+    private string _RepositoryKeyTypeFullName = string.Empty;
+    private string[] _RepositoryKeyPropertyNames = new string[0];
 
     public string FullName {
       get {
@@ -396,6 +427,57 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _Kind = value;
+      }
+    }
+
+    /// <summary>
+    /// Optional display text for the main tree (used for synthetic repository contracts).
+    /// </summary>
+    public string DisplayName {
+      get {
+        return _DisplayName;
+      }
+      set {
+        _DisplayName = value;
+      }
+    }
+
+    /// <summary>
+    /// Only for synthetic FUSE repository contracts ('IRepository&lt;TEntity, TKey&gt;' which was created
+    /// for an entity class): the full name of the entity class. Empty for regular types.
+    /// </summary>
+    public string RepositoryEntityFullName {
+      get {
+        return _RepositoryEntityFullName;
+      }
+      set {
+        _RepositoryEntityFullName = value;
+      }
+    }
+
+    /// <summary>
+    /// Only for synthetic FUSE repository contracts: the full name of a scalar key type or of a base type
+    /// of the entity which is used as key. Empty for composite keys.
+    /// </summary>
+    public string RepositoryKeyTypeFullName {
+      get {
+        return _RepositoryKeyTypeFullName;
+      }
+      set {
+        _RepositoryKeyTypeFullName = value;
+      }
+    }
+
+    /// <summary>
+    /// Only for synthetic FUSE repository contracts: the entity properties which build the key
+    /// (composite keys: 2-5 properties in key order; scalar keys: optional, the property holding the key).
+    /// </summary>
+    public string[] RepositoryKeyPropertyNames {
+      get {
+        return _RepositoryKeyPropertyNames;
+      }
+      set {
+        _RepositoryKeyPropertyNames = value;
       }
     }
 
@@ -434,6 +516,35 @@ namespace UJMW.TestClient.Model {
       }
       set {
         _LastUsedUtc = value;
+      }
+    }
+
+  }
+
+  /// <summary>
+  /// The last URL of a contract (like an invisible favorite of the type itself).
+  /// Note: the authorization textbox is intentionally NOT persisted here (it defaults to '{shared}' after a restart).
+  /// </summary>
+  public sealed class ContractSession {
+
+    private string _TypeFullName = string.Empty;
+    private string _Url = string.Empty;
+
+    public string TypeFullName {
+      get {
+        return _TypeFullName;
+      }
+      set {
+        _TypeFullName = value;
+      }
+    }
+
+    public string Url {
+      get {
+        return _Url;
+      }
+      set {
+        _Url = value;
       }
     }
 

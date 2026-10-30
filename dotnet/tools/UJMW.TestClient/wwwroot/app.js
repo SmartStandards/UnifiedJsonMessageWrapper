@@ -66,10 +66,19 @@
     collapsedKeys: new Set(),
     collapsedNamespaceKeys: new Set(),
     detail: null,
-    infrastructure: null
+    infrastructure: null,
+    // tokens issued within this session (newest first) - intentionally not persisted
+    issuedTokens: []
   };
 
   let sideChannelSaveTimer = null;
+  let contractSessionSaveTimer = null;
+  let contractSessionPending = null;
+  // placeholder within the auth textbox which refers to the persisted shared token (see issue dialog)
+  const SHARED_AUTH_PLACEHOLDER = '{shared}';
+  let sharedTokenPromptOpen = false;
+  // last known URL (persisted) / authorization textbox content (session only) per contract
+  const contractSessionCache = {};
 
   // ======================================================================
   //  generic helpers
@@ -131,6 +140,23 @@
 
   function shortTypeName(fullName) {
     return fullName.substring(fullName.lastIndexOf('.') + 1).replace(/\+/g, '.');
+  }
+
+  // contract name for infrastructure lookups: the UJMW qualifying name (generic arguments joined via '_'
+  // like 'System.Data.Fuse.IRepository_Ns.Person_Int32'), falls back to the type name if not inspectable
+  function infrastructureContractName(detail) {
+    if (detail.contractQualifyingName) {
+      return detail.contractQualifyingName;
+    }
+    return detail.typeFullName;
+  }
+
+  // display text of a checked type
+  function checkedTypeLabel(checkedType) {
+    if (checkedType.displayName) {
+      return checkedType.displayName;
+    }
+    return shortTypeName(checkedType.fullName);
   }
 
   function kindClass(kind) {
@@ -304,6 +330,11 @@
         hasChildren: dll.checkedTypes.length > 0,
         onSelect: () => {
           selectDll(dll);
+        },
+        onContextMenu: (event) => {
+          showRemoveContextMenu(event, () => {
+            removeDll(dll.path);
+          });
         }
       });
 
@@ -311,13 +342,18 @@
         const presets = ui.state.presets.filter((p) => p.typeFullName === checkedType.fullName);
         const typeNode = createTreeNode(ui.collapsedKeys, {
           key: makeKey(['type', dll.path, checkedType.fullName]),
-          label: shortTypeName(checkedType.fullName),
+          label: checkedTypeLabel(checkedType),
           icon: kindIcon(checkedType.kind),
           cssClass: kindClass(checkedType.kind),
           title: checkedType.fullName,
           hasChildren: presets.length > 0,
           onSelect: () => {
             selectType(dll, checkedType);
+          },
+          onContextMenu: (event) => {
+            showRemoveContextMenu(event, () => {
+              removeType(dll.path, checkedType.fullName);
+            });
           }
         });
         if (presets.length > 0) {
@@ -587,10 +623,217 @@
   }
 
   function toggleTypeSelection(dll, type, row) {
+    const isUncheckedClass = type.kind !== KIND_INTERFACE && !isTypeChecked(dll.path, type.fullName);
+    if (isUncheckedClass) {
+      openClassKindDialog(dll, type, row);
+      return;
+    }
     callHost('toggleType', { path: dll.path, fullName: type.fullName, kind: type.kind }).then((state) => {
       applyState(state);
       row.querySelector('.tree-icon').textContent = checkIcon(isTypeChecked(dll.path, type.fullName), false);
     }).catch(showError);
+  }
+
+  // asks whether a class is a service (checked as it is) or an entity (an 'IRepository<Entity, Key>' is added instead)
+  function openClassKindDialog(dll, type, row) {
+    const body = el('div', 'class-kind-dialog');
+    body.appendChild(el('div', 'info', 'What does the class "' + type.fullName + '" represent?'));
+
+    const radioGroupName = 'classKind';
+    const serviceRadio = createRadio(radioGroupName, 'Service (the class itself is the contract)', true);
+    const entityRadio = createRadio(radioGroupName, 'Entity (add an IRepository<' + type.displayName + ', Key> instead)', false);
+    body.append(serviceRadio.label, entityRadio.label);
+
+    const keySection = el('details', 'section key-section');
+    keySection.appendChild(el('summary', null, 'Key'));
+    const keyBody = el('div', 'section-body');
+    keyBody.appendChild(el('div', 'info', 'Loading properties\u2026'));
+    keySection.appendChild(keyBody);
+    body.appendChild(keySection);
+
+    let entityInfo = null;
+    let keyChoice = null;
+    let loadStarted = false;
+
+    const updateSectionState = () => {
+      keySection.open = entityRadio.input.checked;
+      if (!entityRadio.input.checked || loadStarted) {
+        return;
+      }
+      loadStarted = true;
+      callHost('getEntityClass', { path: dll.path, fullName: type.fullName }).then((result) => {
+        entityInfo = result;
+        keyBody.innerHTML = '';
+        keyChoice = buildKeyChoice(keyBody, entityInfo);
+      }).catch((error) => {
+        keyBody.innerHTML = '';
+        keyBody.appendChild(el('div', 'warning', error.message));
+      });
+    };
+    serviceRadio.input.addEventListener('change', updateSectionState);
+    entityRadio.input.addEventListener('change', updateSectionState);
+    keySection.addEventListener('toggle', () => {
+      if (keySection.open && !entityRadio.input.checked) {
+        entityRadio.input.checked = true;
+        updateSectionState();
+      }
+    });
+
+    openModal('Add class', body, [
+      {
+        label: 'OK',
+        className: 'primary',
+        action: (close) => {
+          if (serviceRadio.input.checked) {
+            callHost('toggleType', { path: dll.path, fullName: type.fullName, kind: type.kind }).then((state) => {
+              close();
+              applyState(state);
+              row.querySelector('.tree-icon').textContent = checkIcon(isTypeChecked(dll.path, type.fullName), false);
+            }).catch(showError);
+            return;
+          }
+          if (!entityInfo || !keyChoice) {
+            alert('The properties of the entity are not loaded yet.');
+            return;
+          }
+          const selection = keyChoice.getSelection();
+          if (selection.error) {
+            alert(selection.error);
+            return;
+          }
+          callHost('addRepository', {
+            path: dll.path,
+            entityFullName: type.fullName,
+            keyTypeFullName: selection.keyTypeFullName,
+            keyPropertyNames: selection.keyPropertyNames
+          }).then((state) => {
+            close();
+            applyState(state);
+          }).catch(showError);
+        }
+      },
+      {
+        label: 'Cancel',
+        action: (close) => {
+          close();
+        }
+      }
+    ]);
+  }
+
+  function createRadio(groupName, labelText, checked) {
+    const label = el('label', 'radio-row');
+    const input = el('input');
+    input.type = 'radio';
+    input.name = groupName;
+    input.checked = checked;
+    label.append(input, document.createTextNode(' ' + labelText));
+    return { label: label, input: input };
+  }
+
+  // renders the key options (AUTO, well-known scalar types, base types, composite) and returns { getSelection }
+  function buildKeyChoice(container, entityInfo) {
+    const groupName = 'keyKind';
+    const options = [];
+
+    let autoText = 'AUTO (no key property found)';
+    if (entityInfo.autoKeyPropertyNames.length > 0) {
+      const autoProperties = entityInfo.autoKeyPropertyNames.map((name) => {
+        const property = entityInfo.properties.find((p) => p.name === name);
+        if (property) {
+          return name + ': ' + property.typeName;
+        }
+        return name;
+      });
+      autoText = 'AUTO (' + autoProperties.join(', ') + ')';
+    }
+    const autoRadio = createRadio(groupName, autoText, entityInfo.autoKeyPropertyNames.length > 0);
+    autoRadio.input.disabled = entityInfo.autoKeyPropertyNames.length === 0;
+    container.appendChild(autoRadio.label);
+    options.push({ radio: autoRadio, kind: 'auto' });
+
+    [
+      { text: 'int32', fullName: 'System.Int32' },
+      { text: 'int64', fullName: 'System.Int64' },
+      { text: 'GUID', fullName: 'System.Guid' },
+      { text: 'string', fullName: 'System.String' }
+    ].forEach((scalar) => {
+      const radio = createRadio(groupName, scalar.text, false);
+      container.appendChild(radio.label);
+      options.push({ radio: radio, kind: 'type', keyTypeFullName: scalar.fullName });
+    });
+
+    if (entityInfo.baseTypes.length > 0) {
+      container.appendChild(el('div', 'key-group-title', 'Base types'));
+      entityInfo.baseTypes.forEach((baseType) => {
+        const radio = createRadio(groupName, baseType.displayName, false);
+        radio.label.title = baseType.fullName;
+        container.appendChild(radio.label);
+        options.push({ radio: radio, kind: 'type', keyTypeFullName: baseType.fullName });
+      });
+    }
+
+    const compositeRadio = createRadio(groupName, 'Composite (selected properties in table order)', false);
+    container.appendChild(compositeRadio.label);
+    options.push({ radio: compositeRadio, kind: 'composite' });
+
+    const table = el('table', 'key-property-table');
+    const headerRow = el('tr');
+    headerRow.append(el('th', null, ''), el('th', null, 'Property'), el('th', null, 'Type'));
+    table.appendChild(headerRow);
+    const checkboxes = [];
+    entityInfo.properties.forEach((property) => {
+      const tableRow = el('tr');
+      const checkbox = el('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = entityInfo.autoKeyPropertyNames.indexOf(property.name) >= 0;
+      checkbox.addEventListener('change', () => {
+        compositeRadio.input.checked = true;
+      });
+      checkboxes.push({ checkbox: checkbox, property: property });
+      const checkCell = el('td');
+      checkCell.appendChild(checkbox);
+      tableRow.append(checkCell, el('td', null, property.name), el('td', null, property.typeName));
+      table.appendChild(tableRow);
+    });
+    container.appendChild(table);
+
+    if (entityInfo.autoKeyPropertyNames.length === 0) {
+      options[1].radio.input.checked = true;
+    }
+
+    const getSelection = () => {
+      const selected = options.find((o) => o.radio.input.checked);
+      if (!selected) {
+        return { error: 'Please select a key.' };
+      }
+      if (selected.kind === 'auto') {
+        if (entityInfo.autoKeyPropertyNames.length > 1) {
+          return { keyTypeFullName: '', keyPropertyNames: entityInfo.autoKeyPropertyNames.slice() };
+        }
+        if (!entityInfo.autoKeyTypeFullName) {
+          return { error: 'The key type could not be resolved automatically.' };
+        }
+        return { keyTypeFullName: entityInfo.autoKeyTypeFullName, keyPropertyNames: entityInfo.autoKeyPropertyNames.slice() };
+      }
+      if (selected.kind === 'type') {
+        return { keyTypeFullName: selected.keyTypeFullName, keyPropertyNames: [] };
+      }
+      const names = checkboxes.filter((c) => c.checkbox.checked).map((c) => c.property.name);
+      if (names.length === 0) {
+        return { error: 'Please check at least one property for the composite key.' };
+      }
+      if (names.length > 5) {
+        return { error: 'A composite key can consist of at most 5 properties.' };
+      }
+      if (names.length === 1) {
+        const property = checkboxes.find((c) => c.property.name === names[0]).property;
+        return { keyTypeFullName: property.typeFullName, keyPropertyNames: names };
+      }
+      return { keyTypeFullName: '', keyPropertyNames: names };
+    };
+
+    return { getSelection: getSelection };
   }
 
   // ======================================================================
@@ -690,7 +933,7 @@
 
     // header
     const header = el('div', 'detail-header');
-    const title = el('h2', kindClass(checkedType.kind), shortTypeName(checkedType.fullName));
+    const title = el('h2', kindClass(checkedType.kind), checkedTypeLabel(checkedType));
     if (checkedType.kind === KIND_INTERFACE) {
       title.style.color = '#0050c8';
     }
@@ -723,7 +966,13 @@
     const urlRow = fieldRow('URL');
     e.urlCombo = createHistoryCombo('Service base URL, e.g. https://host/api/MyService');
     e.urlInput = e.urlCombo.input;
-    e.urlInput.addEventListener('input', updateAfterUrlVisibility);
+    e.urlInput.addEventListener('input', () => {
+      updateAfterUrlVisibility();
+      scheduleContractSessionSave(detail);
+    });
+    e.urlInput.addEventListener('change', () => {
+      scheduleContractSessionSave(detail);
+    });
     urlRow.append(
       e.urlCombo.wrapper,
       button('\u2026', openUrlLookupDialog, 'icon', 'Look up the URL (resolve, wellknown endpoints, pinned entries)'),
@@ -736,8 +985,12 @@
 
     // authorization
     const authRow = fieldRow('Authorization');
-    e.authInput = textInput('', 'Authorization header value, e.g. Bearer eyJ\u2026');
-    authRow.append(e.authInput, button('Issue\u2026', openIssueTokenDialog, null, 'Generate a JWT or request a token via OAuth code flow'));
+    e.authInput = textInput('', 'Authorization header value, e.g. ' + SHARED_AUTH_PLACEHOLDER + ' or Bearer eyJ\u2026');
+    e.authInput.value = SHARED_AUTH_PLACEHOLDER;
+    e.authInput.addEventListener('input', () => {
+      scheduleContractSessionSave(detail);
+    });
+    authRow.append(e.authInput, button('...', () => openIssueTokenDialog(), null, 'Issue a token (JWT generator or OAuth code flow)'));
     e.afterUrl.appendChild(authRow);
 
     // sidechannel
@@ -822,6 +1075,7 @@
       }
       detail.methods = result.methods;
       detail.contractRouteName = result.contractRouteName;
+      detail.contractQualifyingName = result.contractQualifyingName;
       detail.fuseEntity = null;
       if (result.fuseEntity) {
         detail.fuseEntity = result.fuseEntity;
@@ -846,15 +1100,22 @@
       if (presetToLoad) {
         applyPreset(presetToLoad);
       } else {
-        if (result.urlHistory.length > 0) {
+        let session = contractSessionCache[detail.typeFullName];
+        if (!session && result.session) {
+          session = { url: result.session.url || '', authHeader: SHARED_AUTH_PLACEHOLDER };
+        }
+        if (session && session.url) {
+          e.urlInput.value = session.url;
+        } else if (result.urlHistory.length > 0) {
           e.urlInput.value = result.urlHistory[0];
+        }
+        if (session && typeof session.authHeader === 'string') {
+          e.authInput.value = session.authHeader;
         }
         applyMethodTemplate();
       }
       updateAfterUrlVisibility();
-      if (!presetToLoad || presetToLoad.kind !== DATA_PRESET_KIND) {
-        reloadDataIfActive();
-      }
+      showDataLoadHint();
     }).catch((error) => {
       e.warningBox.textContent = error.message;
       e.warningBox.classList.remove('hidden');
@@ -999,7 +1260,6 @@
       applyDataPreset(preset);
       setDataModeActive(true);
       updateAfterUrlVisibility();
-      reloadDataIfActive();
       return;
     }
     detail.loadedPresetKind = METHOD_PRESET_KIND;
@@ -1020,6 +1280,44 @@
     e.resultOutput.value = '';
     e.resultOutput.className = 'code';
     updateAfterUrlVisibility();
+    scheduleContractSessionSave(detail);
+  }
+
+  /**
+   * Remembers the current URL (persisted) and the authorization textbox content (session only) of the contract,
+   * so that both are restored when navigating back (after a restart the auth textbox is '{shared}' again).
+   */
+  function scheduleContractSessionSave(detail) {
+    if (!detail || !detail.typeFullName) {
+      return;
+    }
+    const e = detail.elements;
+    const payload = {
+      typeFullName: detail.typeFullName,
+      url: e.urlInput.value.trim()
+    };
+    contractSessionCache[payload.typeFullName] = { url: payload.url, authHeader: e.authInput.value };
+
+    if (contractSessionPending && contractSessionPending.typeFullName !== payload.typeFullName) {
+      flushContractSessionSave();
+    }
+    contractSessionPending = payload;
+    if (contractSessionSaveTimer) {
+      clearTimeout(contractSessionSaveTimer);
+    }
+    contractSessionSaveTimer = setTimeout(flushContractSessionSave, 500);
+  }
+
+  function flushContractSessionSave() {
+    if (contractSessionSaveTimer) {
+      clearTimeout(contractSessionSaveTimer);
+      contractSessionSaveTimer = null;
+    }
+    const payload = contractSessionPending;
+    contractSessionPending = null;
+    if (payload) {
+      callHost('setContractSession', payload).catch(showError);
+    }
   }
 
   function setUrlHistory(history) {
@@ -1058,6 +1356,9 @@
       alert('Please enter a URL.');
       return;
     }
+    if (!ensureSharedTokenUsable(e.authInput.value)) {
+      return;
+    }
 
     e.executeButton.disabled = true;
     e.executeStatus.textContent = 'Executing ' + method.name + '\u2026';
@@ -1076,6 +1377,7 @@
       ui.state.sideChannelText = e.sideChannelInput.value;
       e.resultOutput.value = result.text;
       e.resultOutput.className = 'code result-' + String(result.kind).toLowerCase();
+      handleAuthRejection(result, e.authInput.value);
     }).catch((error) => {
       e.resultOutput.value = error.message;
       e.resultOutput.className = 'code result-error';
@@ -1094,6 +1396,68 @@
       ui.state.sideChannelText = text;
       callHost('setSideChannelText', { text: text }).catch(showError);
     }, 700);
+  }
+
+  // ======================================================================
+  //  shared token
+  // ======================================================================
+
+  function usesSharedToken(authValue) {
+    return typeof authValue === 'string' && authValue.indexOf(SHARED_AUTH_PLACEHOLDER) >= 0;
+  }
+
+  // returns the raw token of the shared authorization header (without the 'Bearer ' prefix)
+  function getSharedToken() {
+    const header = (ui.state && ui.state.sharedAuthHeader) || '';
+    return header.replace(/^\s*Bearer\s+/i, '').trim();
+  }
+
+  // shows the problem, asks whether a token should be issued and opens the issue dialog
+  function promptIssueSharedToken(problem) {
+    if (sharedTokenPromptOpen) {
+      return;
+    }
+    sharedTokenPromptOpen = true;
+    try {
+      if (confirm(problem + '\n\nDo you want to issue a token now?')) {
+        openIssueTokenDialog();
+      }
+    } finally {
+      sharedTokenPromptOpen = false;
+    }
+  }
+
+  // checks (before a call) that a '{shared}' reference can be resolved to a non-expired token
+  function ensureSharedTokenUsable(authValue) {
+    if (!usesSharedToken(authValue)) {
+      return true;
+    }
+    const token = getSharedToken();
+    if (!token) {
+      promptIssueSharedToken('The authorization refers to \'' + SHARED_AUTH_PLACEHOLDER + '\', but no shared token has been issued yet.');
+      return false;
+    }
+    const expiresAt = tryGetJwtExpiry(token);
+    if (expiresAt && expiresAt.getTime() < Date.now()) {
+      promptIssueSharedToken('The shared token (\'' + SHARED_AUTH_PLACEHOLDER + '\') expired at ' + expiresAt.toLocaleString() + '.');
+      return false;
+    }
+    return true;
+  }
+
+  // reacts on HTTP 401/403 when the call was made via the shared token
+  function handleAuthRejection(result, authValue) {
+    if (!result || !usesSharedToken(authValue)) {
+      return;
+    }
+    if (result.statusCode === 401 || result.statusCode === 403) {
+      promptIssueSharedToken('The service rejected the shared token (\'' + SHARED_AUTH_PLACEHOLDER + '\') with HTTP ' + result.statusCode + '.');
+    }
+  }
+
+  function setSharedAuthHeader(authHeader) {
+    ui.state.sharedAuthHeader = authHeader;
+    return callHost('setSharedAuthHeader', { authHeader: authHeader });
   }
 
   // ======================================================================
@@ -1267,6 +1631,15 @@
     loadData();
   }
 
+  // navigating to a FUSE contract (or data favorite) does not load data automatically
+  // (that would immediately trigger token requests) - the user starts loading via 'Reload'
+  function showDataLoadHint() {
+    if (!isDataModeActive()) {
+      return;
+    }
+    setDataStatus('Press \u21BB Reload to load the data.', false);
+  }
+
   function hasRepositoryMethod(name) {
     return ui.detail.methods.some((m) => m.name === name);
   }
@@ -1281,17 +1654,22 @@
     const autoPlaceholder = '__UJMW_DATA_MODE_AUTO__';
     const request = Object.assign({ _: autoPlaceholder }, args);
     const requestText = JSON.stringify(request, null, 2).replace('"' + autoPlaceholder + '"', '{AUTO}');
+    const authValue = e.authInput.value;
+    if (!ensureSharedTokenUsable(authValue)) {
+      return Promise.reject(new Error('No usable shared token (\'' + SHARED_AUTH_PLACEHOLDER + '\').'));
+    }
 
     return callHost('execute', {
       typeFullName: detail.typeFullName,
       url: e.urlInput.value.trim(),
       methodName: methodName,
-      authHeader: e.authInput.value,
+      authHeader: authValue,
       sideChannel: e.sideChannelInput.value,
       zone: e.zoneInput.value.trim(),
       requestText: requestText
     }).then((result) => {
       ui.state.sideChannelText = e.sideChannelInput.value;
+      handleAuthRejection(result, authValue);
       if (result.kind !== 'Success') {
         throw new Error(methodName + ' failed:\n\n' + result.text);
       }
@@ -2821,19 +3199,67 @@
       {
         label: 'Delete',
         action: () => {
-          if (!confirm('Delete the preset "' + preset.name + '"?')) {
-            return;
-          }
-          callHost('deletePreset', { typeFullName: typeFullName, name: preset.name }).then((state) => {
-            const detail = ui.detail;
-            if (detail && detail.typeFullName === typeFullName && detail.loadedPresetName === preset.name) {
-              detail.loadedPresetName = null;
-            }
-            applyState(state);
-          }).catch(showError);
+          deletePreset(typeFullName, preset);
         }
       }
     ]);
+  }
+
+  function deletePreset(typeFullName, preset) {
+    if (!confirm('Delete the preset "' + preset.name + '"?')) {
+      return;
+    }
+    callHost('deletePreset', { typeFullName: typeFullName, name: preset.name }).then((state) => {
+      const detail = ui.detail;
+      if (detail && detail.typeFullName === typeFullName && detail.loadedPresetName === preset.name) {
+        detail.loadedPresetName = null;
+      }
+      applyState(state);
+    }).catch(showError);
+  }
+
+  function showRemoveContextMenu(event, removeAction) {
+    showContextMenu(event, [
+      {
+        label: 'Remove',
+        action: removeAction
+      }
+    ]);
+  }
+
+  function clearSelectionAndDetail() {
+    ui.selectedKey = null;
+    ui.detail = null;
+    showDetailPlaceholder();
+  }
+
+  function removeDll(path) {
+    callHost('removeDll', { path: path }).then((state) => {
+      const selectedParts = parseSelectedKey();
+      if (selectedParts && selectedParts[1] === path) {
+        clearSelectionAndDetail();
+      }
+      applyState(state);
+    }).catch(showError);
+  }
+
+  // removing a checked type is the same as unchecking it in the type selection
+  function removeType(path, fullName) {
+    callHost('removeType', { path: path, fullName: fullName }).then((state) => {
+      const selectedParts = parseSelectedKey();
+      const affectsSelection = selectedParts && selectedParts[0] !== 'dll' && selectedParts[1] === path && selectedParts[2] === fullName;
+      if (affectsSelection) {
+        clearSelectionAndDetail();
+      }
+      applyState(state);
+    }).catch(showError);
+  }
+
+  function parseSelectedKey() {
+    if (!ui.selectedKey) {
+      return null;
+    }
+    return JSON.parse(ui.selectedKey);
   }
 
   // ======================================================================
@@ -3113,6 +3539,7 @@
   function applyResolvedUrl(url) {
     ui.detail.elements.urlInput.value = url;
     updateAfterUrlVisibility();
+    scheduleContractSessionSave(ui.detail);
     touchCurrentUrl().catch(showError);
   }
 
@@ -3159,10 +3586,10 @@
           return;
         }
         resolveButton.disabled = true;
-        callHost('resolveUrls', { contractName: detail.typeFullName, zone: zone }).then((urls) => {
+        callHost('resolveUrls', { contractName: infrastructureContractName(detail), zone: zone }).then((urls) => {
           lookup.resolved = urls;
           if (urls.length === 0) {
-            alert('No URL was resolved for "' + detail.typeFullName + '" within zone "' + zone + '".');
+            alert('No URL was resolved for "' + infrastructureContractName(detail) + '" within zone "' + zone + '".');
           }
           renderList();
         }).catch(showError).finally(() => {
@@ -3309,7 +3736,7 @@
 
       const promote = (closePromote, newHost) => {
         const url = urlInput.value.trim();
-        const args = { contractName: detail.typeFullName, url: url };
+        const args = { contractName: infrastructureContractName(detail), url: url };
         if (newHost) {
           args.newHost = newHost;
         }
@@ -3436,7 +3863,7 @@
       lookup.pins = pins;
       renderList();
     }).catch(showError);
-    callHost('getWellknownEndpoints', { contractName: detail.typeFullName }).then((endpoints) => {
+    callHost('getWellknownEndpoints', { contractName: infrastructureContractName(detail) }).then((endpoints) => {
       lookup.wellknown = endpoints;
       renderList();
     }).catch((error) => {
@@ -3866,17 +4293,80 @@
     tokenOutput.rows = 4;
     tokenOutput.readOnly = true;
     const status = el('div', 'info');
-    const applyButton = button('Apply as "Bearer <token>"', () => {
-      authInput.value = 'Bearer ' + tokenOutput.value;
+    const useSharedButton = button('Use Token via \'' + SHARED_AUTH_PLACEHOLDER + '\'', () => {
+      setSharedAuthHeader('Bearer ' + tokenOutput.value).catch(showError);
+      authInput.value = SHARED_AUTH_PLACEHOLDER;
+      scheduleContractSessionSave(ui.detail);
       closeDialog();
-    }, 'primary');
-    applyButton.disabled = true;
+    }, 'primary', 'Stores the token persistently as shared token; the textbox only refers to it');
+    const useExplicitButton = button('Use Token EXPLICIT (persistable)', () => {
+      authInput.value = 'Bearer ' + tokenOutput.value;
+      scheduleContractSessionSave(ui.detail);
+      closeDialog();
+    }, null, 'Writes the token itself into the textbox (it is stored when saving a favorite)');
+    const applyBar = el('div', 'button-bar');
+    applyBar.append(useSharedButton, useExplicitButton);
+    useSharedButton.disabled = true;
+    useExplicitButton.disabled = true;
+
+    // tokens issued earlier within this session
+    const issuedRow = fieldRow('Issued in this session');
+    const issuedSelect = el('select');
+    issuedRow.appendChild(issuedSelect);
+
+    const renderIssuedTokens = (selectedToken) => {
+      issuedSelect.innerHTML = '';
+      const none = el('option', null, '(select a previously issued token)');
+      none.value = '';
+      issuedSelect.appendChild(none);
+      ui.issuedTokens.forEach((entry, index) => {
+        const option = el('option', null, describeIssuedToken(entry));
+        option.value = String(index);
+        if (entry.token === selectedToken) {
+          option.selected = true;
+        }
+        issuedSelect.appendChild(option);
+      });
+      issuedRow.classList.toggle('hidden', ui.issuedTokens.length === 0);
+    };
 
     const showToken = (token) => {
       tokenOutput.value = token;
-      applyButton.disabled = !token;
+      useSharedButton.disabled = !token;
+      useExplicitButton.disabled = !token;
       status.textContent = '';
     };
+
+    issuedSelect.addEventListener('change', () => {
+      const index = parseInt(issuedSelect.value, 10);
+      if (isNaN(index)) {
+        showToken('');
+        return;
+      }
+      showToken(ui.issuedTokens[index].token);
+    });
+
+    const rememberToken = (token, source) => {
+      if (!token) {
+        return;
+      }
+      ui.issuedTokens = ui.issuedTokens.filter((entry) => entry.token !== token);
+      ui.issuedTokens.unshift({ token: token, source: source, issuedAt: new Date() });
+      renderIssuedTokens(token);
+      showToken(token);
+    };
+
+    if (ui.issuedTokens.length > 0) {
+      renderIssuedTokens(ui.issuedTokens[0].token);
+      showToken(ui.issuedTokens[0].token);
+    } else {
+      renderIssuedTokens(null);
+      const sharedToken = getSharedToken();
+      if (sharedToken) {
+        showToken(sharedToken);
+        status.textContent = describeSharedToken(sharedToken);
+      }
+    }
 
     // JWT pane
     const algorithmRow = fieldRow('Algorithm');
@@ -3924,7 +4414,7 @@
       button('Generate', () => {
         callHost('generateJwt', { jwt: jwt }).then((token) => {
           ui.state.jwt = Object.assign({}, jwt);
-          showToken(token);
+          rememberToken(token, 'JWT ' + (jwt.algorithm || 'HS256'));
         }).catch((error) => {
           status.textContent = error.message;
         });
@@ -3993,7 +4483,7 @@
           if (result.cancelled) {
             status.textContent = 'Cancelled.';
           } else {
-            showToken(result.token);
+            rememberToken(result.token, 'OAuth ' + (oauth.clientId || ''));
           }
         }).catch((error) => {
           status.textContent = error.message;
@@ -4001,11 +4491,58 @@
       }, 'primary')
     );
 
-    body.append(tabs, jwtPane, oauthPane, el('div', 'info', 'Issued token'), tokenOutput, status, applyButton);
+    body.append(tabs, jwtPane, oauthPane, el('div', 'info', 'Issued token'), issuedRow, tokenOutput, status, applyBar);
 
     const closeDialog = openModal('Issue authorization token', body, [
       { label: 'Close', action: (close) => close() }
     ]);
+  }
+
+  // display text of the currently persisted shared token
+  function describeSharedToken(token) {
+    let text = 'Current shared token (' + SHARED_AUTH_PLACEHOLDER + ')';
+    const expiresAt = tryGetJwtExpiry(token);
+    if (expiresAt) {
+      if (expiresAt.getTime() < Date.now()) {
+        text += ' - expired ' + expiresAt.toLocaleString();
+      } else {
+        text += ' - expires ' + expiresAt.toLocaleString();
+      }
+    }
+    return text;
+  }
+
+  // display text of a session token: issue time, source and (if it is a JWT with 'exp') the expiry
+  function describeIssuedToken(entry) {
+    let text = entry.issuedAt.toLocaleTimeString() + ' \u2013 ' + entry.source;
+    const expiresAt = tryGetJwtExpiry(entry.token);
+    if (expiresAt) {
+      if (expiresAt.getTime() < Date.now()) {
+        text += ' (expired ' + expiresAt.toLocaleTimeString() + ')';
+      } else {
+        text += ' (expires ' + expiresAt.toLocaleTimeString() + ')';
+      }
+    }
+    return text;
+  }
+
+  // returns the 'exp' claim of a JWT as Date or null (opaque tokens are not decodable)
+  function tryGetJwtExpiry(token) {
+    const parts = token.split('.');
+    if (parts.length < 2) {
+      return null;
+    }
+    try {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '==='.slice((base64.length + 3) % 4);
+      const payload = JSON.parse(atob(padded));
+      if (typeof payload.exp !== 'number') {
+        return null;
+      }
+      return new Date(payload.exp * 1000);
+    } catch (error) {
+      return null;
+    }
   }
 
   // ======================================================================
@@ -4069,21 +4606,31 @@
   }
 
   function initKeyboard() {
-    document.getElementById('mainTree').addEventListener('keydown', (event) => {
+    const mainTree = document.getElementById('mainTree');
+
+    // the browser context menu is never shown in the tree (nodes without own menu simply do nothing)
+    mainTree.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
+
+    mainTree.addEventListener('keydown', (event) => {
       if (event.key !== 'Delete' || !ui.selectedKey) {
         return;
       }
-      const parts = JSON.parse(ui.selectedKey);
-      if (parts[0] !== 'dll') {
-        return;
+      const parts = parseSelectedKey();
+      if (parts[0] === 'dll') {
+        event.preventDefault();
+        removeDll(parts[1]);
+      } else if (parts[0] === 'type') {
+        event.preventDefault();
+        removeType(parts[1], parts[2]);
+      } else if (parts[0] === 'preset') {
+        const preset = ui.state.presets.find((p) => p.typeFullName === parts[2] && p.name === parts[3]);
+        if (preset) {
+          event.preventDefault();
+          deletePreset(parts[2], preset);
+        }
       }
-      event.preventDefault();
-      callHost('removeDll', { path: parts[1] }).then((state) => {
-        ui.selectedKey = null;
-        ui.detail = null;
-        showDetailPlaceholder();
-        applyState(state);
-      }).catch(showError);
     });
 
     document.addEventListener('keydown', (event) => {

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Web.UJMW;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -66,7 +67,7 @@ namespace UJMW.TestClient.Inspection {
     /// </summary>
     public static NamespaceDescriptor[] GetNamespaces(string assemblyPath) {
       EnsureFileExists(assemblyPath);
-      using (MetadataLoadContext context = CreateContext(assemblyPath)) {
+      using (MetadataLoadContext context = CreateContext(assemblyPath, false)) {
         Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
         Dictionary<string, List<TypeDescriptor>> typesByNamespace = new Dictionary<string, List<TypeDescriptor>>();
 
@@ -133,7 +134,7 @@ namespace UJMW.TestClient.Inspection {
     /// </summary>
     public static ContractDescriptor GetContract(string assemblyPath, string typeFullName) {
       EnsureFileExists(assemblyPath);
-      using (MetadataLoadContext context = CreateContext(assemblyPath)) {
+      using (MetadataLoadContext context = CreateContext(assemblyPath, false)) {
         Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
         Type type = assembly.GetType(typeFullName, false);
         if (type == null) {
@@ -145,27 +146,114 @@ namespace UJMW.TestClient.Inspection {
         contract.Summary = typeDocs.GetTypeSummary(type);
         contract.Warning = GetBaseTypeResolutionWarning(type);
         contract.FuseEntity = FuseRepositoryDetector.TryDetect(type);
-
-        List<MethodDescriptor> result = new List<MethodDescriptor>();
-        foreach (MethodInfo method in CollectMethods(type)) {
-          XmlDocReader methodDocs = typeDocs;
-          if (method.DeclaringType != null && method.DeclaringType.Assembly != assembly) {
-            methodDocs = XmlDocReader.ForAssembly(method.DeclaringType.Assembly);
-          }
-          MethodDescriptor descriptor = new MethodDescriptor();
-          descriptor.Name = method.Name;
-          descriptor.Signature = BuildSignature(method);
-          descriptor.RequestTemplate = RequestTemplateBuilder.BuildRequestTemplate(method);
-          descriptor.Summary = methodDocs.GetMethodSummary(method);
-          descriptor.ReturnTypeName = GetFriendlyTypeName(method.ReturnType);
-          descriptor.ReturnsDescription = methodDocs.GetMethodReturns(method);
-          descriptor.ReturnMembers = BuildMembers(method.ReturnType);
-          descriptor.Parameters = BuildParameters(method, methodDocs);
-          result.Add(descriptor);
-        }
-        contract.Methods = result.ToArray();
+        contract.QualifyingContractName = UjmwContractNaming.GetQualifyingContractName(type);
+        contract.Methods = BuildMethods(assembly, type, typeDocs);
         return contract;
       }
+    }
+
+    /// <summary>
+    /// Returns the contract of a synthetic FUSE repository ('IRepository&lt;TEntity, TKey&gt;') which is built
+    /// for an entity class of the assembly (the FUSE-fx contract assembly is resolved via MetadataLoadContext only).
+    /// </summary>
+    public static ContractDescriptor GetRepositoryContract(string assemblyPath, string entityFullName, string keyTypeFullName, string[] keyPropertyNames) {
+      EnsureFileExists(assemblyPath);
+      using (MetadataLoadContext context = CreateContext(assemblyPath, true)) {
+        Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
+        Type entityType = assembly.GetType(entityFullName, false);
+        if (entityType == null) {
+          throw new InvalidOperationException($"Type '{entityFullName}' was not found in '{assemblyPath}'.");
+        }
+        Type repositoryType = FuseRepositoryDetector.MakeRepositoryType(context, entityType, keyTypeFullName, keyPropertyNames);
+        XmlDocReader entityDocs = XmlDocReader.ForAssemblyPath(assemblyPath);
+        ContractDescriptor contract = new ContractDescriptor();
+        contract.HasDocumentationFile = File.Exists(Path.ChangeExtension(assemblyPath, ".xml"));
+        contract.Summary = entityDocs.GetTypeSummary(entityType);
+        contract.Warning = GetBaseTypeResolutionWarning(repositoryType);
+        contract.FuseEntity = FuseRepositoryDetector.TryDetect(repositoryType, keyPropertyNames);
+        contract.QualifyingContractName = UjmwContractNaming.GetQualifyingContractName(repositoryType);
+        contract.Methods = BuildMethods(repositoryType.Assembly, repositoryType, XmlDocReader.ForAssembly(repositoryType.Assembly));
+        return contract;
+      }
+    }
+
+    /// <summary>
+    /// Returns the information which is required to choose the key of an entity class
+    /// (properties, base types and the automatically resolved key properties).
+    /// </summary>
+    public static EntityClassDescriptor GetEntityClass(string assemblyPath, string typeFullName) {
+
+      EnsureFileExists(assemblyPath);
+      using (MetadataLoadContext context = CreateContext(assemblyPath, false)) {
+
+        Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
+        Type type = assembly.GetType(typeFullName, false);
+        if (type == null) {
+          throw new InvalidOperationException($"Type '{typeFullName}' was not found in '{assemblyPath}'.");
+        }
+
+        EntityClassDescriptor descriptor = new EntityClassDescriptor();
+        descriptor.FullName = type.FullName;
+        descriptor.DisplayName = GetDisplayTypeName(type);
+
+        List<PropertyInfo> properties = FuseRepositoryDetector.GetEntityProperties(type);
+        List<EntityPropertyDescriptor> propertyDescriptors = new List<EntityPropertyDescriptor>();
+        foreach (PropertyInfo property in properties) {
+          EntityPropertyDescriptor propertyDescriptor = new EntityPropertyDescriptor();
+          propertyDescriptor.Name = property.Name;
+          propertyDescriptor.TypeName = GetFriendlyTypeName(property.PropertyType);
+          propertyDescriptor.TypeFullName = FuseRepositoryDetector.GetUnderlyingType(property.PropertyType).FullName;
+          propertyDescriptors.Add(propertyDescriptor);
+        }
+        descriptor.Properties = propertyDescriptors.ToArray();
+
+        List<BaseTypeDescriptor> baseTypes = new List<BaseTypeDescriptor>();
+        foreach (Type baseType in FuseRepositoryDetector.GetBaseTypes(type)) {
+          if (baseType.FullName == null) {
+            continue;
+          }
+          BaseTypeDescriptor baseTypeDescriptor = new BaseTypeDescriptor();
+          baseTypeDescriptor.FullName = baseType.FullName;
+          baseTypeDescriptor.DisplayName = GetFriendlyTypeName(baseType);
+          baseTypes.Add(baseTypeDescriptor);
+        }
+        descriptor.BaseTypes = baseTypes.ToArray();
+
+        string[] autoKeyPropertyNames = FuseRepositoryDetector.ResolveAutoKeyPropertyNames(type, properties);
+        descriptor.AutoKeyPropertyNames = autoKeyPropertyNames;
+        if (autoKeyPropertyNames.Length == 1) {
+          PropertyInfo keyProperty = properties.First((p) => p.Name == autoKeyPropertyNames[0]);
+          descriptor.AutoKeyTypeFullName = FuseRepositoryDetector.GetUnderlyingType(keyProperty.PropertyType).FullName;
+        }
+
+        return descriptor;
+      }
+    }
+
+    /// <summary>
+    /// Builds the method descriptors (UJMW operations) of a contract type.
+    /// </summary>
+    private static MethodDescriptor[] BuildMethods(Assembly assembly, Type type, XmlDocReader typeDocs) {
+
+      List<MethodDescriptor> result = new List<MethodDescriptor>();
+      foreach (MethodInfo method in CollectMethods(type)) {
+        XmlDocReader methodDocs = typeDocs;
+        if (method.DeclaringType != null && method.DeclaringType.Assembly != assembly) {
+          methodDocs = XmlDocReader.ForAssembly(method.DeclaringType.Assembly);
+        }
+        MethodDescriptor descriptor = new MethodDescriptor();
+        descriptor.Name = method.Name;
+        descriptor.Signature = BuildSignature(method);
+        descriptor.RequestTemplate = RequestTemplateBuilder.BuildRequestTemplate(method);
+        descriptor.Summary = methodDocs.GetMethodSummary(method);
+        descriptor.ReturnTypeName = GetFriendlyTypeName(method.ReturnType);
+        descriptor.ReturnsDescription = methodDocs.GetMethodReturns(method);
+        descriptor.ReturnMembers = BuildMembers(method.ReturnType);
+        descriptor.Parameters = BuildParameters(method, methodDocs);
+        result.Add(descriptor);
+      }
+
+      return result.ToArray();
     }
 
     /// <summary>
@@ -345,14 +433,24 @@ namespace UJMW.TestClient.Inspection {
     /// <summary>
     /// Creates a MetadataLoadContext which can resolve references from the folder of the inspected
     /// assembly and from all shared frameworks of the currently running .NET runtime.
+    /// When requested, the newest cached FUSE-fx packages are added as fallback (synthetic repository contracts).
     /// </summary>
-    private static MetadataLoadContext CreateContext(string assemblyPath) {
+    private static MetadataLoadContext CreateContext(string assemblyPath, bool includeFusePackages) {
       List<string> candidatePaths = new List<string>();
       candidatePaths.Add(assemblyPath);
 
       string assemblyDirectory = Path.GetDirectoryName(assemblyPath);
       candidatePaths.AddRange(Directory.GetFiles(assemblyDirectory, "*.dll"));
       candidatePaths.AddRange(GetPackageAssemblyPathsFromDepsFiles(assemblyDirectory));
+
+      if (includeFusePackages) {
+        HashSet<string> knownFileNames = new HashSet<string>(candidatePaths.Select((p) => Path.GetFileName(p)), StringComparer.OrdinalIgnoreCase);
+        foreach (string fusePath in GetCachedFusePackageAssemblyPaths()) {
+          if (knownFileNames.Add(Path.GetFileName(fusePath))) {
+            candidatePaths.Add(fusePath);
+          }
+        }
+      }
 
       DirectoryInfo runtimeDirectory = new DirectoryInfo(RuntimeEnvironment.GetRuntimeDirectory().TrimEnd('\\', '/'));
       candidatePaths.AddRange(Directory.GetFiles(runtimeDirectory.FullName, "*.dll"));
@@ -447,6 +545,76 @@ namespace UJMW.TestClient.Inspection {
       }
 
       return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+    }
+
+    private static readonly string[] _PreferredLibFolders = new string[] {
+      "net10.0", "net9.0", "net8.0", "net6.0", "netstandard2.1", "netstandard2.0", "net48", "net472", "net462", "net461"
+    };
+
+    /// <summary>
+    /// Returns the assemblies of the newest version of every cached 'fuse-fx.*' NuGet package
+    /// (metadata only - used to build synthetic repository contracts when the inspected DLL does not provide FUSE-fx).
+    /// </summary>
+    private static string[] GetCachedFusePackageAssemblyPaths() {
+
+      List<string> result = new List<string>();
+      string packagesRoot = GetNuGetPackagesRoot();
+      if (!Directory.Exists(packagesRoot)) {
+        return result.ToArray();
+      }
+
+      foreach (string packageDirectory in Directory.GetDirectories(packagesRoot, "fuse-fx.*")) {
+
+        string newestVersionDirectory = Directory.GetDirectories(packageDirectory)
+          .Select((d) => new KeyValuePair<Version, string>(ParsePackageVersion(Path.GetFileName(d)), d))
+          .Where((v) => v.Key != null)
+          .OrderByDescending((v) => v.Key)
+          .Select((v) => v.Value)
+          .FirstOrDefault();
+        if (newestVersionDirectory == null) {
+          continue;
+        }
+
+        string libDirectory = Path.Combine(newestVersionDirectory, "lib");
+        if (!Directory.Exists(libDirectory)) {
+          continue;
+        }
+
+        string selectedFolder = null;
+        foreach (string preferredFolder in _PreferredLibFolders) {
+          string candidate = Path.Combine(libDirectory, preferredFolder);
+          if (Directory.Exists(candidate)) {
+            selectedFolder = candidate;
+            break;
+          }
+        }
+        if (selectedFolder == null) {
+          continue;
+        }
+
+        result.AddRange(Directory.GetFiles(selectedFolder, "*.dll"));
+      }
+
+      return result.ToArray();
+    }
+
+    /// <summary>
+    /// Parses a NuGet version folder name (pre-release suffixes are ignored), null if it is no version.
+    /// </summary>
+    private static Version ParsePackageVersion(string folderName) {
+
+      string versionText = folderName;
+      int suffixIndex = versionText.IndexOf('-');
+      if (suffixIndex >= 0) {
+        versionText = versionText.Substring(0, suffixIndex);
+      }
+
+      Version version;
+      if (Version.TryParse(versionText, out version)) {
+        return version;
+      }
+
+      return null;
     }
 
     /// <summary>

@@ -115,6 +115,19 @@ namespace UJMW.TestClient.Bridge {
         case "toggleType":
           this.ToggleType(args.Value<string>("path"), args.Value<string>("fullName"), args.Value<string>("kind"));
           return this.BuildState();
+        case "removeType":
+          this.RemoveType(args.Value<string>("path"), args.Value<string>("fullName"));
+          return this.BuildState();
+        case "getEntityClass":
+          return JToken.FromObject(AssemblyInspector.GetEntityClass(args.Value<string>("path"), args.Value<string>("fullName")), _Serializer);
+        case "addRepository":
+          this.AddRepository(
+            args.Value<string>("path"),
+            args.Value<string>("entityFullName"),
+            args.Value<string>("keyTypeFullName"),
+            args["keyPropertyNames"].ToObject<string[]>()
+          );
+          return this.BuildState();
         case "getTypeDetail":
           return this.GetTypeDetail(args.Value<string>("path"), args.Value<string>("typeFullName"));
         case "setClientSettings":
@@ -175,6 +188,16 @@ namespace UJMW.TestClient.Bridge {
         case "deleteSideChannelTemplate":
           this.DeleteSideChannelTemplate(args.Value<string>("name"));
           return this.BuildState();
+        case "setContractSession":
+          this.SetContractSession(args.Value<string>("typeFullName"), args.Value<string>("url"));
+          return JValue.CreateNull();
+        case "setSharedAuthHeader":
+          this.Settings.SharedAuthHeader = args.Value<string>("authHeader");
+          if (this.Settings.SharedAuthHeader == null) {
+            this.Settings.SharedAuthHeader = string.Empty;
+          }
+          _Store.Save();
+          return JValue.CreateNull();
         case "setSideChannelText":
           this.Settings.SideChannelText = args.Value<string>("text");
           _Store.Save();
@@ -217,6 +240,7 @@ namespace UJMW.TestClient.Bridge {
       state["infrastructureSettings"] = JToken.FromObject(this.Settings.Infrastructure, _Serializer);
       state["oauth"] = JToken.FromObject(this.Settings.OAuth, _Serializer);
       state["sideChannelText"] = this.Settings.SideChannelText;
+      state["sharedAuthHeader"] = this.Settings.SharedAuthHeader;
       state["leftPanelWidth"] = this.Settings.LeftPanelWidth;
       return state;
     }
@@ -428,16 +452,77 @@ namespace UJMW.TestClient.Bridge {
     }
 
     /// <summary>
+    /// Removes a checked type (also a synthetic repository) from a DLL. Unknown types are ignored.
+    /// </summary>
+    private void RemoveType(string path, string fullName) {
+
+      DllEntry dll = this.FindDll(path);
+      dll.CheckedTypes = dll.CheckedTypes.Where((t) => t.FullName != fullName).ToArray();
+      _Store.Save();
+    }
+
+    /// <summary>
+    /// Adds a synthetic FUSE repository contract ('IRepository&lt;TEntity, TKey&gt;') for an entity class.
+    /// The contract is built once for validation (e.g. unresolvable key types or a missing FUSE-fx contract assembly).
+    /// </summary>
+    private void AddRepository(string path, string entityFullName, string keyTypeFullName, string[] keyPropertyNames) {
+
+      if (string.IsNullOrWhiteSpace(entityFullName)) {
+        throw new InvalidOperationException("The entity type is required.");
+      }
+      if (keyPropertyNames == null) {
+        keyPropertyNames = new string[0];
+      }
+      if (keyTypeFullName == null) {
+        keyTypeFullName = string.Empty;
+      }
+      if (keyPropertyNames.Length > 1) {
+        keyTypeFullName = string.Empty;
+      }
+
+      DllEntry dll = this.FindDll(path);
+      ContractDescriptor contract = AssemblyInspector.GetRepositoryContract(dll.Path, entityFullName, keyTypeFullName, keyPropertyNames);
+      if (contract.FuseEntity == null) {
+        throw new InvalidOperationException($"The repository contract for '{entityFullName}' could not be built.");
+      }
+
+      string displayName = "IRepository<" + contract.FuseEntity.EntityName + ", " + contract.FuseEntity.KeyTypeName + ">";
+      string fullName = "System.Data.Fuse.IRepository<" + entityFullName + ", " + contract.FuseEntity.KeyTypeName + ">";
+
+      List<CheckedType> checkedTypes = dll.CheckedTypes.Where((t) => t.FullName != fullName).ToList();
+      CheckedType checkedType = new CheckedType();
+      checkedType.FullName = fullName;
+      checkedType.Kind = AssemblyInspector._KindInterface;
+      checkedType.DisplayName = displayName;
+      checkedType.RepositoryEntityFullName = entityFullName;
+      checkedType.RepositoryKeyTypeFullName = keyTypeFullName;
+      checkedType.RepositoryKeyPropertyNames = keyPropertyNames;
+      checkedTypes.Add(checkedType);
+
+      dll.CheckedTypes = checkedTypes.OrderBy((t) => t.FullName, StringComparer.OrdinalIgnoreCase).ToArray();
+      _Store.Save();
+    }
+
+    /// <summary>
     /// Returns the methods of a type and its URL history.
     /// </summary>
     private JObject GetTypeDetail(string path, string typeFullName) {
       JObject detail = new JObject();
+      CheckedType repositoryType = this.Settings.Dlls
+        .SelectMany((d) => d.CheckedTypes)
+        .FirstOrDefault((t) => t.FullName == typeFullName && !string.IsNullOrEmpty(t.RepositoryEntityFullName));
       if (File.Exists(path)) {
-        ContractDescriptor contract = AssemblyInspector.GetContract(path, typeFullName);
+        ContractDescriptor contract;
+        if (repositoryType != null) {
+          contract = AssemblyInspector.GetRepositoryContract(path, repositoryType.RepositoryEntityFullName, repositoryType.RepositoryKeyTypeFullName, repositoryType.RepositoryKeyPropertyNames);
+        } else {
+          contract = AssemblyInspector.GetContract(path, typeFullName);
+        }
         detail["methods"] = JToken.FromObject(contract.Methods, _Serializer);
         detail["summary"] = contract.Summary;
         detail["hasDocumentationFile"] = contract.HasDocumentationFile;
         detail["warning"] = contract.Warning;
+        detail["contractQualifyingName"] = contract.QualifyingContractName;
         if (contract.FuseEntity != null) {
           detail["fuseEntity"] = JToken.FromObject(contract.FuseEntity, _Serializer);
         } else {
@@ -448,9 +533,20 @@ namespace UJMW.TestClient.Bridge {
         detail["summary"] = string.Empty;
         detail["hasDocumentationFile"] = false;
         detail["fuseEntity"] = JValue.CreateNull();
+        detail["contractQualifyingName"] = string.Empty;
         detail["warning"] = $"The file '{path}' does not exist (anymore) - methods can not be listed.";
       }
       detail["urlHistory"] = this.BuildUrlHistory(typeFullName);
+      ContractSession session = this.Settings.ContractSessions.FirstOrDefault((s) => s.TypeFullName == typeFullName);
+      if (session != null) {
+        detail["session"] = JToken.FromObject(session, _Serializer);
+      } else {
+        detail["session"] = JValue.CreateNull();
+      }
+      if (repositoryType != null) {
+        detail["contractRouteName"] = UjmwContractNaming.GetContractName(repositoryType.RepositoryEntityFullName, false);
+        return detail;
+      }
       bool isInterface = this.Settings.Dlls
         .SelectMany((d) => d.CheckedTypes)
         .Any((t) => t.FullName == typeFullName && t.Kind == AssemblyInspector._KindInterface);
@@ -489,6 +585,33 @@ namespace UJMW.TestClient.Bridge {
     #endregion
 
     #region " URL history "
+
+    /// <summary>
+    /// Stores the current URL of a contract, so that it is restored when the contract is selected again
+    /// (also after a restart of the application).
+    /// </summary>
+    private void SetContractSession(string typeFullName, string url) {
+
+      if (string.IsNullOrWhiteSpace(typeFullName)) {
+        return;
+      }
+
+      if (url == null) {
+        url = string.Empty;
+      }
+
+      ContractSession session = this.Settings.ContractSessions.FirstOrDefault((s) => s.TypeFullName == typeFullName);
+      if (session == null) {
+        session = new ContractSession();
+        session.TypeFullName = typeFullName;
+        List<ContractSession> sessions = this.Settings.ContractSessions.ToList();
+        sessions.Add(session);
+        this.Settings.ContractSessions = sessions.ToArray();
+      }
+
+      session.Url = url.Trim();
+      _Store.Save();
+    }
 
     /// <summary>
     /// Adds the URL to the history of the type or refreshes its last-used timestamp.
@@ -540,6 +663,11 @@ namespace UJMW.TestClient.Bridge {
     #region " Invocation "
 
     /// <summary>
+    /// Placeholder within the authorization textbox which refers to the shared (persisted) token.
+    /// </summary>
+    private const string _SharedAuthPlaceholder = "{shared}";
+
+    /// <summary>
     /// Persists the sidechannel text and invokes the UJMW operation on a worker thread.
     /// </summary>
     private void BeginExecute(long id, JObject args) {
@@ -557,6 +685,11 @@ namespace UJMW.TestClient.Bridge {
       }
       if (requestText == null) {
         requestText = string.Empty;
+      }
+
+      // the '{shared}' placeholder is replaced by the persisted shared authorization header
+      if (authHeader != null && authHeader.Contains(_SharedAuthPlaceholder)) {
+        authHeader = authHeader.Replace(_SharedAuthPlaceholder, this.Settings.SharedAuthHeader);
       }
 
       this.Settings.SideChannelText = sideChannel;

@@ -912,3 +912,11 @@ table.zones input {
   color: #555;
   margin: 6px 0;
 }
+
+/* class kind dialog (service / entity with key selection) */
+.class-kind-dialog .radio-row { display: block; margin: 3px 0; cursor: pointer; }
+.class-kind-dialog .key-section { margin-top: 8px; }
+.class-kind-dialog .key-group-title { margin: 8px 0 2px 0; font-weight: 600; }
+.class-kind-dialog .key-property-table { border-collapse: collapse; margin: 4px 0 0 22px; }
+.class-kind-dialog .key-property-table th, .class-kind-dialog .key-property-table td { padding: 2px 8px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+

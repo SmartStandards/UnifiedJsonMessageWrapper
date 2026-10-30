@@ -44,6 +44,19 @@ namespace System.Web.UJMW {
       return name;
     }
 
+    /// <summary>
+    /// Returns the qualifying contract name (without 'UJMW:' prefix and version) exactly as it is used within
+    /// the endpoint qualifying names (see 'BuildUjmwEndpointQualifyingName') - for example
+    /// 'System.Data.Fuse.IRepository_MyNamespace.Person_Int32' for a closed generic contract.
+    /// This is the name to be used for resolving contracts via an infrastructure.
+    /// </summary>
+    public static string GetQualifyingContractName(Type contractType) {
+      if (contractType == null) {
+        throw new ArgumentNullException(nameof(contractType));
+      }
+      return TypeAliasBuilder.BuildTypeAliasRecursive(contractType, false, 1, null);
+    }
+
   }
 
 }

@@ -21,6 +21,19 @@ namespace UJMW.TestClient.Invocation {
 
     private string _Kind = _KindSuccess;
     private string _Text = string.Empty;
+    private int _StatusCode = 0;
+
+    /// <summary>
+    /// HTTP status code of the response (0 if no response was received).
+    /// </summary>
+    public int StatusCode {
+      get {
+        return _StatusCode;
+      }
+      set {
+        _StatusCode = value;
+      }
+    }
 
     /// <summary>
     /// 'Success', 'Fault' (UJMW fault property was set) or 'Error' (HTTP/transport/protocol failure).
@@ -103,7 +116,9 @@ namespace UJMW.TestClient.Invocation {
           using (HttpResponseMessage response = _HttpClient.Send(request, timeoutSource.Token)) {
             string responseBody = ReadBody(response);
             stopwatch.Stop();
-            return EvaluateResponse(url, response, responseBody, stopwatch.ElapsedMilliseconds);
+            InvocationResult result = EvaluateResponse(url, response, responseBody, stopwatch.ElapsedMilliseconds);
+            result.StatusCode = (int)response.StatusCode;
+            return result;
           }
         }
       } catch (HttpRequestException ex) {

@@ -2,6 +2,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using UJMW.TestClient.Bridge;
@@ -24,6 +25,8 @@ namespace UJMW.TestClient {
       _Store = new SettingsStore();
 
       this.Text = "UJMW Test Client";
+      // reuse the ApplicationIcon (leaf.ico) embedded into the EXE as window icon
+      this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
       this.Width = 1400;
       this.Height = 900;
       this.StartPosition = FormStartPosition.CenterScreen;
@@ -41,6 +44,9 @@ namespace UJMW.TestClient {
       }
 
       this.Load += this.OnFormLoad;
+    }
+
+    private void MainForm_Load(object sender, EventArgs e) {
     }
 
     /// <summary>
@@ -67,12 +73,14 @@ namespace UJMW.TestClient {
       core.SetVirtualHostNameToFolderMapping(
         _VirtualHostName, Path.Combine(AppContext.BaseDirectory, "wwwroot"), CoreWebView2HostResourceAccessKind.Deny
       );
+
       core.Settings.IsStatusBarEnabled = false;
       core.Settings.IsZoomControlEnabled = true;
       core.WebMessageReceived += _Bridge.OnWebMessageReceived;
       core.NavigationStarting += this.OnNavigationStarting;
       core.NewWindowRequested += this.OnNewWindowRequested;
       core.Navigate("https://" + _VirtualHostName + "/index.html");
+
     }
 
     /// <summary>
@@ -84,6 +92,18 @@ namespace UJMW.TestClient {
         return;
       }
       e.Cancel = true;
+    }
+
+    private void InitializeComponent() {
+      this.SuspendLayout();
+      // 
+      // MainForm
+      // 
+      this.ClientSize = new System.Drawing.Size(284, 261);
+      this.Name = "MainForm";
+      this.Load += this.MainForm_Load;
+      this.ResumeLayout(false);
+
     }
 
     /// <summary>
