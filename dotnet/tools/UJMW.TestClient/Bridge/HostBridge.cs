@@ -839,7 +839,7 @@ namespace UJMW.TestClient.Bridge {
     /// </summary>
     private JObject BuildInfrastructureState(IUjmwManagedInfrastructure infrastructure) {
       JObject state = new JObject();
-      state["capabilities"] = JToken.FromObject(GetCapabilities(infrastructure), _Serializer);
+      state["capabilities"] = BuildCapabilities(GetCapabilities(infrastructure));
       state["zones"] = JToken.FromObject(EmptyIfNull(infrastructure.GetZones()), _Serializer);
       state["hosts"] = JToken.FromObject(EmptyIfNull(infrastructure.GetHosts()), _Serializer);
       state["oauthConfigurations"] = JToken.FromObject(EmptyIfNull(infrastructure.GetOAuthConfigurations()), _Serializer);
@@ -1023,6 +1023,22 @@ namespace UJMW.TestClient.Bridge {
         capabilities.OAuthConfigurationsReadOnly = true;
       }
       return capabilities;
+    }
+
+    /// <summary>
+    /// Maps the capabilities to explicit UI property names (the camel case resolver would
+    /// turn 'OAuthConfigurationsReadOnly' into 'oAuthConfigurationsReadOnly').
+    /// </summary>
+    private static JObject BuildCapabilities(UjmwInfrastructureCapabilities capabilities) {
+
+      JObject result = new JObject();
+      result["zonesReadOnly"] = capabilities.ZonesReadOnly;
+      result["hostsReadOnly"] = capabilities.HostsReadOnly;
+      result["wellknownEndpointsReadOnly"] = capabilities.WellknownEndpointsReadOnly;
+      result["oauthConfigurationsReadOnly"] = capabilities.OAuthConfigurationsReadOnly;
+      result["canResolve"] = capabilities.CanResolve;
+
+      return result;
     }
 
     /// <summary>

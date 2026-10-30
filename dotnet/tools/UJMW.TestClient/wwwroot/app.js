@@ -3667,9 +3667,11 @@
     const save = saveButton('Save zones', () => {
       callHost('saveInfrastructureZones', { zones: zones }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly('zonesReadOnly');
-    save.disabled = infrastructureIsReadOnly('zonesReadOnly');
-    pane.append(treeContainer, addButton, el('div', 'button-bar'), save);
+    if (infrastructureIsReadOnly('zonesReadOnly')) {
+      pane.append(treeContainer, el('div', 'info', 'The zones of the current store are read-only.'));
+    } else {
+      pane.append(treeContainer, addButton, el('div', 'button-bar'), save);
+    }
     return pane;
   }
 
@@ -3729,9 +3731,11 @@
     const save = saveButton('Save hosts', () => {
       callHost('saveInfrastructureHosts', { hosts: hosts }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly('hostsReadOnly');
-    save.disabled = infrastructureIsReadOnly('hostsReadOnly');
-    pane.append(container, addButton, el('div', 'button-bar'), save);
+    if (infrastructureIsReadOnly('hostsReadOnly')) {
+      pane.append(container, el('div', 'info', 'The hosts of the current store are read-only.'));
+    } else {
+      pane.append(container, addButton, el('div', 'button-bar'), save);
+    }
     return pane;
   }
 
@@ -3779,9 +3783,11 @@
     const save = saveButton('Save OAuth configurations', () => {
       callHost('saveOAuthConfigurations', { configurations: configurations }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly('oauthConfigurationsReadOnly');
-    save.disabled = infrastructureIsReadOnly('oauthConfigurationsReadOnly');
-    pane.append(container, addButton, el('div', 'button-bar'), save);
+    if (infrastructureIsReadOnly('oauthConfigurationsReadOnly')) {
+      pane.append(container, el('div', 'info', 'The OAuth configurations of the current store are read-only.'));
+    } else {
+      pane.append(container, addButton, el('div', 'button-bar'), save);
+    }
     return pane;
   }
 
