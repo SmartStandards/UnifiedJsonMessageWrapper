@@ -100,7 +100,10 @@ namespace System.Web.UJMW {
     /// </summary>
     public UjmwInfrastructureCapabilities GetCapabilities() {
       UjmwInfrastructureCapabilities capabilities = new UjmwInfrastructureCapabilities();
-      capabilities.IsReadOnly = false;
+      capabilities.ZonesReadOnly = false;
+      capabilities.HostsReadOnly = false;
+      capabilities.WellknownEndpointsReadOnly = false;
+      capabilities.OAuthConfigurationsReadOnly = false;
       capabilities.CanResolve = false;
       return capabilities;
     }

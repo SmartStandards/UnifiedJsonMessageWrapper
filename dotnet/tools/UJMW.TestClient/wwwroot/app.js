@@ -3026,7 +3026,7 @@
 
   function emptyInfrastructure() {
     return {
-      capabilities: { isReadOnly: true, canResolve: false },
+      capabilities: { zonesReadOnly: true, hostsReadOnly: true, wellknownEndpointsReadOnly: true, oauthConfigurationsReadOnly: true, canResolve: false },
       zones: [],
       hosts: [],
       oauthConfigurations: [],
@@ -3038,11 +3038,12 @@
     return !!(ui.infrastructure && ui.infrastructure.capabilities && ui.infrastructure.capabilities.canResolve);
   }
 
-  function infrastructureIsReadOnly() {
+  // area: 'zonesReadOnly' | 'hostsReadOnly' | 'wellknownEndpointsReadOnly' | 'oauthConfigurationsReadOnly'
+  function infrastructureIsReadOnly(area) {
     if (!ui.infrastructure || !ui.infrastructure.capabilities) {
       return true;
     }
-    return !!ui.infrastructure.capabilities.isReadOnly;
+    return !!ui.infrastructure.capabilities[area];
   }
 
   function applyInfrastructure(infrastructure) {
@@ -3054,12 +3055,28 @@
     refreshInfrastructureDependentControls();
   }
 
+  let infrastructureLoading = null;
+
   function loadInfrastructure() {
-    return callHost('getInfrastructure').then(applyInfrastructure).catch((error) => {
+    if (infrastructureLoading) {
+      return infrastructureLoading;
+    }
+    infrastructureLoading = callHost('getInfrastructure').then(applyInfrastructure).catch((error) => {
       const infrastructure = emptyInfrastructure();
       infrastructure.error = error.message;
       applyInfrastructure(infrastructure);
+    }).then(() => {
+      infrastructureLoading = null;
     });
+    return infrastructureLoading;
+  }
+
+  // returns the already loaded infrastructure state without waiting for the store (loads it only once)
+  function ensureInfrastructure() {
+    if (ui.infrastructure && !infrastructureLoading) {
+      return Promise.resolve();
+    }
+    return loadInfrastructure();
   }
 
   function flattenZones(zones, prefix, depth, target) {
@@ -3123,7 +3140,8 @@
     if (!detail) {
       return;
     }
-    const readOnly = infrastructureIsReadOnly();
+    const readOnly = infrastructureIsReadOnly('wellknownEndpointsReadOnly');
+    const hostsReadOnly = infrastructureIsReadOnly('hostsReadOnly');
     const lookup = { resolved: [], wellknown: [], pins: [], wellknownError: null };
     const body = el('div', 'url-lookup');
 
@@ -3284,7 +3302,10 @@
       const zoneInput = textInput(detail.elements.zoneInput.value.trim(), 'e.g. Production/EU');
       zoneRow.appendChild(zoneInput);
       createBox.append(hostRow, zoneRow);
-      promoteBody.append(urlRow, createBox);
+      promoteBody.appendChild(urlRow);
+      if (!hostsReadOnly) {
+        promoteBody.appendChild(createBox);
+      }
 
       const promote = (closePromote, newHost) => {
         const url = urlInput.value.trim();
@@ -3305,8 +3326,9 @@
         }).catch(showError);
       };
 
-      openSubModal('Promote pin into the store', promoteBody, [
-        {
+      const promoteActions = [];
+      if (!hostsReadOnly) {
+        promoteActions.push({
           label: 'Create in Zone',
           action: (closePromote) => {
             const hostUrl = hostInput.value.trim();
@@ -3316,10 +3338,11 @@
             }
             promote(closePromote, { hostUrl: hostUrl, zone: zoneInput.value.trim() });
           }
-        },
-        { label: 'Promote', className: 'primary', action: (closePromote) => promote(closePromote, null) },
-        { label: 'Cancel', action: (close) => close() }
-      ]);
+        });
+      }
+      promoteActions.push({ label: 'Promote', className: 'primary', action: (closePromote) => promote(closePromote, null) });
+      promoteActions.push({ label: 'Cancel', action: (close) => close() });
+      openSubModal('Promote pin into the store', promoteBody, promoteActions);
       urlInput.focus();
     };
 
@@ -3563,12 +3586,19 @@
       status.textContent = 'Current store is not available: ' + ui.infrastructure.error;
       status.className = 'warning';
     } else {
-      let text = 'Current store: ';
-      if (capabilities.isReadOnly) {
-        text = text + 'read-only';
-      } else {
-        text = text + 'editable';
-      }
+      const areas = [
+        ['zones', 'zonesReadOnly'],
+        ['hosts', 'hostsReadOnly'],
+        ['wellknown endpoints', 'wellknownEndpointsReadOnly'],
+        ['OAuth', 'oauthConfigurationsReadOnly']
+      ];
+      const areaTexts = areas.map((area) => {
+        if (capabilities[area[1]]) {
+          return area[0] + ' read-only';
+        }
+        return area[0] + ' editable';
+      });
+      let text = 'Current store: ' + areaTexts.join(', ');
       if (capabilities.canResolve) {
         text = text + ', supports url resolution';
       } else {
@@ -3626,7 +3656,7 @@
     const render = () => {
       treeContainer.innerHTML = '';
       renderLevel(treeContainer, zones, 0);
-      setReadOnly(treeContainer, infrastructureIsReadOnly());
+      setReadOnly(treeContainer, infrastructureIsReadOnly('zonesReadOnly'));
     };
     render();
 
@@ -3637,8 +3667,8 @@
     const save = saveButton('Save zones', () => {
       callHost('saveInfrastructureZones', { zones: zones }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly();
-    save.disabled = infrastructureIsReadOnly();
+    addButton.disabled = infrastructureIsReadOnly('zonesReadOnly');
+    save.disabled = infrastructureIsReadOnly('zonesReadOnly');
     pane.append(treeContainer, addButton, el('div', 'button-bar'), save);
     return pane;
   }
@@ -3688,7 +3718,7 @@
         box.appendChild(addApplication);
         container.appendChild(box);
       });
-      setReadOnly(container, infrastructureIsReadOnly());
+      setReadOnly(container, infrastructureIsReadOnly('hostsReadOnly'));
     };
     render();
 
@@ -3699,8 +3729,8 @@
     const save = saveButton('Save hosts', () => {
       callHost('saveInfrastructureHosts', { hosts: hosts }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly();
-    save.disabled = infrastructureIsReadOnly();
+    addButton.disabled = infrastructureIsReadOnly('hostsReadOnly');
+    save.disabled = infrastructureIsReadOnly('hostsReadOnly');
     pane.append(container, addButton, el('div', 'button-bar'), save);
     return pane;
   }
@@ -3738,7 +3768,7 @@
         );
         container.appendChild(box);
       });
-      setReadOnly(container, infrastructureIsReadOnly());
+      setReadOnly(container, infrastructureIsReadOnly('oauthConfigurationsReadOnly'));
     };
     render();
 
@@ -3749,8 +3779,8 @@
     const save = saveButton('Save OAuth configurations', () => {
       callHost('saveOAuthConfigurations', { configurations: configurations }).then(applyInfrastructure).catch(showError);
     });
-    addButton.disabled = infrastructureIsReadOnly();
-    save.disabled = infrastructureIsReadOnly();
+    addButton.disabled = infrastructureIsReadOnly('oauthConfigurationsReadOnly');
+    save.disabled = infrastructureIsReadOnly('oauthConfigurationsReadOnly');
     pane.append(container, addButton, el('div', 'button-bar'), save);
     return pane;
   }
@@ -3772,7 +3802,7 @@
         { label: 'Close', action: (close) => close() }
       ]);
     };
-    loadInfrastructure().then(show);
+    ensureInfrastructure().then(show);
   }
 
   // ======================================================================
@@ -3928,6 +3958,9 @@
         const configuration = configurations[index];
         Object.keys(oauthFieldInputs).forEach((property) => {
           oauth[property] = configuration[property] || '';
+          if (property === 'redirectUri' && !oauth[property].trim()) {
+            oauth[property] = 'http://localhost/oauth-callback';
+          }
           oauthFieldInputs[property].value = oauth[property];
         });
         oauth.usePkce = !!configuration.usePkce;
@@ -4081,8 +4114,6 @@
     callHost('getState').then((state) => {
       document.getElementById('leftPanel').style.width = state.leftPanelWidth + 'px';
       applyState(state);
-      return loadInfrastructure();
-    }).then(() => {
       return callHost('takeStartupDll');
     }).then((startupDllPath) => {
       if (!startupDllPath) {
@@ -4096,7 +4127,13 @@
           row.scrollIntoView({ block: 'nearest' });
         }
       }
-    }).catch(showError);
+    }).catch(showError).then(() => {
+      //the infrastructure store (provider DLL / external store) is initialized in the background
+      //only after the UI has been rendered
+      window.setTimeout(() => {
+        loadInfrastructure();
+      }, 50);
+    });
   }
 
   init();

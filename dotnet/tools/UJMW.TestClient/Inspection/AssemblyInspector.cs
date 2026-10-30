@@ -379,7 +379,7 @@ namespace UJMW.TestClient.Inspection {
     /// given folder and exist within the global NuGet packages folder. This makes references resolvable which
     /// are not copied next to the inspected assembly (e.g. the 'dist' output of a class library).
     /// </summary>
-    private static string[] GetPackageAssemblyPathsFromDepsFiles(string assemblyDirectory) {
+    internal static string[] GetPackageAssemblyPathsFromDepsFiles(string assemblyDirectory) {
 
       List<string> result = new List<string>();
       string packagesRoot = GetNuGetPackagesRoot();

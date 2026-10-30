@@ -11,7 +11,7 @@ namespace System.Web.UJMW {
   public interface IUjmwManagedInfrastructure {
 
     /// <summary>
-    /// Returns the capabilities of the store (read-only state and resolve support).
+    /// Returns the capabilities of the store (read-only state per area and resolve support).
     /// </summary>
     UjmwInfrastructureCapabilities GetCapabilities();
 
@@ -21,7 +21,7 @@ namespace System.Web.UJMW {
     UjmwInfrastructureZone[] GetZones();
 
     /// <summary>
-    /// Replaces the complete zone (area) tree (only supported if not read-only).
+    /// Replaces the complete zone (area) tree (only supported if not 'ZonesReadOnly').
     /// </summary>
     void SaveZones(UjmwInfrastructureZone[] rootZones);
 
@@ -31,7 +31,7 @@ namespace System.Web.UJMW {
     UjmwInfrastructureHost[] GetHosts();
 
     /// <summary>
-    /// Replaces all known hosts including their web applications (only supported if not read-only).
+    /// Replaces all known hosts including their web applications (only supported if not 'HostsReadOnly').
     /// </summary>
     void SaveHosts(UjmwInfrastructureHost[] hosts);
 
@@ -41,7 +41,7 @@ namespace System.Web.UJMW {
     UjmwOAuthConfiguration[] GetOAuthConfigurations();
 
     /// <summary>
-    /// Replaces all known OAuth configurations (only supported if not read-only).
+    /// Replaces all known OAuth configurations (only supported if not 'OAuthConfigurationsReadOnly').
     /// </summary>
     void SaveOAuthConfigurations(UjmwOAuthConfiguration[] configurations);
 
@@ -53,12 +53,12 @@ namespace System.Web.UJMW {
 
     /// <summary>
     /// Creates or updates a wellknown endpoint (identified by contract name, host url and web application name).
-    /// Only supported if not read-only.
+    /// Only supported if not 'WellknownEndpointsReadOnly'.
     /// </summary>
     void SaveWellknownEndpoint(UjmwWellknownEndpoint endpoint);
 
     /// <summary>
-    /// Deletes a wellknown endpoint (only supported if not read-only).
+    /// Deletes a wellknown endpoint (only supported if not 'WellknownEndpointsReadOnly').
     /// </summary>
     void DeleteWellknownEndpoint(string contractName, string hostUrl, string webApplicationName);
 
@@ -76,18 +76,74 @@ namespace System.Web.UJMW {
   /// </summary>
   public class UjmwInfrastructureCapabilities {
 
-    private bool _IsReadOnly = false;
+    private bool _ZonesReadOnly = false;
+    private bool _HostsReadOnly = false;
+    private bool _WellknownEndpointsReadOnly = false;
+    private bool _OAuthConfigurationsReadOnly = false;
     private bool _CanResolve = false;
 
     /// <summary>
-    /// If true, all 'Save...' and 'Delete...' methods are not supported.
+    /// If true, 'SaveZones' is not supported.
     /// </summary>
-    public bool IsReadOnly {
+    public bool ZonesReadOnly {
       get {
-        return _IsReadOnly;
+        return _ZonesReadOnly;
       }
       set {
-        _IsReadOnly = value;
+        _ZonesReadOnly = value;
+      }
+    }
+
+    /// <summary>
+    /// If true, 'SaveHosts' (hosts including their web applications) is not supported.
+    /// </summary>
+    public bool HostsReadOnly {
+      get {
+        return _HostsReadOnly;
+      }
+      set {
+        _HostsReadOnly = value;
+      }
+    }
+
+    /// <summary>
+    /// If true, 'SaveWellknownEndpoint' and 'DeleteWellknownEndpoint' are not supported.
+    /// </summary>
+    public bool WellknownEndpointsReadOnly {
+      get {
+        return _WellknownEndpointsReadOnly;
+      }
+      set {
+        _WellknownEndpointsReadOnly = value;
+      }
+    }
+
+    /// <summary>
+    /// If true, 'SaveOAuthConfigurations' is not supported.
+    /// </summary>
+    public bool OAuthConfigurationsReadOnly {
+      get {
+        return _OAuthConfigurationsReadOnly;
+      }
+      set {
+        _OAuthConfigurationsReadOnly = value;
+      }
+    }
+
+    /// <summary>
+    /// Compatibility shortcut: true if ALL areas are read-only. Setting the value applies it to all areas.
+    /// </summary>
+    [Obsolete("Use 'ZonesReadOnly', 'HostsReadOnly', 'WellknownEndpointsReadOnly' and 'OAuthConfigurationsReadOnly' instead.")]
+    [Newtonsoft.Json.JsonIgnore]
+    public bool IsReadOnly {
+      get {
+        return _ZonesReadOnly && _HostsReadOnly && _WellknownEndpointsReadOnly && _OAuthConfigurationsReadOnly;
+      }
+      set {
+        _ZonesReadOnly = value;
+        _HostsReadOnly = value;
+        _WellknownEndpointsReadOnly = value;
+        _OAuthConfigurationsReadOnly = value;
       }
     }
 

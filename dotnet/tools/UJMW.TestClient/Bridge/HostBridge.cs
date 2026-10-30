@@ -42,6 +42,8 @@ namespace UJMW.TestClient.Bridge {
       _Serializer = JsonSerializer.Create(serializerSettings);
     }
 
+    private const string _DefaultOAuthRedirectUri = "http://localhost/oauth-callback";
+
     private AppSettings Settings {
       get {
         return _Store.Current;
@@ -716,6 +718,7 @@ namespace UJMW.TestClient.Bridge {
 
     private readonly object _InfrastructureLock = new object();
     private IUjmwManagedInfrastructure _Infrastructure = null;
+    private InfrastructureSettings _InfrastructureCreatedFor = null;
 
     /// <summary>
     /// Applies the general client settings.
@@ -768,8 +771,9 @@ namespace UJMW.TestClient.Bridge {
     /// </summary>
     private IUjmwManagedInfrastructure GetInfrastructure(InfrastructureSettings infrastructureSettings) {
       lock (_InfrastructureLock) {
-        if (_Infrastructure == null) {
+        if (_Infrastructure == null || !ReferenceEquals(_InfrastructureCreatedFor, infrastructureSettings)) {
           _Infrastructure = InfrastructureProvider.Create(infrastructureSettings);
+          _InfrastructureCreatedFor = infrastructureSettings;
         }
         return _Infrastructure;
       }
@@ -783,34 +787,36 @@ namespace UJMW.TestClient.Bridge {
         case "getInfrastructure":
           return this.BuildInfrastructureState(infrastructure);
         case "saveInfrastructureZones":
-          EnsureWritable(infrastructure);
+          EnsureWritable(GetCapabilities(infrastructure).ZonesReadOnly, "zones");
           infrastructure.SaveZones(args["zones"].ToObject<UjmwInfrastructureZone[]>(_Serializer));
           return this.BuildInfrastructureState(infrastructure);
         case "saveInfrastructureHosts":
-          EnsureWritable(infrastructure);
+          EnsureWritable(GetCapabilities(infrastructure).HostsReadOnly, "hosts");
           infrastructure.SaveHosts(args["hosts"].ToObject<UjmwInfrastructureHost[]>(_Serializer));
           return this.BuildInfrastructureState(infrastructure);
         case "saveOAuthConfigurations":
-          EnsureWritable(infrastructure);
+          EnsureWritable(GetCapabilities(infrastructure).OAuthConfigurationsReadOnly, "OAuth configurations");
           infrastructure.SaveOAuthConfigurations(args["configurations"].ToObject<UjmwOAuthConfiguration[]>(_Serializer));
           return this.BuildInfrastructureState(infrastructure);
         case "getWellknownEndpoints":
           return this.BuildWellknownEndpoints(infrastructure, args.Value<string>("contractName"));
         case "saveWellknownEndpoint":
-          EnsureWritable(infrastructure);
+          EnsureWritable(GetCapabilities(infrastructure).WellknownEndpointsReadOnly, "wellknown endpoints");
           UjmwWellknownEndpoint endpoint = args["endpoint"].ToObject<UjmwWellknownEndpoint>(_Serializer);
           infrastructure.SaveWellknownEndpoint(endpoint);
           return this.BuildWellknownEndpoints(infrastructure, endpoint.ContractName);
         case "deleteWellknownEndpoint":
-          EnsureWritable(infrastructure);
+          EnsureWritable(GetCapabilities(infrastructure).WellknownEndpointsReadOnly, "wellknown endpoints");
           string contractName = args.Value<string>("contractName");
           infrastructure.DeleteWellknownEndpoint(contractName, args.Value<string>("hostUrl"), args.Value<string>("webApplicationName"));
           return this.BuildWellknownEndpoints(infrastructure, contractName);
         case "promotePinnedEndpoint":
-          EnsureWritable(infrastructure);
+          UjmwInfrastructureCapabilities promoteCapabilities = GetCapabilities(infrastructure);
+          EnsureWritable(promoteCapabilities.WellknownEndpointsReadOnly, "wellknown endpoints");
           string promotedContractName = args.Value<string>("contractName");
           JObject newHost = args["newHost"] as JObject;
           if (newHost != null) {
+            EnsureWritable(promoteCapabilities.HostsReadOnly, "hosts");
             this.CreateOrMergeHost(
               infrastructure,
               newHost.Value<string>("hostUrl"),
@@ -1011,18 +1017,23 @@ namespace UJMW.TestClient.Bridge {
       UjmwInfrastructureCapabilities capabilities = infrastructure.GetCapabilities();
       if (capabilities == null) {
         capabilities = new UjmwInfrastructureCapabilities();
-        capabilities.IsReadOnly = true;
+        capabilities.ZonesReadOnly = true;
+        capabilities.HostsReadOnly = true;
+        capabilities.WellknownEndpointsReadOnly = true;
+        capabilities.OAuthConfigurationsReadOnly = true;
       }
       return capabilities;
     }
 
     /// <summary>
-    /// Throws if the store is read-only.
+    /// Throws if the given area of the store is read-only.
     /// </summary>
-    private static void EnsureWritable(IUjmwManagedInfrastructure infrastructure) {
-      if (GetCapabilities(infrastructure).IsReadOnly) {
-        throw new InvalidOperationException("The current infrastructure store is read-only.");
+    private static void EnsureWritable(bool isReadOnly, string areaName) {
+
+      if (isReadOnly) {
+        throw new InvalidOperationException($"The {areaName} of the current infrastructure store are read-only.");
       }
+
     }
 
     /// <summary>
@@ -1093,6 +1104,12 @@ namespace UJMW.TestClient.Bridge {
     /// Persists the OAuth inputs and runs the code flow within a modal WebView2 dialog.
     /// </summary>
     private JToken StartOAuth(OAuthSettings oauthSettings) {
+
+      //configurations without redirect uri (e.g. from the infrastructure store) get the default on demand
+      if (string.IsNullOrWhiteSpace(oauthSettings.RedirectUri)) {
+        oauthSettings.RedirectUri = _DefaultOAuthRedirectUri;
+      }
+
       this.Settings.OAuth = oauthSettings;
       _Store.Save();
       using (OAuthCodeFlowDialog dialog = new OAuthCodeFlowDialog(oauthSettings)) {

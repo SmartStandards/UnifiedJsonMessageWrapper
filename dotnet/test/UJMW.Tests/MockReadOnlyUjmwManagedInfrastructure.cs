@@ -21,7 +21,10 @@ namespace System.Web.UJMW {
     public UjmwInfrastructureCapabilities GetCapabilities() {
 
       UjmwInfrastructureCapabilities capabilities = new UjmwInfrastructureCapabilities();
-      capabilities.IsReadOnly = true;
+      capabilities.ZonesReadOnly = true;
+      capabilities.HostsReadOnly = true;
+      capabilities.WellknownEndpointsReadOnly = true;
+      capabilities.OAuthConfigurationsReadOnly = true;
       capabilities.CanResolve = true;
 
       return capabilities;

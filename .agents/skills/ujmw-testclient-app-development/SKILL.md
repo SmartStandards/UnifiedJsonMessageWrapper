@@ -31,7 +31,8 @@ Location: `dotnet/tools/UJMW.TestClient` (solution folder `tools` inside `dotnet
 | JWT generation via `jose-jwt` | requirement |
 | Infrastructure data (zones as area tree, hosts with web applications, OAuth configurations, wellknown endpoints) is provided by `System.Web.UJMW.IUjmwManagedInfrastructure` (shared in `UJMW.DynamicClient`) | reusable contract; only infrastructure-relevant data, never user-specific presets/templates/JWT inputs |
 | Infrastructure source selectable in the settings: **Local** (`LocalUjmwManagedInfrastructure`, `%APPDATA%\UJMW.TestClient\infrastructure.json`), **External** (UJMW `DynamicClientFactory` proxy with URL + token) or a **registered store provider** (public, non-abstract class with public parameterless constructor implementing the interface, found in a regularly added DLL, registered by the user; the registration (`RegisteredProvider`: DLL path + type name) survives the removal of the DLL from the list; loaded into an own `AssemblyLoadContext`, `UJMW.DynamicClient` and all client assemblies are shared) | out-of-the-box usable locally, centrally manageable in organizations, custom stores without neighbour-DLL scanning |
-| Editing is only offered if `GetCapabilities().IsReadOnly == false`; Resolve only if `CanResolve == true` | capability-driven UI |
+Resolve only if `CanResolve == true` | capability-driven UI |
+| The infrastructure store/provider is created lazily in the background only after the UI has been rendered (startup never waits for it); the settings dialog uses the already loaded state | fast startup, settings dialog opens quickly, slow providers do not block the UI |
 | Target framework `net10.0-windows` | aligned with newest TFM of the solution |
 
 ## 3. Functional requirements
