@@ -233,3 +233,11 @@ public class EntryModule : IHttpModule {
   **IS STABLE** but discontinued (see '/Resources/for ASP.NET 5 MVC/...')
   The NuGet-Package ID is 'UJMW.Tools.CodeGen'
 
+
+
+# Documentation
+
+- [Changelog](doc/changelog.md)
+- [Decisions](doc/decisions/)
+- [Epics (future ideas)](doc/epics/)
+
