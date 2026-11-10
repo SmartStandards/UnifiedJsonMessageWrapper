@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
@@ -113,7 +114,8 @@ namespace System.Web.UJMW {
             List<MethodInfo> allMethods = new();
             CollectAllMethodsForType(contract, allMethods);
 
-            endpointMetadata["EndpointQualifyingName"] = $"UJMW:{contract.FullName}/{version}";
+            //same naming as 'BuildUjmwEndpointQualifyingName' of the DynamicClient (which is used for matching on client side)
+            endpointMetadata["EndpointQualifyingName"] = $"UJMW:{TypeAliasBuilder.BuildTypeAliasRecursive(contract, false, 1, null)}/{version}";
             endpointMetadata["ApiGroupName"] = controller.Value.ApiGroupName;
             //endpointMetadata["UJMW.ConcreteServiceInstanceTypeName"] = concreteServiceInstanceTypeName;
             endpointMetadata["UJMW.KnownMethods"] = allMethods.Where((mi)=> !mi.IsSpecialName).Select((mi) => mi.Name);
@@ -157,7 +159,7 @@ namespace System.Web.UJMW {
 
     }
 
-    public class DynamicControllerBase<TServiceInterface> : DynamicControllerBase, IDisposable {
+    public partial class DynamicControllerBase<TServiceInterface> : DynamicControllerBase, IDisposable {
 
       protected Func<TServiceInterface> _ServiceInstanceGetter = null;
 
@@ -254,16 +256,17 @@ namespace System.Web.UJMW {
       protected object InvokeMethod(string methodName, object requestDto) {
         try {
 
-          RedirectorMethodDelegate redirector = GetOrCreateRedirectorMethod(methodName, this);
+          MethodRedirector redirector = GetOrCreateRedirector(methodName, this);
 
-          object responseDto = redirector.Invoke(
+          object responseDto = redirector.InvokeSynchronous(
             _ServiceInstanceGetter,
             requestDto,
             this.HttpContext.Request.Headers,
             this.HttpContext.Response.Headers,
             _Options,
-            _ContextualArgumentCollector
-          );        
+            _ContextualArgumentCollector,
+            this.HttpContext.RequestAborted
+          );
 
           return responseDto;
         }
@@ -275,250 +278,154 @@ namespace System.Web.UJMW {
         }
       }
 
-      private delegate object RedirectorMethodDelegate(
-        Func<TServiceInterface> svcInstanceGetter,
-        object requestDto,
-        IHeaderDictionary requestHeaders,
-        IHeaderDictionary responseHeaders,
-        DynamicUjmwControllerOptions options,
-        ContextualArgumentCollectorDelegate contextualArgumentCollector
-      );
+      /// <summary>
+      /// Initiates a long-running operation (HTTP POST). Without the query parameter 'wait' the operation is
+      /// executed synchronously (100% backward compatible), otherwise it is handed over to the operation store.
+      /// WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHICH IS INHERITING FROM US!
+      /// </summary>
+      protected object InvokeLongRunningMethod(string methodName, object requestDto, string wait) {
+        try {
 
-      /// A Cache for the redirector methods
-      private static Dictionary<string, RedirectorMethodDelegate> _RedirectorMethods = new Dictionary<string, RedirectorMethodDelegate>();
+          MethodRedirector redirector = GetOrCreateRedirector(methodName, this);
 
-      private static RedirectorMethodDelegate GetOrCreateRedirectorMethod(string methodName, DynamicControllerBase<TServiceInterface> controller) {
-        lock (_RedirectorMethods) {
+          TimeSpan waitTime;
+          if (!TryParseWait(wait, out waitTime)) {
+
+            return redirector.InvokeSynchronous(
+              _ServiceInstanceGetter,
+              requestDto,
+              this.HttpContext.Request.Headers,
+              this.HttpContext.Response.Headers,
+              _Options,
+              _ContextualArgumentCollector,
+              this.HttpContext.RequestAborted
+            );
+
+          }
+
+          return redirector.InitiateAsync(
+            this.GetOperationScope(methodName),
+            _ServiceInstanceGetter,
+            requestDto,
+            this.HttpContext.Request.Headers,
+            this.HttpContext.Response.Headers,
+            _Options,
+            _ContextualArgumentCollector,
+            waitTime
+          );
+
+        }
+        catch (Exception ex) {
+          //LAST DEFENCE - SHOULD NEVER HAPPEN
+          DevLogger.LogCritical(ex.Wrap(72500, $"UJMW Operation '{methodName}' failed: {ex.Message}"));
+          this.HttpContext.Response.StatusCode = 500;
+          throw;
+        }
+      }
+
+      /// <summary>
+      /// Polls (HTTP GET) or requests the cancellation (HTTP DELETE) of a long-running operation.
+      /// The regular UJMW auth hooks have already been evaluated (by the action filter) at this point,
+      /// so only the 'pollingHash' verification is left (which is done by the operation store).
+      /// WILL BE INVOKED VIA EMITED CODE FROM DYNAMIC PROXY-FACADE WHICH IS INHERITING FROM US!
+      /// </summary>
+      protected object InvokeAsyncControl(string methodName, int controlKind, string asyncId, string pollingSalt, string pollingHash, string wait) {
+        try {
+
+          MethodRedirector redirector = GetOrCreateRedirector(methodName, this);
+          IUjmwOperationStore store = UjmwHostConfiguration.OperationStore;
+          string operationScope = this.GetOperationScope(methodName);
+
+          UjmwOperationSnapshot snapshot;
+          bool authenticated;
+
+          if (controlKind == (int)UjmwAsyncControlKind.Cancel) {
+
+            TimeSpan waitTime;
+            if (!TryParseWait(wait, out waitTime)) {
+              waitTime = TimeSpan.Zero;
+            }
+
+            authenticated = store.TryCancel(operationScope, asyncId, pollingSalt, pollingHash, waitTime, out snapshot);
+
+          }
+          else {
+            authenticated = store.TryPoll(operationScope, asyncId, pollingSalt, pollingHash, out snapshot);
+          }
+
+          if (!authenticated) {
+            //no information about the existence of the operation must be exposed
+            return redirector.CreateFaultResponse(UjmwAsyncProtocol._WrongPollingAuthFault);
+          }
+
+          return redirector.CreateResponseFromSnapshot(snapshot, this.HttpContext.Response.Headers);
+        }
+        catch (Exception ex) {
+          //LAST DEFENCE - SHOULD NEVER HAPPEN
+          DevLogger.LogCritical(ex.Wrap(72500, $"UJMW Operation '{methodName}' (async control) failed: {ex.Message}"));
+          this.HttpContext.Response.StatusCode = 500;
+          throw;
+        }
+      }
+
+      /// <summary>
+      /// Polls are only accepted for the same endpoint operation which has initiated the operation.
+      /// </summary>
+      private string GetOperationScope(string methodName) {
+        return this.GetType().FullName + "." + methodName;
+      }
+
+      /// <summary>
+      /// Parses the 'wait' query parameter (seconds, invariant culture). Returns false if not present or not parsable
+      /// (which leads to a synchronous execution - the same behaviour as an older UJMW server).
+      /// </summary>
+      private static bool TryParseWait(string wait, out TimeSpan waitTime) {
+
+        waitTime = TimeSpan.Zero;
+
+        if (string.IsNullOrWhiteSpace(wait)) {
+          return false;
+        }
+
+        double seconds;
+        if (!double.TryParse(wait, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds)) {
+          return false;
+        }
+
+        if (seconds > _MaxWaitSeconds) {
+          seconds = _MaxWaitSeconds;
+        }
+
+        if (seconds > 0) {
+          waitTime = TimeSpan.FromSeconds(seconds);
+        }
+
+        return true;
+      }
+
+      private const double _MaxWaitSeconds = 3600;
+
+      /// A Cache for the redirectors
+      private static Dictionary<string, MethodRedirector> _Redirectors = new Dictionary<string, MethodRedirector>();
+
+      private static MethodRedirector GetOrCreateRedirector(string methodName, DynamicControllerBase<TServiceInterface> controller) {
+
+        lock (_Redirectors) {
 
           string uniqueMethodName = controller.GetType().FullName + "." + methodName;
 
-          if (_RedirectorMethods.ContainsKey(uniqueMethodName)) {
-            return _RedirectorMethods[uniqueMethodName];
-          } //doing the expensive creaction of mapping code only once (on demand) and give the handles into a lambda:
-
-          Type contractType = typeof(TServiceInterface);
-          MethodInfo controllerMethod = controller.GetType().GetMethod(methodName);
-          MethodInfo contractMethod = contractType.GetMethod(methodName);
-          if (!DynamicUjmwControllerFactory.TryGetContractMethod(
-            contractType, methodName, out contractMethod
-          )) {
-            throw new Exception($"Cannot find a Method named '{methodName}' on Contract Interface '{contractType.FullName}'!");
+          MethodRedirector redirector;
+          if (_Redirectors.TryGetValue(uniqueMethodName, out redirector)) {
+            return redirector;
           }
 
-          Type requestDtoType = controllerMethod.GetParameters().Single().ParameterType;
-          Type responseDtoType = controllerMethod.ReturnType;
+          //doing the expensive creation of the mapping code only once (on demand)
+          redirector = new MethodRedirector(controller.GetType(), methodName);
+          _Redirectors[uniqueMethodName] = redirector;
 
-          var requestDtoValueMappers = new List<DtoValueMapper>();
-          var responseDtoValueMappers = new List<DtoValueMapper>();
-
-          ParameterInfo[] serviceMethodParams = contractMethod.GetParameters();
-          int paramCount = serviceMethodParams.Length;
-          for (int idx = 0; idx < paramCount; idx++) {
-            ParameterInfo param = serviceMethodParams[idx];
-            if (!param.IsOut) {
-              requestDtoValueMappers.Add(new DtoValueMapper(requestDtoType, responseDtoType, param.Name, idx));
-            }
-            if (param.IsOut || param.ParameterType.IsByRef) {
-              responseDtoValueMappers.Add(new DtoValueMapper(requestDtoType, responseDtoType, param.Name, idx));
-            }
-          }
-
-          PropertyInfo returnProp = null;
-          if (contractMethod.ReturnType != null && contractMethod.ReturnType != typeof(void)) {
-            returnProp = responseDtoType.GetProperty(UjmwReturnPropertyName);
-          }
-
-          PropertyInfo faultProp = responseDtoType.GetProperty(UjmwFaultPropertyName);
-
-          PropertyInfo requestSidechannelProp = requestDtoType.GetProperty(UjmwSideChannelPropertyName);
-          PropertyInfo responseSidechannelProp = responseDtoType.GetProperty(UjmwSideChannelPropertyName);
-
-          IncommingRequestSideChannelConfiguration inboundSideChannelCfg = UjmwHostConfiguration.GetRequestSideChannelConfiguration(typeof(TServiceInterface));
-          OutgoingResponseSideChannelConfiguration outboundSideChannelCfg = UjmwHostConfiguration.GetResponseSideChannelConfiguration(typeof(TServiceInterface));
-
-          /////////// lambda (mth) ////////////////////////////////////////////
-          RedirectorMethodDelegate mth = (
-            (svcInstanceGetter, requestDto, requestHeaders, responseHeaders, options, contextualArgumentCollector) => {
-
-              object responseDto = Activator.CreateInstance(responseDtoType);
-              object[] serviceMethodParams = new object[paramCount];
-
-              try {
-       
-                if(requestDto == null) {
-                  throw new Exception($"The request DTO is null or could not be deserialized!");
-                }
-
-                //map the in-args
-                foreach (DtoValueMapper requestDtoValueMapper in requestDtoValueMappers) {
-                  requestDtoValueMapper.MapRequestDtoToParam(requestDto, serviceMethodParams);
-                }
-
-                ///// RESTORE INCOMMING SIDECHANNEL /////
-
-                bool sideChannelReceived = false;
-                IDictionary<string, string> sideChannelContent = null;
-                foreach (string acceptedChannel in inboundSideChannelCfg.AcceptedChannels) {
-                  if (acceptedChannel == "_") {
-                    if (requestSidechannelProp != null) {
-                      var container = (IDictionary<string, string>)requestSidechannelProp.GetValue(requestDto);
-                      if (container != null) {
-                        sideChannelReceived = true;
-                        //overlay the endpoint-individual 'contextualArgument's
-                        contextualArgumentCollector.Invoke(ref container, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
-                        //now invoke the propagation into the ambience-room
-                        inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, container);
-                        break;
-                      }
-                    }
-                  }
-                  else { //lets look into the http header
-                    if(requestHeaders.TryGetValue(acceptedChannel,out string rawSideChannelContent)) {
-                      var serializer = new Newtonsoft.Json.JsonSerializer();
-                      sideChannelContent = JsonConvert.DeserializeObject<Dictionary<string, string>>(rawSideChannelContent);
-                      sideChannelReceived = true;
-                      //overlay the endpoint-individual 'contextualArgument's
-                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
-                      //now invoke the propagation into the ambience-room
-                      inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
-                      break;
-                    }
-                  }
-                }
-
-                if (!sideChannelReceived && inboundSideChannelCfg.AcceptedChannels.Length > 0) {
-                  if (inboundSideChannelCfg.SkipAllowed) {
-                    //if the whole getter is null, then (and only in this case) it will be a 'silent skip'
-                    if (inboundSideChannelCfg.DefaultsGetterOnSkip != null) {
-                      sideChannelContent = new Dictionary<string, string>();
-                      //also null (when the DefaultsGetterOnSkip sets the ref handle to null) can be passed to the processing method...
-                      inboundSideChannelCfg.DefaultsGetterOnSkip.Invoke(ref sideChannelContent);
-                      //overlay the endpoint-individual 'contextualArgument's
-                      contextualArgumentCollector.Invoke(ref sideChannelContent, inboundSideChannelCfg.ContextualArgumentsToOverlay, requestDto);
-                      //now invoke the propagation into the ambience-room
-                      inboundSideChannelCfg.ProcessingMethod.Invoke(contractMethod, sideChannelContent);
-                    }
-                  }
-                  else {
-                    string msg = "Rejected incomming request because of missing side channel";
-                    DevLogger.LogWarning(0, 72003, msg);
-                    throw new Exception(msg);
-                  }
-                }
-
-                if (UjmwHostConfiguration.EnableTraceMessagesForEveryIncommingRequest) {
-                  DevLogger.LogTrace(0, 72000, $"Invoking UJMW call to UJMW Operation '{contractMethod.Name}'");
-                }
-
-                ///// (end) RESTORE INCOMMING SIDECHANNEL /////
-
-                bool innerInvokeWasCalled = false;
-
-                //this encapsulation is only to support contextualization hooks exactly arround this closure... 
-                Action innerInvokeContextual = ()=> {
-                  innerInvokeWasCalled = true;
-
-                  TServiceInterface svc = svcInstanceGetter.Invoke();
-
-                  if (UjmwHostConfiguration.ArgumentPreEvaluator != null) {
-                    try {
-                      UjmwHostConfiguration.ArgumentPreEvaluator.Invoke(
-                        contractType, contractMethod, serviceMethodParams
-                      );
-                    }
-                    catch (TargetInvocationException ex) {
-                      throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72001", ex.InnerException);
-                    }
-                    catch (Exception ex) {
-                      throw new ApplicationException($"ArgumentPreEvaluator for '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72001", ex);
-                    }
-                  }
-
-                  //invoke the service method
-                  object returnVal;
-                  try {
-                    returnVal = contractMethod.Invoke(svc, serviceMethodParams);
-                  }
-                  catch (TargetInvocationException ex) {
-                    throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.InnerException.Message + " #72000", ex.InnerException);
-                  }
-                  catch (Exception ex) {
-                    throw new ApplicationException($"BL-Method '{contractMethod.Name}' has thrown an Exception: " + ex.Message + " #72000", ex);
-                  }
-
-                  //map the return value
-                  foreach (DtoValueMapper responseDtoValueMapper in responseDtoValueMappers) {
-                    responseDtoValueMapper.MapParamToResponseDto(serviceMethodParams, responseDto);
-                  }
-
-                  //map the out-/ref-args
-                  if (returnProp != null) {
-                    returnProp.SetValue(responseDto, returnVal);
-                  }
-
-                };
-
-                //routing over contextualization hook around the internal invoke...
-                if (options.ContextualizationHook != null) {
-                  IDictionary<string, string> contextualArguments = new Dictionary<string, string>();
-                  contextualArgumentCollector.Invoke(ref contextualArguments, Array.Empty<string>(), requestDto);
-                  options.ContextualizationHook.Invoke(contextualArguments, innerInvokeContextual);
-                  if (!innerInvokeWasCalled) {
-                    throw new Exception("The UJMW ContextualizationHook MUST NOT skip invoking the given inner action!");
-                  }
-                } else {
-                  innerInvokeContextual.Invoke();
-                }
-
-              }
-              catch (Exception ex) {
-
-                DevLogger.LogError(ex);
-
-                if (faultProp != null) {
-                  if (UjmwHostConfiguration.HideExeptionMessageInFaultProperty) {
-                    faultProp.SetValue(responseDto, "UJMW Invocation Error");
-                  }
-                  else {
-                    faultProp.SetValue(responseDto, ex.Message);
-                  }
-                }
-
-              }
-
-              ///// CAPTURE OUTGOING BACKCHANNEL /////
-              
-              if (outboundSideChannelCfg.ChannelsToProvide.Any()) {
-                var backChannelContainer = new Dictionary<string, string>();
-                outboundSideChannelCfg.CaptureMethod.Invoke(contractMethod, backChannelContainer);
-
-                //COLLECT THE DATA
-                string serializedSnapshot = null;
-                foreach (string channelName in outboundSideChannelCfg.ChannelsToProvide) {
-                  if (channelName == "_") {
-                    if (responseSidechannelProp != null) {
-                      responseSidechannelProp.SetValue(responseDto, backChannelContainer);
-                    }
-                  }
-                  else {
-                    if (serializedSnapshot == null) { //on-demand, but bufferred...
-                      serializedSnapshot = JsonConvert.SerializeObject(backChannelContainer);
-                    }
-                    responseHeaders.Add(channelName, serializedSnapshot);
-                  }
-                }
-
-              }
-
-              ///// (end) CAPTURE OUTGOING BACKCHANNEL /////
-
-              return responseDto;
-            }
-          );/////// end of lambda (mth) ////////////////////////////////////////
-
-          _RedirectorMethods[uniqueMethodName] = mth;
-          return mth;
+          return redirector;
         }
+
       }
 
     }

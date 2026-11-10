@@ -97,6 +97,20 @@ namespace UJMW.TestClient.Inspection {
     private string _ReturnsDescription = string.Empty;
     private ParameterDescriptor[] _Parameters = new ParameterDescriptor[0];
     private MemberDescriptor[] _ReturnMembers = new MemberDescriptor[0];
+    private bool _IsLongRunning = false;
+
+    /// <summary>
+    /// True, if the method declares a 'CancellationToken' parameter (UJMW long-running operation:
+    /// invoked via 'POST ?wait', polled via 'GET' and cancellable via 'DELETE').
+    /// </summary>
+    public bool IsLongRunning {
+      get {
+        return _IsLongRunning;
+      }
+      set {
+        _IsLongRunning = value;
+      }
+    }
 
     /// <summary>
     /// Documented properties/fields of the return type (only for complex types).
@@ -196,6 +210,46 @@ namespace UJMW.TestClient.Inspection {
     private bool _IsOptional = false;
     private string _Description = string.Empty;
     private MemberDescriptor[] _Members = new MemberDescriptor[0];
+    private bool _IsCancellationToken = false;
+    private bool _IsCallback = false;
+    private string[] _CallbackArgumentKinds = new string[0];
+
+    /// <summary>
+    /// True, if the parameter is the 'CancellationToken' of a long-running operation (never part of the request).
+    /// </summary>
+    public bool IsCancellationToken {
+      get {
+        return _IsCancellationToken;
+      }
+      set {
+        _IsCancellationToken = value;
+      }
+    }
+
+    /// <summary>
+    /// True, if the parameter is an 'Action&lt;...&gt;' callback (never part of the request,
+    /// its invocations are delivered within the '&lt;name&gt;Invokes' response property).
+    /// </summary>
+    public bool IsCallback {
+      get {
+        return _IsCallback;
+      }
+      set {
+        _IsCallback = value;
+      }
+    }
+
+    /// <summary>
+    /// Positional argument kinds of a callback ('string', 'int', 'bool' or 'other').
+    /// </summary>
+    public string[] CallbackArgumentKinds {
+      get {
+        return _CallbackArgumentKinds;
+      }
+      set {
+        _CallbackArgumentKinds = value;
+      }
+    }
 
     /// <summary>
     /// Documented properties/fields of the parameter type (only for complex types like 'MyMethodRequest').
@@ -317,6 +371,32 @@ namespace UJMW.TestClient.Inspection {
     private FuseEntityDescriptor _FuseEntity = null;
     private string _Warning = null;
     private string _QualifyingContractName = string.Empty;
+    private string _EndpointQualifyingName = string.Empty;
+    private string _ContractVersion = string.Empty;
+
+    /// <summary>
+    /// Full (local) endpoint qualifying name including the contract version, like 'UJMW:MyNamespace.IMyContract/1.2.3'.
+    /// </summary>
+    public string EndpointQualifyingName {
+      get {
+        return _EndpointQualifyingName;
+      }
+      set {
+        _EndpointQualifyingName = value;
+      }
+    }
+
+    /// <summary>
+    /// Version of the (local) contract assembly (3 parts, like '1.2.3').
+    /// </summary>
+    public string ContractVersion {
+      get {
+        return _ContractVersion;
+      }
+      set {
+        _ContractVersion = value;
+      }
+    }
 
     /// <summary>
     /// Contract name as used within UJMW endpoint qualifying names (generic arguments are joined via '_'),

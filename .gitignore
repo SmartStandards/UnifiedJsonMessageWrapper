@@ -343,3 +343,5 @@ healthchecksdb
 /dotnet/test/UJMW.DemoWebService/_AnnouncementInfo.txt
 /**/vendor/nuget
 /dotnet/test/UJMW.DemoWebService.net8.0/_AnnouncementInfo.txt
+/dotnet/src/UJMW.DynamicController/_splice_tmp.txt
+/dotnet/test/UJMW.DemoWebService.net10.0/_AnnouncementInfo.txt

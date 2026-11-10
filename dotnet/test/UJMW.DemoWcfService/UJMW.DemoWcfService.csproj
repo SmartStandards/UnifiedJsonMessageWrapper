@@ -42,22 +42,21 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="jose-jwt, Version=4.0.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\jose-jwt.4.0.1\lib\net461\jose-jwt.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="jose-jwt, Version=5.3.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\jose-jwt.5.3.0\lib\net472\jose-jwt.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\vendor\nuget\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="SmartAmbience, Version=2.4.8.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartAmbience.2.4.8\lib\net48\SmartAmbience.dll</HintPath>
+    <Reference Include="SmartAmbience, Version=3.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartAmbience.3.2.2\lib\net48\SmartAmbience.dll</HintPath>
     </Reference>
-    <Reference Include="SmartStandards.AuthTokenHandling, Version=5.1.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.5.1.0\lib\net48\SmartStandards.AuthTokenHandling.dll</HintPath>
+    <Reference Include="SmartStandards.AuthTokenHandling, Version=6.0.6.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartStandards.AuthTokenHandling.6.0.6\lib\net48\SmartStandards.AuthTokenHandling.dll</HintPath>
     </Reference>
-    <Reference Include="SmartStandards.Logging, Version=3.4.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\vendor\nuget\SmartStandards.Logging.3.4.3\lib\net48\SmartStandards.Logging.dll</HintPath>
+    <Reference Include="SmartStandards.Logging, Version=3.4.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\vendor\nuget\SmartStandards.Logging.3.4.4\lib\net48\SmartStandards.Logging.dll</HintPath>
     </Reference>
     <Reference Include="SwaggerWcf, Version=1.4.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\vendor\nuget\KornSW.SwaggerWcf.1.4.1\lib\net48\SwaggerWcf.dll</HintPath>

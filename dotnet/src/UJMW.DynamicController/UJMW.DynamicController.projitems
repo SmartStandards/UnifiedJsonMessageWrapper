@@ -15,8 +15,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DtoValueMapper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.DynamicControllerBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.MethodRedirector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\UJMW.DynamicClient\UjmwAsyncProtocol.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\AnnouncementTriggerEndpoint.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\EndpointInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\UJMW.DynamicClient\TypeAliasBuilder.cs" />
@@ -24,6 +26,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\SelfAnnouncementHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AuthHeaderInterceptorAttribute.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SpliceTmp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)XmlCommentAccessExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunning\IUjmwOperationStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunning\UjmwAsyncResponseState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunning\UjmwInMemoryOperationStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunning\UjmwLongRunningOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunning\UjmwOperationStoreHostedService.cs" />
   </ItemGroup>
 </Project>

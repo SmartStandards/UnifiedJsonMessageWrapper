@@ -211,6 +211,25 @@ namespace System.Web.UJMW {
     /// </summary>
     public static RequestErrorDiagnosticMethod RequestErrorDiagnosticHook { get; set; } = null;
 
+    /// <summary>
+    /// The 'wait' value (in seconds) which is sent when initiating a long-running operation
+    /// (= a contract method declaring a 'CancellationToken' parameter) and when requesting its cancellation.
+    /// After this time the server ends the HTTP request and the client continues with internal polling.
+    /// Default is 10 seconds (suitable for backend-to-backend calls). For UI layers about 2 seconds are recommended.
+    /// </summary>
+    public static int LongRunningWaitSeconds = 10;
+
+    /// <summary>
+    /// Used to sleep between the internal polls of a long-running operation (respecting the 'pollNbf').
+    /// The sleep must return early when the given token is cancelled.
+    /// Can be replaced (for example within unit tests).
+    /// </summary>
+    public static Action<TimeSpan, Threading.CancellationToken> PollSleeper { get; set; } = (
+      (TimeSpan delay, Threading.CancellationToken token) => {
+        token.WaitHandle.WaitOne(delay);
+      }
+    );
+
   }
 
 }

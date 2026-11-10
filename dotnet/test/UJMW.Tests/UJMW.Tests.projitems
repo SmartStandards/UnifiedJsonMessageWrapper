@@ -10,6 +10,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactoryTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicClientLongRunningTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwAsyncProtocolTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunningOperationStoreTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LongRunningEndToEndTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwExtensionsTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Mocks.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientTests.cs" />

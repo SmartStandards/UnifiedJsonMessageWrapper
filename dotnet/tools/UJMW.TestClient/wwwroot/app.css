@@ -491,8 +491,89 @@ details.section > .section-body {
 }
 
 .test-client h3 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 14px;
+}
+
+.test-client-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px 0;
+}
+
+/* ---------- contract version info (local vs. remote) ---------- */
+
+.version-info {
+  margin: 0;
+  font-size: 12px;
+  color: #000;
+  text-align: right;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.version-evaluate {
+  color: #4a7bd0;
+  text-decoration: none;
+}
+
+.version-evaluate:hover {
+  text-decoration: underline;
+}
+
+.version-status {
+  margin-left: 6px;
+}
+
+.version-status.version-na {
+  color: #7b1e2b;
+  font-weight: 600;
+}
+
+.version-status.version-pending {
+  color: #888;
+  font-style: italic;
+}
+
+.version-remote.version-match {
+  color: #1e8a2e;
+  font-weight: 600;
+}
+
+.version-remote.version-mismatch,
+.version-status.version-mismatch {
+  color: #e8200c;
+  font-weight: 700;
+}
+
+/* methods which are not provided by the remote endpoint (visual warning only - still invokable) */
+.combo.method-combo > select {
+  flex: 1;
+  min-width: 100px;
+}
+
+.combo-item.combo-item-selected {
+  background: #e5f1fb;
+}
+
+select.method-select option {
+  color: #000;
+  text-decoration: none;
+}
+
+select.method-select option.method-unavailable,
+select.method-select.method-unavailable,
+.combo-item.method-unavailable {
+  color: #7b1e2b;
+  text-decoration: line-through;
 }
 
 /* ---------- FUSE data mode ---------- */
@@ -713,6 +794,144 @@ details.section > .section-body {
   color: #666;
 }
 
+/* progress display of long-running operations (embedded above the result box) */
+.progress-panel {
+  border: 1px solid #ccd;
+  border-radius: 4px;
+  background: #f7f8fc;
+  padding: 6px 8px;
+  margin: 0 0 8px 0;
+}
+
+.progress-panel.progress-completed {
+  background: #f4fbf4;
+}
+
+.progress-panel.progress-failed {
+  background: #fde7e7;
+}
+
+.progress-panel.progress-cancelled {
+  background: #fdf6e3;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.progress-hourglass {
+  width: 1.2em;
+  text-align: center;
+}
+
+.progress-title {
+  flex: 1 1 auto;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-state {
+  color: #666;
+}
+
+.progress-stopwatch {
+  color: #666;
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+}
+
+.progress-poll-override {
+  color: #9aa3bb;
+  font-size: 0.85em;
+  text-decoration: none;
+}
+
+.progress-poll-override:hover {
+  color: #4a7bd0;
+  text-decoration: underline;
+}
+
+.progress-poll-override.disabled {
+  color: #bbb;
+  pointer-events: none;
+  cursor: default;
+}
+
+.progress-cancel.disabled {
+  color: #aaa;
+  pointer-events: none;
+  cursor: default;
+}
+
+.progress-bar {
+  position: relative;
+  height: 10px;
+  background: #e2e4ee;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0;
+  background: #4a7bd0;
+  transition: width 0.2s ease-out;
+}
+
+.progress-bar.indeterminate .progress-bar-fill {
+  position: absolute;
+  width: 30%;
+  transition: none;
+  animation: progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.progress-counter {
+  color: #555;
+  font-size: 0.9em;
+  min-height: 1.2em;
+  margin-top: 2px;
+}
+
+.progress-poll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.progress-poll-bar {
+  flex: 0 0 120px;
+  height: 4px;
+  background: #e2e4ee;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-poll-fill {
+  height: 100%;
+  width: 0;
+  background: #9aa3bb;
+}
+
+.progress-poll-label {
+  color: #777;
+  font-size: 0.85em;
+}
+
 /* parameter documentation as help side panel right of the request/response boxes */
 .test-client-columns {
   display: flex;
@@ -777,6 +996,23 @@ details.section > .section-body {
   margin: 4px 0 0 14px;
   padding-left: 8px;
   border-left: 2px solid #e0e0e0;
+}
+
+/* interface description (same look as the parameter documentation, full width, growing height) */
+.type-summary {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  background: #fbfbf4;
+  border: 1px solid #e3e3d0;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  color: #333;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .sub-modal-layer {

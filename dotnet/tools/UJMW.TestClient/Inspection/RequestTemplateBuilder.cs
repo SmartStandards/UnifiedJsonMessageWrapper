@@ -31,6 +31,32 @@ namespace UJMW.TestClient.Inspection {
       return _NamingStrategy.GetPropertyName(memberName, false);
     }
 
+    /// <summary>
+    /// Returns true for 'System.Threading.CancellationToken' (compared by name, because the type
+    /// originates from a MetadataLoadContext).
+    /// </summary>
+    public static bool IsCancellationTokenType(Type type) {
+      return (type.FullName == "System.Threading.CancellationToken");
+    }
+
+    /// <summary>
+    /// Returns true for 'System.Action' and closed generic 'System.Action&lt;...&gt;' (compared by name,
+    /// because the type originates from a MetadataLoadContext).
+    /// </summary>
+    public static bool IsCallbackType(Type type) {
+
+      if (type.FullName == "System.Action") {
+        return true;
+      }
+
+      if (!type.IsGenericType) {
+        return false;
+      }
+
+      Type genericDefinition = type.GetGenericTypeDefinition();
+      return (genericDefinition.Namespace == "System" && genericDefinition.Name.StartsWith("Action`", StringComparison.Ordinal));
+    }
+
     private static readonly HashSet<string> _CollectionDefinitions = new HashSet<string>() {
       "System.Collections.Generic.List`1",
       "System.Collections.Generic.IList`1",
@@ -72,6 +98,10 @@ namespace UJMW.TestClient.Inspection {
 
       foreach (ParameterInfo parameter in method.GetParameters()) {
         Type parameterType = parameter.ParameterType;
+        if (IsCancellationTokenType(parameterType) || IsCallbackType(parameterType)) {
+          //tokens and callbacks are never part of the request (UJMW long-running operations)
+          continue;
+        }
         if (parameterType.IsByRef) {
           if (parameter.IsOut) {
             //out-parameters are not part of the request

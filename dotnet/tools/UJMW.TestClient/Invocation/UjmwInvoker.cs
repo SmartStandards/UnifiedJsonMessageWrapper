@@ -22,6 +22,20 @@ namespace UJMW.TestClient.Invocation {
     private string _Kind = _KindSuccess;
     private string _Text = string.Empty;
     private int _StatusCode = 0;
+    private JObject _AsyncUpdate = null;
+
+    /// <summary>
+    /// Final state of a long-running operation (execState and the callback invocations of the last response),
+    /// null for classic invocations.
+    /// </summary>
+    public JObject AsyncUpdate {
+      get {
+        return _AsyncUpdate;
+      }
+      set {
+        _AsyncUpdate = value;
+      }
+    }
 
     /// <summary>
     /// HTTP status code of the response (0 if no response was received).
@@ -71,7 +85,7 @@ namespace UJMW.TestClient.Invocation {
   /// <summary>
   /// Executes UJMW calls via plain HTTP (wire protocol according to the 'ujmw' skill).
   /// </summary>
-  internal static class UjmwInvoker {
+  internal static partial class UjmwInvoker {
 
     /// <summary>
     /// Placeholder within the sidechannel content which is replaced by the selected zone.
@@ -187,6 +201,53 @@ namespace UJMW.TestClient.Invocation {
       }
       requestBody = parsedBody.ToString(Formatting.None);
       return true;
+    }
+
+    /// <summary>
+    /// Calls the info-endpoint (HTTP-GET on the root url of the service) and returns its raw response.
+    /// Never throws - any failure (timeout, transport error, non-2xx) results in 'false'.
+    /// </summary>
+    public static bool TryGetInfoEndpointResponse(string baseUrl, string authHeader, int timeoutSeconds, out string rawResponse) {
+
+      rawResponse = null;
+
+      if (string.IsNullOrWhiteSpace(baseUrl)) {
+        return false;
+      }
+
+      if (timeoutSeconds < 1) {
+        timeoutSeconds = 1;
+      }
+
+      string url = baseUrl.Trim().TrimEnd('/') + "/";
+
+      try {
+
+        using (CancellationTokenSource timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
+        using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url)) {
+
+          if (!string.IsNullOrWhiteSpace(authHeader)) {
+            request.Headers.TryAddWithoutValidation("Authorization", authHeader.Trim());
+          }
+
+          using (HttpResponseMessage response = _HttpClient.Send(request, timeoutSource.Token)) {
+
+            if (!response.IsSuccessStatusCode) {
+              return false;
+            }
+
+            rawResponse = ReadBody(response);
+            return true;
+          }
+
+        }
+
+      } catch (Exception) {
+        //the caller only distinguishes between 'metadata available' and 'not available' (no details are displayed)
+        rawResponse = null;
+        return false;
+      }
+
     }
 
     /// <summary>
