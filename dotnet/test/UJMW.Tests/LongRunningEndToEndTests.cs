@@ -80,6 +80,8 @@ namespace System.Web.UJMW {
 
   }
 
+#if NET10_0_OR_GREATER
+
   [TestClass]
   public class LongRunningEndToEndTests {
 
@@ -333,6 +335,7 @@ namespace System.Web.UJMW {
     }
 
   }
+#endif
 
 }
 #endif
