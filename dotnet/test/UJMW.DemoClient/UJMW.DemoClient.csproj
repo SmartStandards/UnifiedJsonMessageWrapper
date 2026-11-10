@@ -13,9 +13,13 @@
 
   <ItemGroup>
   
-    <PackageReference Include="SmartAmbience" Version="2.4.7" />
-    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="5.0.5" />
-    <PackageReference Include="SmartStandards.Logging" Version="3.3.1" />
+    <PackageReference Include="jose-jwt" Version="5.3.0" />
+  
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  
+    <PackageReference Include="SmartAmbience" Version="3.2.2" />
+    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="6.0.6" />
+    <PackageReference Include="SmartStandards.Logging" Version="3.4.4" />
 
     <!-- WCF-Ballast -->
     <PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />

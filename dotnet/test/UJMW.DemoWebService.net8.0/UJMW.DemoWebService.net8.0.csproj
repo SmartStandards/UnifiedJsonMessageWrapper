@@ -50,6 +50,8 @@
 
   <ItemGroup>
     
+    <PackageReference Include="jose-jwt" Version="5.3.0" />
+    
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.0" NoWarn="NU1605" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="5.0.17" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.0" NoWarn="NU1605" />
@@ -67,15 +69,15 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     
-    <PackageReference Include="SmartAmbience" Version="2.4.7" />
+    <PackageReference Include="SmartAmbience" Version="3.2.2" />
     <PackageReference Include="SmartAmbience.MvcSupport" Version="2.4.7" />
     
-    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="5.0.5" />
-    <PackageReference Include="SmartStandards.AuthTokenHandling.MvcSupport" Version="5.0.5" />
+    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="6.0.6" />
+    <PackageReference Include="SmartStandards.AuthTokenHandling.MvcSupport" Version="5.0.10" />
     
-    <PackageReference Include="SmartStandards.Logging" Version="3.4.3" />   
+    <PackageReference Include="SmartStandards.Logging" Version="3.4.4" />   
     <PackageReference Include="SmartStandards.Logging.AspSupport" Version="3.4.3" />
     <PackageReference Include="SmartStandards.Logging.Centralized" Version="3.4.3" />
     

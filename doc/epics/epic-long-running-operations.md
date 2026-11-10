@@ -440,6 +440,16 @@ A separate identity binding of operations is **not** provided – it is subsumed
 - **Integrations:** MCP exposure, Swagger / OpenAPI representation.
 - **WCF:** explicitly **not** implemented.
 
+### 8.1 Implementation progress
+
+| Area | State |
+|---|---|
+| Shared protocol primitives (`UjmwAsyncProtocol`: parameter classification, polling hash, secrets/salts, Fibonacci poll delay) | done |
+| .NET dynamic client (`POST ?wait` → `GET` polling respecting `pollNbf` → single `DELETE` on cancellation, callback replay in `#` order, `UjmwClientConfiguration.LongRunningWaitSeconds` / `PollSleeper`, new optional transport interface `IHttpRequestExecutor`; transports without it fall back to a synchronous `POST`) | done |
+| ASP.NET Core dynamic controller (pluggable `IUjmwOperationStore` with in-memory default bound to an `IHostedService`, emitted `GET` / `DELETE` actions, `POST ?wait` dispatch, outcome retention, callback buffering incl. freeze/overflow, sidechannel snapshot/restore; validated end-to-end over Kestrel with the .NET dynamic client) | done |
+| Swagger / OpenAPI representation (emitted `GET` / `DELETE` actions incl. `asyncId` / `pollingSalt` / `pollingHash` / `wait` query parameters and protocol documentation comments) | done |
+| TypeScript `CreateServiceProxy`, UJMW.TestClient, MCP | open |
+
 ---
 
 ## 9. Open questions (to be clarified)

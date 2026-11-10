@@ -332,6 +332,74 @@ namespace System.Web.UJMW {
     /// </summary>
     public static Action<Type, IDictionary<string, object>> EndpointInfoEnricher { get; set; } = null;
 
+    #region " Long-Running Operations "
+
+    private static readonly object _LongRunningSyncRoot = new object();
+    private static UjmwLongRunningOptions _LongRunningOptions = new UjmwLongRunningOptions();
+    private static IUjmwOperationStore _OperationStore = null;
+
+    /// <summary>
+    /// Configuration of the default (in-memory) operation store for long-running operations
+    /// (methods declaring a 'CancellationToken' parameter). Changes must be applied before the first
+    /// long-running operation is initiated, because the default store is created on demand.
+    /// </summary>
+    public static UjmwLongRunningOptions LongRunningOptions {
+      get {
+        lock (_LongRunningSyncRoot) {
+          return _LongRunningOptions;
+        }
+      }
+      set {
+        if (value == null) {
+          throw new ArgumentNullException(nameof(value));
+        }
+        lock (_LongRunningSyncRoot) {
+          _LongRunningOptions = value;
+        }
+      }
+    }
+
+    /// <summary>
+    /// The operation store which manages long-running operations (async execution, polling, cancellation and callbacks).
+    /// If not set explicitly, a 'UjmwInMemoryOperationStore' (using 'LongRunningOptions') is created on demand.
+    /// </summary>
+    public static IUjmwOperationStore OperationStore {
+      get {
+        lock (_LongRunningSyncRoot) {
+          if (_OperationStore == null) {
+            _OperationStore = new UjmwInMemoryOperationStore(_LongRunningOptions);
+          }
+          return _OperationStore;
+        }
+      }
+      set {
+        lock (_LongRunningSyncRoot) {
+          _OperationStore = value;
+        }
+      }
+    }
+
+    /// <summary>
+    /// Shuts down the operation store (if it has been created), so that all running operations get cancelled.
+    /// The store is detached afterwards, so that a host which is started again within the same process
+    /// gets a fresh store on demand (an explicitly configured store has to be configured again in this case).
+    /// </summary>
+    internal static void ShutdownOperationStore() {
+
+      IUjmwOperationStore store;
+      lock (_LongRunningSyncRoot) {
+        store = _OperationStore;
+        _OperationStore = null;
+      }
+
+      if (store != null) {
+        store.Shutdown();
+      }
+
+    }
+
+    #endregion
+
   }
 
 }

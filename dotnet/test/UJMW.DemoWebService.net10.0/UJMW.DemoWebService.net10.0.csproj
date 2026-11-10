@@ -57,6 +57,7 @@
   <ItemGroup>
   
      <!-- any additional MS-near references to get complete access to asp, is provided by this dependency-package: -->
+    <PackageReference Include="jose-jwt" Version="5.3.0" />
     <PackageReference Include="SmartStandards.WebApiDependencies.AspNetCore.net10.0" Version="10.0.0" />
 
      <!-- additional packages which are note implicitely provided by 'Microsoft.AspNetCore.App' -->
@@ -71,15 +72,15 @@
     <!-- intermediate (until we've completely switched to 'System.Text.Json' -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 
-    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="5.0.10" />
+    <PackageReference Include="SmartStandards.AuthTokenHandling" Version="6.0.6" />
     <PackageReference Include="SmartStandards.AuthTokenHandling.MvcSupport" Version="5.0.10" />
 
-    <PackageReference Include="SmartAmbience" Version="2.4.8" />
+    <PackageReference Include="SmartAmbience" Version="3.2.2" />
     <PackageReference Include="SmartAmbience.MvcSupport" Version="2.4.8" />
 
     <PackageReference Include="SmartStandards.Essentials" Version="0.8.0" />
 
-    <PackageReference Include="SmartStandards.Logging" Version="3.4.3" />
+    <PackageReference Include="SmartStandards.Logging" Version="3.4.4" />
     <PackageReference Include="SmartStandards.Logging.AspSupport" Version="3.4.3" />
 
     <PackageReference Include="Snowflake44" Version="3.7.0" />

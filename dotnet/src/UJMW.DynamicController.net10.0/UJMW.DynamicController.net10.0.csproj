@@ -47,11 +47,12 @@
     <!-- IMPORTANT: this package is made for the ASP.NET Core ecosystem ONLY -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
 
-    <!-- any additional MS-near references to get complete access to asp, is provided by this dependency-package: -->
-    <PackageReference Include="SmartStandards.WebApiDependencies.AspNetCore.net10.0" Version="10.0.0" />
+    <!-- any additional MS-near references to get complete access to asp, is provided by this dependency-package: --><!--
+    <PackageReference Include="SmartStandards.WebApiDependencies.AspNetCore.net10.0" Version="10.0.0" />-->
 
     <!-- additional packages which are note implicitely provided by 'Microsoft.AspNetCore.App' -->
     <!-- <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.8" /> -->
 
