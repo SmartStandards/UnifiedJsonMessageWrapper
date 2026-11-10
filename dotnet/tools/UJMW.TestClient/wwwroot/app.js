@@ -34,10 +34,27 @@
     });
   }
 
+  // like 'callHost', but additionally receives intermediate events ({event, id, update}) until the reply arrives;
+  // returns { id, promise } so that the request can be referenced (e.g. for a cancellation)
+  function callHostWithEvents(command, args, onEvent) {
+    const id = nextRequestId++;
+    const promise = new Promise((resolve, reject) => {
+      pendingRequests.set(id, { resolve: resolve, reject: reject, onEvent: onEvent });
+      window.chrome.webview.postMessage({ id: id, cmd: command, args: args });
+    });
+    return { id: id, promise: promise };
+  }
+
   window.chrome.webview.addEventListener('message', (event) => {
     const reply = event.data;
     const pending = pendingRequests.get(reply.id);
     if (!pending) {
+      return;
+    }
+    if (reply.event) {
+      if (pending.onEvent) {
+        pending.onEvent(reply);
+      }
       return;
     }
     pendingRequests.delete(reply.id);
@@ -946,7 +963,7 @@
     e.warningBox = el('div', 'warning hidden');
     panel.appendChild(e.warningBox);
 
-    e.typeSummary = el('div', 'doc-summary hidden');
+    e.typeSummary = el('div', 'doc-summary type-summary hidden');
     panel.appendChild(e.typeSummary);
 
     // zone
@@ -1034,11 +1051,14 @@
     // test client
     const testClient = el('section', 'test-client');
     e.testClient = testClient;
-    testClient.appendChild(el('h3', null, 'Test client'));
+    const testClientHeader = el('div', 'test-client-header');
+    e.versionInfo = createVersionInfoRow();
+    testClientHeader.append(el('h3', null, 'Test client'), e.versionInfo.root);
+    testClient.appendChild(testClientHeader);
     const methodRow = fieldRow('Method');
-    e.methodSelect = el('select');
+    e.methodSelect = el('select', 'method-select');
     e.methodSelect.addEventListener('change', applyMethodTemplate);
-    methodRow.appendChild(e.methodSelect);
+    methodRow.appendChild(createMethodDropdown(e.methodSelect));
     e.signature = el('div', 'signature code');
     e.methodSummary = el('div', 'doc-summary hidden');
     e.requestInput = el('textarea', 'code editor');
@@ -1050,7 +1070,7 @@
     e.executeStatus = el('span', 'execute-status');
     executeRow.append(
       e.executeButton,
-      button('\u2605', saveCurrentAsPreset, 'btn-star', 'Save this call (URL, authorization, sidechannel, method and request) as favorite'),
+      button('\uD83D\uDCBE', saveCurrentAsPreset, 'btn-star', 'Save this call (URL, authorization, sidechannel, method and request) as favorite'),
       e.executeStatus
     );
     e.resultOutput = el('textarea', 'code editor');
@@ -1058,10 +1078,11 @@
     e.resultOutput.readOnly = true;
     e.resultOutput.spellcheck = false;
     e.resultOutput.wrap = 'off';
+    e.progressPanel = createProgressPanel();
 
     const testClientColumns = el('div', 'test-client-columns');
     const editorColumn = el('div', 'editor-column');
-    editorColumn.append(e.requestInput, executeRow, e.resultOutput);
+    editorColumn.append(e.requestInput, executeRow, e.progressPanel.root, e.resultOutput);
     e.docColumn = el('div', 'doc-column');
     testClientColumns.append(editorColumn, e.docColumn);
     testClient.append(methodRow, e.signature, e.methodSummary, testClientColumns);
@@ -1076,6 +1097,10 @@
       detail.methods = result.methods;
       detail.contractRouteName = result.contractRouteName;
       detail.contractQualifyingName = result.contractQualifyingName;
+      detail.endpointQualifyingName = result.endpointQualifyingName || '';
+      detail.localVersion = result.localVersion || '';
+      detail.remoteContract = null;
+      detail.remoteContractUrl = null;
       detail.fuseEntity = null;
       if (result.fuseEntity) {
         detail.fuseEntity = result.fuseEntity;
@@ -1088,6 +1113,7 @@
         option.title = method.signature;
         e.methodSelect.appendChild(option);
       });
+      renderRemoteContractInfo();
       if (result.warning) {
         e.warningBox.textContent = result.warning;
         e.warningBox.classList.remove('hidden');
@@ -1127,6 +1153,8 @@
     if (!detail) {
       return;
     }
+    resetRemoteContractIfUrlChanged(detail);
+    scheduleAutoEvaluateRemoteContract(detail);
     const hasUrl = detail.elements.urlInput.value.trim().length > 0;
     const afterUrl = detail.elements.afterUrl;
     if (hasUrl) {
@@ -1140,6 +1168,244 @@
       control.disabled = !hasUrl;
     });
     updateDataCapabilityStates();
+  }
+
+  // ---------- contract version info (local vs. remote, session-only - never persisted) ----------
+
+  function createVersionInfoRow() {
+    const root = el('div', 'version-info');
+    const local = el('span', 'version-local');
+    const separator = el('span', 'version-separator', ' / ');
+    const remote = el('span', 'version-remote');
+    const link = el('a', 'version-evaluate', '(click to evaluate)');
+    link.href = '#';
+    link.title = 'Calls the root URL of the endpoint (info-endpoint) and compares the contract version and the provided methods';
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      evaluateRemoteContract();
+    });
+    const status = el('span', 'version-status');
+    root.append(local, separator, remote, link, status);
+    return { root: root, local: local, remote: remote, link: link, status: status };
+  }
+
+  function resetRemoteContractIfUrlChanged(detail) {
+    if (!detail.remoteContractUrl) {
+      return;
+    }
+    if (detail.remoteContractUrl === detail.elements.urlInput.value.trim()) {
+      return;
+    }
+    detail.remoteContract = null;
+    detail.remoteContractUrl = null;
+    renderRemoteContractInfo();
+  }
+
+  const AUTO_EVALUATE_DELAY_MS = 800;
+
+  function isEvaluableUrl(url) {
+    return /^https?:\/\/[^\/\s]+/i.test(url);
+  }
+
+  // evaluates the remote contract automatically (if enabled within the settings) as soon as a (new) valid URL is present
+  function scheduleAutoEvaluateRemoteContract(detail) {
+    if (detail.autoEvaluateTimer) {
+      clearTimeout(detail.autoEvaluateTimer);
+      detail.autoEvaluateTimer = null;
+    }
+    if (ui.state.autoEvaluateContractVersion !== true || !detail.loaded) {
+      return;
+    }
+    const url = detail.elements.urlInput.value.trim();
+    if (!isEvaluableUrl(url) || detail.remoteContractUrl === url) {
+      return;
+    }
+    detail.autoEvaluateTimer = setTimeout(() => {
+      detail.autoEvaluateTimer = null;
+      if (ui.detail !== detail) {
+        return;
+      }
+      const currentUrl = detail.elements.urlInput.value.trim();
+      if (isEvaluableUrl(currentUrl) && detail.remoteContractUrl !== currentUrl) {
+        evaluateRemoteContract();
+      }
+    }, AUTO_EVALUATE_DELAY_MS);
+  }
+
+  function evaluateRemoteContract() {
+    const detail = ui.detail;
+    if (!detail || !detail.loaded || detail.remoteContractPending) {
+      return;
+    }
+    const e = detail.elements;
+    const url = e.urlInput.value.trim();
+    if (!url) {
+      return;
+    }
+    detail.remoteContract = null;
+    detail.remoteContractUrl = url;
+    detail.remoteContractPending = true;
+    renderRemoteContractInfo();
+    callHost('evaluateRemoteContract', {
+      url: url,
+      authHeader: e.authInput.value,
+      endpointQualifyingName: detail.endpointQualifyingName
+    }).then((result) => {
+      return result;
+    }).catch(() => {
+      return { ok: false };
+    }).then((result) => {
+      detail.remoteContractPending = false;
+      // the result is discarded if the URL was changed (or the detail was closed) meanwhile
+      if (ui.detail !== detail || detail.remoteContractUrl !== url) {
+        renderRemoteContractInfo();
+        if (ui.detail === detail) {
+          scheduleAutoEvaluateRemoteContract(detail);
+        }
+        return;
+      }
+      detail.remoteContract = result || { ok: false };
+      renderRemoteContractInfo();
+    });
+  }
+
+  function renderRemoteContractInfo() {
+    const detail = ui.detail;
+    if (!detail) {
+      return;
+    }
+    const v = detail.elements.versionInfo;
+    const remote = detail.remoteContract;
+
+    v.local.textContent = "Local: '" + (detail.localVersion || '?') + "'";
+    v.status.textContent = '';
+    v.status.className = 'version-status';
+    v.remote.className = 'version-remote';
+
+    if (detail.remoteContractPending) {
+      v.remote.textContent = 'Remote: ';
+      v.link.classList.add('hidden');
+      v.status.textContent = 'evaluating\u2026';
+      v.status.classList.add('version-pending');
+    } else if (!remote) {
+      v.remote.textContent = 'Remote: ';
+      v.link.classList.remove('hidden');
+    } else if (!remote.ok) {
+      v.remote.textContent = 'Remote: ';
+      v.link.classList.remove('hidden');
+      v.status.textContent = 'N/A';
+      v.status.classList.add('version-na');
+    } else {
+      v.link.classList.add('hidden');
+      if (remote.compatible) {
+        v.remote.textContent = "Remote: '" + remote.remoteVersion + "'";
+        v.remote.classList.add('version-match');
+      } else {
+        let remoteName = remote.remoteEndpointQualifyingName;
+        if (!remoteName) {
+          remoteName = remote.remoteVersion;
+        }
+        v.remote.textContent = "Remote: '" + remote.remoteVersion + "'";
+        v.status.textContent = "Mismatch! Contract is '" + remoteName + "'";
+        v.status.classList.add('version-mismatch');
+        v.remote.classList.add('version-mismatch');
+      }
+    }
+
+    applyMethodAvailability();
+  }
+
+  function applyMethodAvailability() {
+    const detail = ui.detail;
+    const select = detail.elements.methodSelect;
+    let knownMethods = null;
+    if (detail.remoteContract && detail.remoteContract.ok && Array.isArray(detail.remoteContract.knownMethods)) {
+      knownMethods = detail.remoteContract.knownMethods;
+    }
+    Array.from(select.options).forEach((option) => {
+      const method = detail.methods ? detail.methods[parseInt(option.value, 10)] : null;
+      const unavailable = !!(knownMethods && method && knownMethods.indexOf(method.name) < 0);
+      option.classList.toggle('method-unavailable', unavailable);
+      if (method) {
+        option.textContent = method.name;
+        option.title = unavailable ? method.signature + '\n\n(not provided by the remote endpoint)' : method.signature;
+      }
+    });
+    const selected = select.selectedOptions.length > 0 ? select.selectedOptions[0] : null;
+    const selectedUnavailable = !!(selected && selected.classList.contains('method-unavailable'));
+    select.classList.toggle('method-unavailable', selectedUnavailable);
+    select.title = selectedUnavailable ? 'This method is not provided by the remote endpoint (it can be invoked anyway)' : '';
+  }
+
+  // the native popup of a select ignores 'text-decoration' - so the list is rendered by ourselves
+  // (the select stays the model: value, keyboard navigation and 'change' events)
+  function createMethodDropdown(select) {
+    const wrapper = el('div', 'combo method-combo');
+    const list = el('div', 'combo-list hidden');
+
+    const hideList = () => {
+      list.classList.add('hidden');
+    };
+
+    const showList = () => {
+      list.innerHTML = '';
+      let selectedEntry = null;
+      Array.from(select.options).forEach((option) => {
+        const entry = el('div', 'combo-item', option.textContent);
+        if (option.classList.contains('method-unavailable')) {
+          entry.classList.add('method-unavailable');
+        }
+        if (option.selected) {
+          entry.classList.add('combo-item-selected');
+          selectedEntry = entry;
+        }
+        entry.title = option.title;
+        entry.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          hideList();
+          if (select.value !== option.value) {
+            select.value = option.value;
+            select.dispatchEvent(new Event('change'));
+          }
+        });
+        list.appendChild(entry);
+      });
+      list.classList.remove('hidden');
+      if (selectedEntry) {
+        selectedEntry.scrollIntoView({ block: 'nearest' });
+      }
+    };
+
+    const toggleList = () => {
+      if (list.classList.contains('hidden')) {
+        showList();
+      } else {
+        hideList();
+      }
+    };
+
+    select.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      select.focus();
+      if (!select.disabled) {
+        toggleList();
+      }
+    });
+    select.addEventListener('keydown', (event) => {
+      if ((event.key === 'ArrowDown' && event.altKey) || event.key === 'F4') {
+        event.preventDefault();
+        toggleList();
+      } else if (event.key === 'Escape') {
+        hideList();
+      } else if (event.key === 'Enter' && !list.classList.contains('hidden')) {
+        event.preventDefault();
+        hideList();
+      }
+    });
+    select.addEventListener('blur', hideList);
+
+    wrapper.append(select, list);
+    return wrapper;
   }
 
   function currentMethod() {
@@ -1174,6 +1440,7 @@
   function renderMethodDocumentation() {
     const e = ui.detail.elements;
     const method = currentMethod();
+    applyMethodAvailability();
     e.docColumn.innerHTML = '';
     if (!method) {
       e.signature.textContent = '';
@@ -1365,26 +1632,449 @@
     e.resultOutput.value = '';
     e.resultOutput.className = 'code';
 
-    touchCurrentUrl().then(() => callHost('execute', {
+    const progress = e.progressPanel;
+    const longRunning = method.isLongRunning === true;
+    progress.start(method, longRunning);
+
+    const executeArgs = {
       typeFullName: detail.typeFullName,
       url: url,
       methodName: method.name,
       authHeader: e.authInput.value,
       sideChannel: e.sideChannelInput.value,
       zone: e.zoneInput.value.trim(),
-      requestText: e.requestInput.value
-    })).then((result) => {
+      requestText: e.requestInput.value,
+      longRunning: longRunning
+    };
+
+    touchCurrentUrl().then(() => {
+      const call = callHostWithEvents('execute', executeArgs, (message) => {
+        progress.update(message.update);
+        if (message.update && typeof message.update.log === 'string') {
+          e.resultOutput.value = message.update.log;
+          e.resultOutput.scrollTop = e.resultOutput.scrollHeight;
+        }
+      });
+      progress.setCancelHandler(() => callHost('cancelExecution', { executeId: call.id }).catch(showError));
+      progress.setPollOverrideHandler((fixedSeconds) => callHost('overrideNbfPolling', { executeId: call.id, fixedSeconds: fixedSeconds }).catch(showError));
+      return call.promise;
+    }).then((result) => {
       ui.state.sideChannelText = e.sideChannelInput.value;
+      progress.finish(result);
       e.resultOutput.value = result.text;
       e.resultOutput.className = 'code result-' + String(result.kind).toLowerCase();
       handleAuthRejection(result, e.authInput.value);
     }).catch((error) => {
+      progress.finish(null);
       e.resultOutput.value = error.message;
       e.resultOutput.className = 'code result-error';
     }).finally(() => {
       e.executeButton.disabled = false;
       e.executeStatus.textContent = '';
     });
+  }
+
+  // ======================================================================
+  //  progress display of long-running operations (embedded into the result pane)
+  //  conventions: see 'UShell.ServerCommands.Contract/doc/epic-ujmw-based-server-commands.md' (sections 4, 5, 7)
+  // ======================================================================
+
+  // the local timer (~ the 'wait' wish of the POST) after which the default animation is shown
+  const PROGRESS_OPEN_DELAY_MS = 2000;
+  const HOURGLASS_INTERVAL_MS = 250;
+  const HOURGLASS_FRAMES = ['\u231B', '\u23F3'];
+  const EXEC_STATE_LABELS = {
+    '-2': 'cancelled',
+    '-1': 'cancellation requested',
+    '0': 'queued',
+    '1': 'running',
+    '2': 'completed',
+    '3': 'failed'
+  };
+
+  function createProgressPanel() {
+    const root = el('div', 'progress-panel hidden');
+    const header = el('div', 'progress-header');
+    const hourglass = el('span', 'progress-hourglass');
+    const title = el('span', 'progress-title');
+    const stateLabel = el('span', 'progress-state');
+    const stopwatch = el('span', 'progress-stopwatch');
+    const cancelLink = el('a', 'progress-cancel', 'Cancel');
+    cancelLink.href = '#';
+    header.append(hourglass, title, stateLabel, stopwatch, cancelLink);
+
+    const bar = el('div', 'progress-bar');
+    const barFill = el('div', 'progress-bar-fill');
+    bar.appendChild(barFill);
+    const counter = el('div', 'progress-counter');
+
+    const pollRow = el('div', 'progress-poll');
+    const pollBar = el('div', 'progress-poll-bar');
+    const pollFill = el('div', 'progress-poll-fill');
+    pollBar.appendChild(pollFill);
+    const pollLabel = el('span', 'progress-poll-label');
+    const pollOverrideLink = el('a', 'progress-poll-override', 'activate FAST POLLING (ignore nbf)');
+    pollOverrideLink.href = '#';
+    pollOverrideLink.title = 'Ignores the \'pollNbf\' of the server and polls every 500 ms (like IUjmwClient.OverrideNbfPolling(0))';
+    pollRow.append(pollBar, pollLabel, pollOverrideLink);
+
+    root.append(header, bar, counter, pollRow);
+
+    const state = {
+      active: false,
+      label: '',
+      longRunning: false,
+      callbackKinds: {},
+      lastSequence: 0,
+      text: '',
+      current: null,
+      total: null,
+      callbackCancellable: true,
+      transportCancellable: false,
+      cancellationSent: false,
+      execState: null,
+      pollStart: 0,
+      pollDue: 0,
+      openTimer: null,
+      tickTimer: null,
+      tickCount: 0,
+      startTime: 0,
+      endTime: 0,
+      pollOverridden: false,
+      pollOverrideHandler: null,
+      cancelHandler: null
+    };
+
+    pollOverrideLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (state.pollOverridden || !state.pollOverrideHandler) {
+        return;
+      }
+      state.pollOverridden = true;
+      render();
+      state.pollOverrideHandler(0);
+    });
+
+    cancelLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (cancelLink.classList.contains('disabled') || !state.cancelHandler) {
+        return;
+      }
+      state.cancellationSent = true;
+      render();
+      state.cancelHandler();
+    });
+
+    function show() {
+      root.classList.remove('hidden');
+    }
+
+    function stopTimers() {
+      if (state.openTimer) {
+        clearTimeout(state.openTimer);
+        state.openTimer = null;
+      }
+      if (state.tickTimer) {
+        clearInterval(state.tickTimer);
+        state.tickTimer = null;
+      }
+    }
+
+    // progress callback: a callback parameter whose name contains 'progress' (case-insensitive)
+    function isProgressCallback(name) {
+      return String(name).toLowerCase().indexOf('progress') >= 0;
+    }
+
+    // determines the kind of an argument: by the declared callback signature, otherwise by the JSON value
+    function argumentKind(callbackName, index, value) {
+      const kinds = state.callbackKinds[callbackName];
+      if (kinds && index < kinds.length && kinds[index] !== 'other') {
+        return kinds[index];
+      }
+      if (typeof value === 'string') {
+        return 'string';
+      }
+      if (typeof value === 'boolean') {
+        return 'bool';
+      }
+      if (typeof value === 'number' && Number.isInteger(value)) {
+        return 'int';
+      }
+      return 'other';
+    }
+
+    // interprets one progress invocation by type and position; values not carried (or null) keep their state
+    function applyProgressInvocation(invocation) {
+      let textSeen = false;
+      let boolSeen = false;
+      let intIndex = 0;
+      let current = null;
+      let total = null;
+      invocation.args.forEach((value, index) => {
+        const kind = argumentKind(invocation.callback, index, value);
+        if (kind === 'string') {
+          if (!textSeen) {
+            textSeen = true;
+            if (typeof value === 'string') {
+              state.text = value;
+            }
+          }
+        } else if (kind === 'int') {
+          if (intIndex === 0 && typeof value === 'number') {
+            current = value;
+          } else if (intIndex === 1 && typeof value === 'number') {
+            total = value;
+          }
+          intIndex++;
+        } else if (kind === 'bool') {
+          if (!boolSeen) {
+            boolSeen = true;
+            if (typeof value === 'boolean') {
+              state.callbackCancellable = value;
+            }
+          }
+        }
+      });
+      if (current !== null) {
+        state.current = current;
+      }
+      if (total !== null) {
+        state.total = total;
+      }
+      // indicator for a contract declaring (total, current): swap
+      if (state.current !== null && state.total !== null && state.total > 1 && state.total < state.current) {
+        const swapped = state.current;
+        state.current = state.total;
+        state.total = swapped;
+      }
+    }
+
+    function applyInvocations(invocations) {
+      if (!invocations) {
+        return;
+      }
+      invocations.forEach((invocation) => {
+        if (invocation.seq <= state.lastSequence) {
+          return;
+        }
+        state.lastSequence = invocation.seq;
+        if (isProgressCallback(invocation.callback)) {
+          applyProgressInvocation(invocation);
+        }
+      });
+    }
+
+    function isCancelAvailable() {
+      if (!state.active || !state.longRunning || state.cancellationSent) {
+        return false;
+      }
+      return state.transportCancellable && state.callbackCancellable;
+    }
+
+    function render() {
+      let titleText = state.text;
+      if (!titleText) {
+        titleText = state.label;
+      }
+      title.textContent = titleText;
+
+      let stateText = '';
+      if (state.execState !== null && EXEC_STATE_LABELS[String(state.execState)]) {
+        stateText = EXEC_STATE_LABELS[String(state.execState)];
+      }
+      if (state.active && state.cancellationSent && state.execState !== -1 && state.execState !== -2) {
+        stateText = 'cancellation requested';
+      }
+      stateLabel.textContent = stateText;
+      renderStopwatch();
+
+      pollOverrideLink.classList.toggle('disabled', state.pollOverridden);
+      if (state.pollOverridden) {
+        pollOverrideLink.textContent = 'FAST POLLING active (nbf ignored)';
+      } else {
+        pollOverrideLink.textContent = 'activate FAST POLLING (ignore nbf)';
+      }
+
+      cancelLink.classList.toggle('hidden', !state.longRunning);
+      cancelLink.classList.toggle('disabled', !isCancelAvailable());
+
+      const determinate = state.total !== null && state.total > 0 && state.current !== null;
+      bar.classList.toggle('indeterminate', state.active && !determinate);
+      if (determinate) {
+        let percent = (state.current / state.total) * 100;
+        percent = Math.max(0, Math.min(100, percent));
+        barFill.style.width = percent + '%';
+        counter.textContent = state.current + ' / ' + state.total;
+      } else {
+        barFill.style.width = state.active ? '' : '100%';
+        if (state.current !== null) {
+          counter.textContent = String(state.current);
+        } else {
+          counter.textContent = '';
+        }
+      }
+
+      hourglass.textContent = state.active ? HOURGLASS_FRAMES[state.tickCount % HOURGLASS_FRAMES.length] : '';
+      renderPoll();
+    }
+
+    // the 'next poll' bar counts down to the 'pollNbf' of the next poll
+    function renderPoll() {
+      if (!state.active || state.pollDue === 0) {
+        pollRow.classList.add('hidden');
+        return;
+      }
+      pollRow.classList.remove('hidden');
+
+      // fast polling: the countdown is meaningless, so the bar and its label are deactivated
+      pollBar.classList.toggle('hidden', state.pollOverridden);
+      pollLabel.classList.toggle('hidden', state.pollOverridden);
+      if (state.pollOverridden) {
+        return;
+      }
+
+      const now = Date.now();
+      const duration = state.pollDue - state.pollStart;
+      let remaining = 0;
+      if (duration > 0) {
+        remaining = Math.max(0, Math.min(1, (state.pollDue - now) / duration));
+      }
+      pollFill.style.width = (remaining * 100) + '%';
+      pollLabel.textContent = 'next poll ' + new Date(state.pollDue).toLocaleTimeString();
+    }
+
+    function tick() {
+      state.tickCount++;
+      hourglass.textContent = HOURGLASS_FRAMES[state.tickCount % HOURGLASS_FRAMES.length];
+      renderStopwatch();
+      renderPoll();
+    }
+
+    // formats a duration as 'm:ss' (or 'h:mm:ss')
+    function formatDuration(milliseconds) {
+      const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const paddedSeconds = String(seconds).padStart(2, '0');
+      if (hours > 0) {
+        return hours + ':' + String(minutes).padStart(2, '0') + ':' + paddedSeconds;
+      }
+      return minutes + ':' + paddedSeconds;
+    }
+
+    // running: the elapsed time follows the state label - terminated: 'after m:ss' stays visible
+    function renderStopwatch() {
+      if (!state.longRunning || state.startTime === 0) {
+        stopwatch.textContent = '';
+        return;
+      }
+      if (state.active) {
+        stopwatch.textContent = formatDuration(Date.now() - state.startTime);
+      } else {
+        stopwatch.textContent = 'after ' + formatDuration(state.endTime - state.startTime);
+      }
+    }
+
+    return {
+      root: root,
+
+      start: function (method, longRunning) {
+        stopTimers();
+        state.active = true;
+        state.label = method.name;
+        state.longRunning = longRunning;
+        state.callbackKinds = {};
+        (method.parameters || []).forEach((parameter) => {
+          if (parameter.isCallback) {
+            state.callbackKinds[parameter.name] = parameter.callbackArgumentKinds || [];
+          }
+        });
+        state.lastSequence = 0;
+        state.text = '';
+        state.current = null;
+        state.total = null;
+        state.callbackCancellable = true;
+        state.transportCancellable = false;
+        state.cancellationSent = false;
+        state.execState = null;
+        state.pollStart = 0;
+        state.pollDue = 0;
+        state.tickCount = 0;
+        state.startTime = Date.now();
+        state.endTime = 0;
+        state.pollOverridden = ui.state.alwaysOverrideNbfPolling === true;
+        state.pollOverrideHandler = null;
+        state.cancelHandler = null;
+        root.classList.add('hidden');
+        root.classList.remove('progress-completed', 'progress-failed', 'progress-cancelled');
+        render();
+        // the local timer opens the display with the default animation (also for synchronous operations)
+        state.openTimer = setTimeout(() => {
+          state.openTimer = null;
+          show();
+        }, PROGRESS_OPEN_DELAY_MS);
+        state.tickTimer = setInterval(tick, HOURGLASS_INTERVAL_MS);
+      },
+
+      setCancelHandler: function (handler) {
+        state.cancelHandler = handler;
+      },
+
+      setPollOverrideHandler: function (handler) {
+        state.pollOverrideHandler = handler;
+      },
+
+      // intermediate state of an active operation: the display opens immediately with details
+      update: function (update) {
+        if (!state.active || !update) {
+          return;
+        }
+        state.execState = update.execState;
+        state.transportCancellable = update.cancellable === true;
+        if (update.cancellationSent) {
+          state.cancellationSent = true;
+        }
+        applyInvocations(update.invocations);
+        if (update.nextPollInMs >= 0) {
+          state.pollStart = Date.now();
+          state.pollDue = state.pollStart + update.nextPollInMs;
+        }
+        if (state.openTimer) {
+          clearTimeout(state.openTimer);
+          state.openTimer = null;
+        }
+        show();
+        render();
+      },
+
+      // final result: terminated operations which never opened the display stay hidden
+      finish: function (result) {
+        const wasVisible = !root.classList.contains('hidden');
+        stopTimers();
+        if (result && result.asyncUpdate) {
+          state.execState = result.asyncUpdate.execState;
+          applyInvocations(result.asyncUpdate.invocations);
+        }
+        state.active = false;
+        state.endTime = Date.now();
+        state.pollDue = 0;
+        if (!wasVisible) {
+          root.classList.add('hidden');
+          return;
+        }
+        if (state.execState === 2) {
+          root.classList.add('progress-completed');
+        } else if (state.execState === -2) {
+          root.classList.add('progress-cancelled');
+        } else if (state.execState === 3 || !result || result.kind !== 'Success') {
+          root.classList.add('progress-failed');
+        } else {
+          root.classList.add('progress-completed');
+        }
+        render();
+      }
+    };
   }
 
   function scheduleSideChannelSave(text) {
@@ -1707,7 +2397,7 @@
     d.byKeyButton = button('By key\u2026', openByKeyDialog, null, 'GetEntitiesByKey / GetEntityFieldsByKey / ContainsKey');
     d.columnsButton = button('Columns\u2026', openColumnsDialog, null, 'Choose visible columns (hidden columns switch the read access to GetEntityFields*)');
     d.infoButton = button('\u2139 Repository', openRepositoryInfoDialog, null, 'GetCapabilities / GetOriginIdentity and entity metadata');
-    d.starButton = button('\u2605', saveCurrentDataAsPreset, 'btn-star', 'Save this data view (URL, authorization, sidechannel, filter, sorting and page size) as favorite');
+    d.starButton = button('\uD83D\uDCBE', saveCurrentDataAsPreset, 'btn-star', 'Save this data view (URL, authorization, sidechannel, filter, sorting and page size) as favorite');
     toolbar.append(d.reloadButton, d.newButton, d.deleteSelectedButton, d.massupdateButton, d.byKeyButton, d.columnsButton, d.infoButton, d.starButton);
     panel.appendChild(toolbar);
 
@@ -3897,17 +4587,41 @@
     timeoutInput.min = '1';
     timeoutInput.value = String(ui.state.requestTimeoutSeconds);
     timeoutRow.appendChild(timeoutInput);
+    const autoEvaluateRow = el('label', 'checkbox-row');
+    const autoEvaluateInput = el('input');
+    autoEvaluateInput.type = 'checkbox';
+    autoEvaluateInput.checked = ui.state.autoEvaluateContractVersion === true;
+    autoEvaluateRow.append(autoEvaluateInput, el('span', null, 'Always evaluate the contract version of the remote endpoint automatically'));
+    const fastPollingRow = el('label', 'checkbox-row');
+    const fastPollingInput = el('input');
+    fastPollingInput.type = 'checkbox';
+    fastPollingInput.checked = ui.state.alwaysOverrideNbfPolling === true;
+    fastPollingRow.append(fastPollingInput, el('span', null, 'Always use FAST POLLING for long-running operations (ignore nbf)'));
     pane.append(
       timeoutRow,
       el('div', 'info', 'Maximum duration of a single request which is executed by the test client (default: 5 seconds).'),
+      autoEvaluateRow,
+      el('div', 'info', 'Calls the root URL (info-endpoint) as soon as a (new) valid URL is present and compares the contract version and the provided methods.'),
+      fastPollingRow,
+      el('div', 'info', 'Ignores the \'pollNbf\' of the server and polls every 500 ms (like IUjmwClient.OverrideNbfPolling(0)).'),
       saveButton('Save', () => {
         const seconds = parseInt(timeoutInput.value, 10);
         if (isNaN(seconds) || seconds < 1) {
           alert('The timeout must be at least 1 second.');
           return;
         }
-        callHost('setClientSettings', { requestTimeoutSeconds: seconds }).then(() => {
+        const settings = {
+          requestTimeoutSeconds: seconds,
+          autoEvaluateContractVersion: autoEvaluateInput.checked,
+          alwaysOverrideNbfPolling: fastPollingInput.checked
+        };
+        callHost('setClientSettings', settings).then(() => {
           ui.state.requestTimeoutSeconds = seconds;
+          ui.state.autoEvaluateContractVersion = settings.autoEvaluateContractVersion;
+          ui.state.alwaysOverrideNbfPolling = settings.alwaysOverrideNbfPolling;
+          if (ui.detail) {
+            scheduleAutoEvaluateRemoteContract(ui.detail);
+          }
         }).catch(showError);
       })
     );

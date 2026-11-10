@@ -29,7 +29,37 @@ namespace System.Web.UJMW {
 
   }
 
-  internal class WebClientBasedHttpPostExecutor : IHttpPostExecutor {
+  /// <summary>
+  /// Optional extension of 'IHttpPostExecutor' which supports explicit HTTP verbs.
+  /// It is required for the long-running operation protocol (POST to initiate, GET to poll, DELETE to cancel).
+  /// If a transport does not implement this interface, long-running operations fall back to a synchronous POST.
+  /// </summary>
+  public interface IHttpRequestExecutor {
+
+    /// <summary>
+    /// Executes a HTTP request using the given verb ('POST', 'GET' or 'DELETE').
+    /// </summary>
+    /// <param name="httpMethod">the HTTP verb</param>
+    /// <param name="url"></param>
+    /// <param name="requestContent">the request body (null for requests without content)</param>
+    /// <param name="requestHeaders"></param>
+    /// <param name="responseContent"></param>
+    /// <param name="responseHeaders"></param>
+    /// <param name="reasonPhrase"></param>
+    /// <returns>the HTTP status code</returns>
+    int ExecuteHttpRequest(
+      string httpMethod,
+      string url,
+      string requestContent,
+      IDictionary<string, string> requestHeaders,
+      out string responseContent,
+      out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
+      out string reasonPhrase
+    );
+
+  }
+
+  internal class WebClientBasedHttpPostExecutor : IHttpPostExecutor, IHttpRequestExecutor {
 
     private HttpClient _HttpClient;
     private Func<string> _AuthHeaderGetter;
@@ -50,10 +80,29 @@ namespace System.Web.UJMW {
       out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
       out string reasonPhrase
     ) {
-      HttpMethod httpM = HttpMethod.Post;
+
+      string httpMethod = "POST";
       if (requestContent == null) {
-        httpM = HttpMethod.Get;
+        httpMethod = "GET";
       }
+
+      return this.ExecuteHttpRequest(httpMethod, url, requestContent, requestHeaders, out responseContent, out responseHeaders, out reasonPhrase);
+    }
+
+    /// <summary>
+    /// Executes a HTTP request using the given verb ('POST', 'GET' or 'DELETE').
+    /// </summary>
+    public int ExecuteHttpRequest(
+      string httpMethod,
+      string url,
+      string requestContent,
+      IDictionary<string, string> requestHeaders,
+      out string responseContent,
+      out IEnumerable<KeyValuePair<string, IEnumerable<string>>> responseHeaders,
+      out string reasonPhrase
+    ) {
+
+      HttpMethod httpM = new HttpMethod(httpMethod.ToUpperInvariant());
 
       if (_AuthHeaderGetter != null) {
         if (_AuthHeaderCacheTime < DateTime.Now) {

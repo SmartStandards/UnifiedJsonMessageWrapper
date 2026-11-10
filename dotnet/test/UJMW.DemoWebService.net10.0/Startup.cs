@@ -181,6 +181,8 @@ namespace Security {
 
       services.AddSingleton<IContextualizationDemo>(new ContextualizationDemo());
 
+      services.AddSingleton<ILongRunningDemoService>(new LongRunningDemoService());
+
 
 
 
@@ -260,6 +262,11 @@ namespace Security {
           ControllerRoute = "CliService",
           EnableAuthHeaderEvaluatorHook = false,
           ApiGroupName = "CLI-Demo"
+        });
+
+        r.AddControllerFor<ILongRunningDemoService>(new DynamicUjmwControllerOptions {
+          ControllerRoute = "LongRunningDemo",
+          ApiGroupName = "LongRunning-Demo"
         });
 
         r.AddAnnouncementTriggerEndpoint();

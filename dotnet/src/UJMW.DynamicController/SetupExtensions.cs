@@ -18,6 +18,18 @@ namespace System.Web.UJMW {
         (apm) => apm.FeatureProviders.Add(registrar)
       );
 
+      //binds the lifetime of long-running operations to the application lifetime
+      bool hostedServiceRegistered = false;
+      foreach (ServiceDescriptor descriptor in services) {
+        if (descriptor.ImplementationType == typeof(UjmwOperationStoreHostedService)) {
+          hostedServiceRegistered = true;
+          break;
+        }
+      }
+      if (!hostedServiceRegistered) {
+        services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, UjmwOperationStoreHostedService>();
+      }
+
     }
 
     internal static bool TryGetValue(this IHeaderDictionary headers, string headerName, out string headerValue) {

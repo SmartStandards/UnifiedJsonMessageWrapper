@@ -390,6 +390,28 @@ namespace System.Web.UJMW {
 
         typeBuilder.DefineMethodOverride(getContractMethodBuilder, getContractMethod);
 
+        //Sub OverrideNbfPolling(fixedSeconds As Integer) -> IL implementierung, die an den statischen helper delegiert:
+
+        MethodInfo overrideNbfPollingMethod = typeof(IUjmwClient).GetMethod(nameof(IUjmwClient.OverrideNbfPolling));
+
+        MethodBuilder overrideNbfPollingMethodBuilder = typeBuilder.DefineMethod(
+          overrideNbfPollingMethod.Name, MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+          overrideNbfPollingMethod.ReturnType, new Type[] { typeof(int) }
+        );
+        ILGenerator overrideNbfPollingMethodIlGen = overrideNbfPollingMethodBuilder.GetILGenerator();
+
+        MethodInfo applyNbfPollingOverrideMethod = typeof(DynamicClientFactory).GetMethod(
+          nameof(DynamicClientFactory.ApplyNbfPollingOverride),
+          new Type[] { typeof(IUjmwClient), typeof(int) }
+        );
+
+        overrideNbfPollingMethodIlGen.Emit(OpCodes.Ldarg_0);
+        overrideNbfPollingMethodIlGen.Emit(OpCodes.Ldarg_1);
+        overrideNbfPollingMethodIlGen.Emit(OpCodes.Call, applyNbfPollingOverrideMethod);
+        overrideNbfPollingMethodIlGen.Emit(OpCodes.Ret);
+
+        typeBuilder.DefineMethodOverride(overrideNbfPollingMethodBuilder, overrideNbfPollingMethod);
+
         #endregion
 
         #region " METHODS "
@@ -843,6 +865,21 @@ namespace System.Web.UJMW {
       return CreateInstance(propertyType, parentInvoker, subClientPath);
     }
 
+    //ACHTUNG WEAK REFERENCE -> wird aus emit aufgerufen
+    /// <summary>
+    /// Implementation of 'IUjmwClient.OverrideNbfPolling' for the dynamically generated clients.
+    /// </summary>
+    public static void ApplyNbfPollingOverride(IUjmwClient dynamicClientInstance, int fixedSeconds) {
+
+      UjmwWebCallInvoker webCallInvoker = dynamicClientInstance.GetInvoker() as UjmwWebCallInvoker;
+
+      if (webCallInvoker == null) {
+        throw new NotSupportedException("The polling interval can only be overridden for clients which are based on the UJMW web call invoker!");
+      }
+
+      webCallInvoker.OverrideNbfPolling(fixedSeconds);
+    }
+
     //https://www.aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
     private static Dictionary<string, HttpClient> _HttpClientsPerCustomizing = new Dictionary<string, HttpClient>();
 
@@ -1011,24 +1048,11 @@ namespace System.Web.UJMW {
         Type contractType = ujmwClient.GetContract();
 
         string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
-        string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
 
         string rawInfoResponse = invoker.InvokeCall(null, null, new object[0], new string[0], null)?.ToString();
 
-        if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
-          JObject json = JObject.Parse(rawInfoResponse);
-          JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
-          if (serviceEndpoints != null) {
-            foreach (JObject endpoint in serviceEndpoints) {
-              string eqn = endpoint["EndpointQualifyingName"]?.ToString();
-              if( GetEndpointQualifyingNameWithoutVersion(eqn) == nameOnlyToSearch) {
-                versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
-                JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
-                knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
-                return true;
-              }
-            }
-          }
+        if (TryEvaluateInfoEndpointResponse(rawInfoResponse, fullEqnToSearch, out versionOnServerSide, out knownMethodNames)) {
+          return true;
         }
 
       }
@@ -1038,6 +1062,98 @@ namespace System.Web.UJMW {
       versionOnServerSide = null;
       knownMethodNames = null;
       return false;
+    }
+
+    /// <summary>
+    /// Evaluates the raw (JSON) response of an UJMW info-endpoint (= HTTP-GET on the root url of a service)
+    /// and searches the entry of the given endpoint (matched without version).
+    /// Never throws - invalid or unexpected content results in 'false'.
+    /// </summary>
+    /// <param name="rawInfoResponse">The raw response of the info-endpoint.</param>
+    /// <param name="endpointQualifyingName">The (local) endpoint qualifying name, like 'UJMW:MyNamespace.IMyContract/1.2.3'.</param>
+    /// <param name="versionOnServerSide">The contract version which is provided by the server.</param>
+    /// <param name="knownMethodNames">The methods provided by the server or null, if the server does not deliver this information.</param>
+    public static bool TryEvaluateInfoEndpointResponse(string rawInfoResponse, string endpointQualifyingName, out Version versionOnServerSide, out string[] knownMethodNames) {
+      string endpointQualifyingNameOnServerSide;
+      return TryEvaluateInfoEndpointResponse(rawInfoResponse, endpointQualifyingName, out versionOnServerSide, out knownMethodNames, out endpointQualifyingNameOnServerSide);
+    }
+
+    /// <summary>
+    /// Evaluates the raw (JSON) response of an UJMW info-endpoint (= HTTP-GET on the root url of a service)
+    /// and searches the entry of the given endpoint (matched without version).
+    /// Never throws - invalid or unexpected content results in 'false'.
+    /// </summary>
+    /// <param name="rawInfoResponse">The raw response of the info-endpoint.</param>
+    /// <param name="endpointQualifyingName">The (local) endpoint qualifying name, like 'UJMW:MyNamespace.IMyContract/1.2.3'.</param>
+    /// <param name="versionOnServerSide">The contract version which is provided by the server.</param>
+    /// <param name="knownMethodNames">The methods provided by the server or null, if the server does not deliver this information.</param>
+    /// <param name="endpointQualifyingNameOnServerSide">The full endpoint qualifying name (including version) as provided by the server.</param>
+    public static bool TryEvaluateInfoEndpointResponse(string rawInfoResponse, string endpointQualifyingName, out Version versionOnServerSide, out string[] knownMethodNames, out string endpointQualifyingNameOnServerSide) {
+
+      versionOnServerSide = null;
+      knownMethodNames = null;
+      endpointQualifyingNameOnServerSide = null;
+
+      if (string.IsNullOrWhiteSpace(rawInfoResponse) || string.IsNullOrWhiteSpace(endpointQualifyingName)) {
+        return false;
+      }
+
+      try {
+
+        string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(endpointQualifyingName);
+
+        JObject json = JObject.Parse(rawInfoResponse);
+        JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
+        if (serviceEndpoints == null) {
+          return false;
+        }
+
+        foreach (JObject endpoint in serviceEndpoints.OfType<JObject>()) {
+          string eqn = endpoint["EndpointQualifyingName"]?.ToString();
+          if (eqn != null && GetEndpointQualifyingNameWithoutVersion(eqn) == nameOnlyToSearch) {
+            versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
+            JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
+            knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
+            endpointQualifyingNameOnServerSide = eqn;
+            return true;
+          }
+        }
+
+      }
+      catch {
+      }
+
+      versionOnServerSide = null;
+      knownMethodNames = null;
+      endpointQualifyingNameOnServerSide = null;
+      return false;
+    }
+
+    /// <summary>
+    /// Returns true, if the version on server side is compatible
+    /// (same major version - or higher major, if allowed - and not lower than the required minor/build).
+    /// </summary>
+    public static bool IsVersionCompatible(Version versionOnServerSide, Version minReqiredVersion, bool allowHigherMajor = false) {
+
+      if (versionOnServerSide.Major < minReqiredVersion.Major) {
+        return false;
+      }
+      else if (versionOnServerSide.Major > minReqiredVersion.Major) {
+        return allowHigherMajor;
+      }
+
+      if (versionOnServerSide.Minor < minReqiredVersion.Minor) {
+        return false;
+      }
+      else if (versionOnServerSide.Minor > minReqiredVersion.Minor) {
+        return true;
+      }
+
+      if (versionOnServerSide.Build < minReqiredVersion.Build) {
+        return false;
+      }
+
+      return true;
     }
 
     public static bool TryResolveContractVersionOnServerSide(Type contractType, string url, out Version versionOnServerSide, out string[] knownMethodNames) {
@@ -1051,24 +1167,11 @@ namespace System.Web.UJMW {
           );
 
           string fullEqnToSearch = BuildEndpointQualifyingName(contractType);
-          string nameOnlyToSearch = GetEndpointQualifyingNameWithoutVersion(fullEqnToSearch);
 
           string rawInfoResponse = invoker.InvokeCall(null, null, new object[0], new string[0], null)?.ToString();
 
-          if (!string.IsNullOrWhiteSpace(rawInfoResponse)) {
-            JObject json = JObject.Parse(rawInfoResponse);
-            JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
-            if (serviceEndpoints != null) {
-              foreach (JObject endpoint in serviceEndpoints) {
-                string eqn = endpoint["EndpointQualifyingName"]?.ToString();
-                if (GetEndpointQualifyingNameWithoutVersion(eqn) == nameOnlyToSearch) {
-                  versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
-                  JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
-                  knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
-                  return true;
-                }
-              }
-            }
+          if (TryEvaluateInfoEndpointResponse(rawInfoResponse, fullEqnToSearch, out versionOnServerSide, out knownMethodNames)) {
+            return true;
           }
 
         }

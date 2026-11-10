@@ -27,6 +27,14 @@ namespace System.Web.UJMW {
     string GetSubClientPath();
     Type GetContract();
 
+    /// <summary>
+    /// Overrides the polling interval of long-running operations: the 'pollNbf' provided by the server
+    /// is ignored and the client polls every 'fixedSeconds' instead (0 becomes 500 ms internally).
+    /// A negative value restores the default behavior (respecting the 'pollNbf').
+    /// NOTE: the setting applies to the underlying invoker (and is therefore shared with all sub-clients).
+    /// </summary>
+    void OverrideNbfPolling(int fixedSeconds);
+
   }
 
 }

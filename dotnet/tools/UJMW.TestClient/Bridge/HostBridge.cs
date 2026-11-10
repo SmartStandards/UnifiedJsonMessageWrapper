@@ -79,6 +79,18 @@ namespace UJMW.TestClient.Bridge {
         this.BeginExecute(id, args);
         return;
       }
+      if (command == "cancelExecution") {
+        this.CancelExecution(id, args.Value<long>("executeId"));
+        return;
+      }
+      if (command == "overrideNbfPolling") {
+        this.OverrideNbfPolling(id, args.Value<long>("executeId"), args.Value<int>("fixedSeconds"));
+        return;
+      }
+      if (command == "evaluateRemoteContract") {
+        this.BeginEvaluateRemoteContract(id, args);
+        return;
+      }
       if (_InfrastructureCommands.Contains(command)) {
         this.BeginInfrastructureCommand(id, command, args);
         return;
@@ -131,7 +143,11 @@ namespace UJMW.TestClient.Bridge {
         case "getTypeDetail":
           return this.GetTypeDetail(args.Value<string>("path"), args.Value<string>("typeFullName"));
         case "setClientSettings":
-          this.SetClientSettings(args.Value<int>("requestTimeoutSeconds"));
+          this.SetClientSettings(
+            args.Value<int>("requestTimeoutSeconds"),
+            args.Value<bool?>("autoEvaluateContractVersion") == true,
+            args.Value<bool?>("alwaysOverrideNbfPolling") == true
+          );
           return this.BuildState();
         case "setCurrentZone":
           this.Settings.CurrentZone = args.Value<string>("zone");
@@ -236,6 +252,8 @@ namespace UJMW.TestClient.Bridge {
       state["sideChannelTemplates"] = JToken.FromObject(this.Settings.SideChannelTemplates, _Serializer);
       state["jwt"] = JToken.FromObject(this.Settings.Jwt, _Serializer);
       state["requestTimeoutSeconds"] = this.Settings.RequestTimeoutSeconds;
+      state["autoEvaluateContractVersion"] = this.Settings.AutoEvaluateContractVersion;
+      state["alwaysOverrideNbfPolling"] = this.Settings.AlwaysOverrideNbfPolling;
       state["currentZone"] = this.Settings.CurrentZone;
       state["infrastructureSettings"] = JToken.FromObject(this.Settings.Infrastructure, _Serializer);
       state["oauth"] = JToken.FromObject(this.Settings.OAuth, _Serializer);
@@ -523,6 +541,8 @@ namespace UJMW.TestClient.Bridge {
         detail["hasDocumentationFile"] = contract.HasDocumentationFile;
         detail["warning"] = contract.Warning;
         detail["contractQualifyingName"] = contract.QualifyingContractName;
+        detail["endpointQualifyingName"] = contract.EndpointQualifyingName;
+        detail["localVersion"] = contract.ContractVersion;
         if (contract.FuseEntity != null) {
           detail["fuseEntity"] = JToken.FromObject(contract.FuseEntity, _Serializer);
         } else {
@@ -534,6 +554,8 @@ namespace UJMW.TestClient.Bridge {
         detail["hasDocumentationFile"] = false;
         detail["fuseEntity"] = JValue.CreateNull();
         detail["contractQualifyingName"] = string.Empty;
+        detail["endpointQualifyingName"] = string.Empty;
+        detail["localVersion"] = string.Empty;
         detail["warning"] = $"The file '{path}' does not exist (anymore) - methods can not be listed.";
       }
       detail["urlHistory"] = this.BuildUrlHistory(typeFullName);
@@ -698,10 +720,142 @@ namespace UJMW.TestClient.Bridge {
       }
       _Store.Save();
 
+      bool longRunning = args.Value<bool?>("longRunning") == true;
+      if (!longRunning) {
+        Task.Run(() => {
+          InvocationResult invocationResult = UjmwInvoker.Invoke(url, methodName, authHeader, sideChannel, zone, requestText, timeoutSeconds);
+          _Owner.BeginInvoke(new Action(() => this.PostReply(id, true, JToken.FromObject(invocationResult, _Serializer), null)));
+        });
+        return;
+      }
+
+      LongRunningExecution execution = new LongRunningExecution(
+        (update) => _Owner.BeginInvoke(new Action(() => this.PostExecuteUpdate(id, update)))
+      );
+
+      if (this.Settings.AlwaysOverrideNbfPolling) {
+        execution.OverrideNbfPolling(0);
+      }
+
+      _RunningExecutions[id] = execution;
+
       Task.Run(() => {
-        InvocationResult invocationResult = UjmwInvoker.Invoke(url, methodName, authHeader, sideChannel, zone, requestText, timeoutSeconds);
-        _Owner.BeginInvoke(new Action(() => this.PostReply(id, true, JToken.FromObject(invocationResult, _Serializer), null)));
+        InvocationResult invocationResult = UjmwInvoker.InvokeLongRunning(url, methodName, authHeader, sideChannel, zone, requestText, timeoutSeconds, execution);
+        _Owner.BeginInvoke(new Action(() => {
+          _RunningExecutions.Remove(id);
+          this.PostReply(id, true, JToken.FromObject(invocationResult, _Serializer), null);
+        }));
       });
+    }
+
+    /// <summary>
+    /// Running long-running invocations by the request id of their 'execute' command (accessed on the UI thread only).
+    /// </summary>
+    private readonly Dictionary<long, LongRunningExecution> _RunningExecutions = new Dictionary<long, LongRunningExecution>();
+
+    /// <summary>
+    /// Requests the cancellation (DELETE) of a running long-running invocation.
+    /// </summary>
+    private void CancelExecution(long id, long executeId) {
+
+      LongRunningExecution execution;
+      if (_RunningExecutions.TryGetValue(executeId, out execution)) {
+        execution.RequestCancellation();
+      }
+
+      this.PostReply(id, true, null, null);
+    }
+
+    /// <summary>
+    /// Overrides the polling interval of a running long-running invocation (ignoring the 'pollNbf' of the server).
+    /// </summary>
+    private void OverrideNbfPolling(long id, long executeId, int fixedSeconds) {
+
+      LongRunningExecution execution;
+      if (_RunningExecutions.TryGetValue(executeId, out execution)) {
+        execution.OverrideNbfPolling(fixedSeconds);
+      }
+
+      this.PostReply(id, true, null, null);
+    }
+
+    /// <summary>
+    /// Calls the info-endpoint (root url) of the service on a worker thread and evaluates the metadata of the
+    /// contract (remote version, compatibility to the local version and the known methods).
+    /// Failures (timeouts, exceptions, missing metadata) are never reported in detail - the reply just contains 'ok: false'.
+    /// </summary>
+    private void BeginEvaluateRemoteContract(long id, JObject args) {
+
+      string url = args.Value<string>("url");
+      string authHeader = args.Value<string>("authHeader");
+      string endpointQualifyingName = args.Value<string>("endpointQualifyingName");
+      int timeoutSeconds = this.Settings.RequestTimeoutSeconds;
+
+      if (authHeader != null && authHeader.Contains(_SharedAuthPlaceholder)) {
+        authHeader = authHeader.Replace(_SharedAuthPlaceholder, this.Settings.SharedAuthHeader);
+      }
+
+      Task.Run(() => {
+        JObject result = EvaluateRemoteContract(url, authHeader, endpointQualifyingName, timeoutSeconds);
+        _Owner.BeginInvoke(new Action(() => this.PostReply(id, true, result, null)));
+      });
+
+    }
+
+    /// <summary>
+    /// Evaluates the metadata of the info-endpoint (using the helpers of the DynamicClient).
+    /// </summary>
+    private static JObject EvaluateRemoteContract(string url, string authHeader, string endpointQualifyingName, int timeoutSeconds) {
+
+      JObject result = new JObject();
+      result["ok"] = false;
+
+      if (string.IsNullOrWhiteSpace(endpointQualifyingName)) {
+        return result;
+      }
+
+      string rawInfoResponse;
+      if (!UjmwInvoker.TryGetInfoEndpointResponse(url, authHeader, timeoutSeconds, out rawInfoResponse)) {
+        return result;
+      }
+
+      Version remoteVersion;
+      string[] knownMethodNames;
+      string remoteEndpointQualifyingName;
+      if (!DynamicClientFactory.TryEvaluateInfoEndpointResponse(rawInfoResponse, endpointQualifyingName, out remoteVersion, out knownMethodNames, out remoteEndpointQualifyingName)) {
+        return result;
+      }
+
+      Version localVersion = DynamicClientFactory.ExtractVersionFromEndpointQualifyingName(endpointQualifyingName);
+
+      result["ok"] = true;
+      result["remoteVersion"] = remoteVersion.ToString(3);
+      result["remoteEndpointQualifyingName"] = remoteEndpointQualifyingName;
+      result["compatible"] = DynamicClientFactory.IsVersionCompatible(remoteVersion, localVersion, false);
+
+      if (knownMethodNames != null) {
+        result["knownMethods"] = new JArray(knownMethodNames);
+      } else {
+        result["knownMethods"] = JValue.CreateNull();
+      }
+
+      return result;
+    }
+
+    /// <summary>
+    /// Posts an intermediate state
+    /// </summary>
+    private void PostExecuteUpdate(long id, JObject update) {
+
+      if (_WebView.CoreWebView2 == null) {
+        return;
+      }
+
+      JObject message = new JObject();
+      message["event"] = "executeUpdate";
+      message["id"] = id;
+      message["update"] = update;
+      _WebView.CoreWebView2.PostWebMessageAsJson(message.ToString(Formatting.None));
     }
 
     #endregion
@@ -856,11 +1010,13 @@ namespace UJMW.TestClient.Bridge {
     /// <summary>
     /// Applies the general client settings.
     /// </summary>
-    private void SetClientSettings(int requestTimeoutSeconds) {
+    private void SetClientSettings(int requestTimeoutSeconds, bool autoEvaluateContractVersion, bool alwaysOverrideNbfPolling) {
       if (requestTimeoutSeconds < 1) {
         throw new InvalidOperationException("The timeout must be at least 1 second.");
       }
       this.Settings.RequestTimeoutSeconds = requestTimeoutSeconds;
+      this.Settings.AutoEvaluateContractVersion = autoEvaluateContractVersion;
+      this.Settings.AlwaysOverrideNbfPolling = alwaysOverrideNbfPolling;
       _Store.Save();
     }
 

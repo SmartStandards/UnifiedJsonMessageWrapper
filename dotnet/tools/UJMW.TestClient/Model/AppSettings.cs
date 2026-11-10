@@ -22,6 +22,33 @@ namespace UJMW.TestClient.Model {
     private PinnedEndpoint[] _PinnedEndpoints = new PinnedEndpoint[0];
     private ContractSession[] _ContractSessions = new ContractSession[0];
     private string _SharedAuthHeader = string.Empty;
+    private bool _AutoEvaluateContractVersion = false;
+    private bool _AlwaysOverrideNbfPolling = false;
+
+    /// <summary>
+    /// True, if the contract version (and the provided methods) of the remote endpoint should be evaluated automatically
+    /// as soon as a (new) valid URL is present.
+    /// </summary>
+    public bool AutoEvaluateContractVersion {
+      get {
+        return _AutoEvaluateContractVersion;
+      }
+      set {
+        _AutoEvaluateContractVersion = value;
+      }
+    }
+
+    /// <summary>
+    /// True, if long-running operations should always ignore the 'pollNbf' of the server (fast polling every 500 ms).
+    /// </summary>
+    public bool AlwaysOverrideNbfPolling {
+      get {
+        return _AlwaysOverrideNbfPolling;
+      }
+      set {
+        _AlwaysOverrideNbfPolling = value;
+      }
+    }
 
     /// <summary>
     /// The 'shared' authorization header (e.g. 'Bearer eyJ...') which is issued via the token dialog and

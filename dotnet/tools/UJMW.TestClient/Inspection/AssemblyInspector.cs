@@ -147,9 +147,27 @@ namespace UJMW.TestClient.Inspection {
         contract.Warning = GetBaseTypeResolutionWarning(type);
         contract.FuseEntity = FuseRepositoryDetector.TryDetect(type);
         contract.QualifyingContractName = UjmwContractNaming.GetQualifyingContractName(type);
+        ApplyEndpointQualifyingName(contract, type);
         contract.Methods = BuildMethods(assembly, type, typeDocs);
         return contract;
       }
+    }
+
+    /// <summary>
+    /// Applies the (local) endpoint qualifying name and contract version (using the helpers of the DynamicClient).
+    /// </summary>
+    private static void ApplyEndpointQualifyingName(ContractDescriptor contract, Type contractType) {
+
+      string endpointQualifyingName = DynamicClientFactory.BuildEndpointQualifyingName(contractType);
+
+      //assemblies without version information would produce a name ending with '/' (which is not parsable)
+      if (endpointQualifyingName.EndsWith("/")) {
+        endpointQualifyingName = endpointQualifyingName + "0.0.0";
+      }
+
+      contract.EndpointQualifyingName = endpointQualifyingName;
+      contract.ContractVersion = DynamicClientFactory.ExtractVersionFromEndpointQualifyingName(endpointQualifyingName).ToString(3);
+
     }
 
     /// <summary>
@@ -172,6 +190,7 @@ namespace UJMW.TestClient.Inspection {
         contract.Warning = GetBaseTypeResolutionWarning(repositoryType);
         contract.FuseEntity = FuseRepositoryDetector.TryDetect(repositoryType, keyPropertyNames);
         contract.QualifyingContractName = UjmwContractNaming.GetQualifyingContractName(repositoryType);
+        ApplyEndpointQualifyingName(contract, repositoryType);
         contract.Methods = BuildMethods(repositoryType.Assembly, repositoryType, XmlDocReader.ForAssembly(repositoryType.Assembly));
         return contract;
       }
@@ -250,6 +269,7 @@ namespace UJMW.TestClient.Inspection {
         descriptor.ReturnsDescription = methodDocs.GetMethodReturns(method);
         descriptor.ReturnMembers = BuildMembers(method.ReturnType);
         descriptor.Parameters = BuildParameters(method, methodDocs);
+        descriptor.IsLongRunning = descriptor.Parameters.Any((p) => p.IsCancellationToken);
         result.Add(descriptor);
       }
 
@@ -300,10 +320,51 @@ namespace UJMW.TestClient.Inspection {
         }
         descriptor.IsOptional = parameter.HasDefaultValue;
         descriptor.Description = docs.GetParameterDescription(method, parameter.Name);
-        descriptor.Members = BuildMembers(parameter.ParameterType);
+        descriptor.IsCancellationToken = RequestTemplateBuilder.IsCancellationTokenType(parameter.ParameterType);
+        descriptor.IsCallback = RequestTemplateBuilder.IsCallbackType(parameter.ParameterType);
+        if (descriptor.IsCallback) {
+          descriptor.CallbackArgumentKinds = BuildCallbackArgumentKinds(parameter.ParameterType);
+        } else if (!descriptor.IsCancellationToken) {
+          descriptor.Members = BuildMembers(parameter.ParameterType);
+        }
         parameters.Add(descriptor);
       }
       return parameters.ToArray();
+    }
+
+    /// <summary>
+    /// Classifies the generic arguments of an 'Action&lt;...&gt;' callback as 'string', 'int', 'bool' or 'other'
+    /// (used by the UI to interpret progress callbacks by type and position).
+    /// </summary>
+    private static string[] BuildCallbackArgumentKinds(Type callbackType) {
+
+      if (!callbackType.IsGenericType) {
+        return new string[0];
+      }
+
+      Type[] argumentTypes = callbackType.GetGenericArguments();
+      string[] kinds = new string[argumentTypes.Length];
+      for (int i = 0; i < argumentTypes.Length; i++) {
+
+        Type argumentType = argumentTypes[i];
+        if (argumentType.IsGenericType && argumentType.GetGenericTypeDefinition().FullName == "System.Nullable`1") {
+          argumentType = argumentType.GetGenericArguments()[0];
+        }
+
+        string fullName = argumentType.FullName;
+        if (fullName == "System.String") {
+          kinds[i] = "string";
+        } else if (fullName == "System.Int32" || fullName == "System.Int64") {
+          kinds[i] = "int";
+        } else if (fullName == "System.Boolean") {
+          kinds[i] = "bool";
+        } else {
+          kinds[i] = "other";
+        }
+
+      }
+
+      return kinds;
     }
 
     /// <summary>

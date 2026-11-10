@@ -26,6 +26,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\SelfAnnouncementHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SetupExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AuthHeaderInterceptorAttribute.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SpliceTmp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)XmlCommentAccessExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LongRunning\IUjmwOperationStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LongRunning\UjmwAsyncResponseState.cs" />

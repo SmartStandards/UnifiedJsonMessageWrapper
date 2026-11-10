@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Logging.SmartStandards;
+using Logging.SmartStandards.CopyForUJMW;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SmartStandards;
@@ -38,6 +40,13 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _FromBodyAttributeConstructor = typeof(FromBodyAttribute).GetConstructors().Where((c) => c.GetParameters().Count() == 0).Single();
     private static ConstructorInfo _RouteAttributeConstructor = typeof(RouteAttribute).GetConstructors().Where((c) => c.GetParameters().First().ParameterType == typeof(string)).Single();
 
+    //required for long-running operations (GET = poll, DELETE = cancellation request)
+    private static ConstructorInfo _HttpGetWithTemplateAttributeConstructor = typeof(HttpGetAttribute).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo _HttpDeleteAttributeConstructor = typeof(HttpDeleteAttribute).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo _ActionNameAttributeConstructor = typeof(ActionNameAttribute).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo _FromQueryAttributeConstructor = typeof(FromQueryAttribute).GetConstructor(Type.EmptyTypes);
+    private static PropertyInfo _FromQueryNameProp = typeof(FromQueryAttribute).GetProperty(nameof(FromQueryAttribute.Name));
+
     private static ConstructorInfo _ApiExplorerSettingsAttributeConstructor = typeof(ApiExplorerSettingsAttribute).GetConstructors().Single();
     private static PropertyInfo _ApiExplorerSettingsGroupNameProp = typeof(ApiExplorerSettingsAttribute).GetProperty(nameof(ApiExplorerSettingsAttribute.GroupName));
 
@@ -52,6 +61,7 @@ namespace System.Web.UJMW {
     private static ConstructorInfo _SwaggerRequestBodyAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerRequestBodyAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
     private static ConstructorInfo _SwaggerResponseAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerResponseAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();//Skip(1)?.
     private static ConstructorInfo _SwaggerSchemaAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerSchemaAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
+    private static ConstructorInfo _SwaggerParameterAttributeConstructor = Type.GetType(swashbuckle + ".SwaggerParameterAttribute, " + swashbuckle, false)?.GetConstructors()?.FirstOrDefault();
     
     public static Type BuildDynamicControllerType(Type serviceType, DynamicUjmwControllerOptions options = null, string apiGroupName = null) {
       return BuildDynamicControllerType(serviceType, options, out string dummyRoute, out string dummyTitle, apiGroupName);
@@ -99,6 +109,8 @@ namespace System.Web.UJMW {
 
       MethodInfo invokeMethod = baseType.GetMethod("InvokeMethod", BindingFlags.Instance | BindingFlags.NonPublic);
       MethodInfo renderInfoSite = baseType.GetMethod(RenderInfoSiteMethodName, BindingFlags.Instance | BindingFlags.NonPublic);
+      MethodInfo invokeLongRunningMethod = baseType.GetMethod("InvokeLongRunningMethod", BindingFlags.Instance | BindingFlags.NonPublic);
+      MethodInfo invokeAsyncControlMethod = baseType.GetMethod("InvokeAsyncControl", BindingFlags.Instance | BindingFlags.NonPublic);
 
       ////////////// NAMING ///////////////////////////////////////////////////////////////////
 
@@ -355,11 +367,19 @@ namespace System.Web.UJMW {
               serviceType, wrapperNamePattern, serviceMethod, moduleBuilder, true, options
             );
 
+            //a 'CancellationToken' parameter marks a potentially long-running operation (see 'doc/epics/epic-long-running-operations.md')
+            bool isLongRunning = UjmwAsyncProtocol.IsLongRunningMethod(serviceMethod);
+
+            Type[] actionParameterTypes = new Type[] { requestType };
+            if (isLongRunning) {
+              actionParameterTypes = new Type[] { requestType, typeof(string) };
+            }
+
             MethodBuilder methodBuilder = typeBuilder.DefineMethod(
               serviceMethod.GetNameOrOverride(true),
               MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
               responseType,
-              new Type[] { requestType }
+              actionParameterTypes
             );
 
             string nameInUrl = serviceMethod.GetNameOrOverride(false);
@@ -374,6 +394,9 @@ namespace System.Web.UJMW {
                 if(string.IsNullOrWhiteSpace(sum)) { sum = ""; }
                 else if (sum.Length>120) { sum = sum.Substring(0, 117) + "..."; };
                 string doc = serviceMethod.GetDocumentation(false, true).Replace("Returns:", "**Returns:**\n");
+                if (isLongRunning) {
+                  doc = doc + "\n\n" + GetLongRunningProtocolDocumentation(UjmwAsyncControlKind.Initiate);
+                }
                 CustomAttributeBuilder swaggerOperationAttributeBuilder = new CustomAttributeBuilder(
                   _SwaggerOperationAttributeConstructor, new object[] { sum, doc }
                 );
@@ -452,9 +475,15 @@ namespace System.Web.UJMW {
               methodIlGen.Emit(OpCodes.Ldstr, serviceMethod.Name); // < methodenname als string auf den stack holen
 
               methodIlGen.Emit(OpCodes.Ldarg, 1);// zuzuweisendes methoden-argument auf den stack holen
-                 
-              // aufruf auf umgeleitete funktion absetzen
-              methodIlGen.Emit(OpCodes.Callvirt, invokeMethod); // _DynamicProxyInvoker.InvokeMethod("Foo", args)
+
+              if (isLongRunning) {
+                methodIlGen.Emit(OpCodes.Ldarg_2); // the 'wait' query parameter
+                methodIlGen.Emit(OpCodes.Callvirt, invokeLongRunningMethod); // InvokeLongRunningMethod("Foo", args, wait)
+              }
+              else {
+                // aufruf auf umgeleitete funktion absetzen
+                methodIlGen.Emit(OpCodes.Callvirt, invokeMethod); // _DynamicProxyInvoker.InvokeMethod("Foo", args)
+              }
                                                                 // jetzt liegt ein result auf dem stack...
        
               methodIlGen.Emit(OpCodes.Castclass, responseType); // reference-types müssen gecastet werden, weil der retval in "object" ist
@@ -467,6 +496,24 @@ namespace System.Web.UJMW {
               methodIlGen.Emit(OpCodes.Ret);
             }
 
+            if (isLongRunning) {
+
+              //only for documentation purposes (the value is evaluated directly from the query string)
+              DefineQueryParameter(
+                methodBuilder, 2, UjmwAsyncProtocol._WaitQueryParam,
+                "Optional: number of seconds to wait for the termination. If set, the operation continues in the background after this time and the response contains the 'async' state."
+              );
+
+              EmitAsyncControlAction(
+                typeBuilder, serviceMethod, responseType, invokeAsyncControlMethod, UjmwAsyncControlKind.Poll, authAttributeConstructor, options
+              );
+
+              EmitAsyncControlAction(
+                typeBuilder, serviceMethod, responseType, invokeAsyncControlMethod, UjmwAsyncControlKind.Cancel, authAttributeConstructor, options
+              );
+
+            }
+
           }
         }
 
@@ -477,6 +524,150 @@ namespace System.Web.UJMW {
         _OptionsPerDynamicControllerType[dynamicType] = options;
       }
       return dynamicType;
+    }
+
+    /// <summary>
+    /// Kind of a request which controls an existing long-running operation (or initiates a new one).
+    /// </summary>
+    internal enum UjmwAsyncControlKind {
+      Initiate = 0,
+      Poll = 1,
+      Cancel = 2
+    }
+
+    /// <summary>
+    /// Emits the GET (poll) or DELETE (cancellation request) action of a long-running operation.
+    /// Both actions share the URL and the action name of the initiating POST, so that the regular
+    /// UJMW auth hooks will evaluate them against the original contract method.
+    /// </summary>
+    private static void EmitAsyncControlAction(
+      TypeBuilder typeBuilder, MethodInfo serviceMethod, Type responseType, MethodInfo invokeAsyncControlMethod,
+      UjmwAsyncControlKind kind, ConstructorInfo authAttributeConstructor, DynamicUjmwControllerOptions options
+    ) {
+
+      string actionName = serviceMethod.GetNameOrOverride(true);
+      string nameInUrl = serviceMethod.GetNameOrOverride(false);
+      bool isCancel = (kind == UjmwAsyncControlKind.Cancel);
+
+      Type[] parameterTypes = new Type[] { typeof(string), typeof(string), typeof(string) };
+      if (isCancel) {
+        parameterTypes = new Type[] { typeof(string), typeof(string), typeof(string), typeof(string) };
+      }
+
+      MethodBuilder methodBuilder = typeBuilder.DefineMethod(
+        actionName + "_Ujmw" + kind.ToString(),
+        MethodAttributes.Public | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual,
+        responseType,
+        parameterTypes
+      );
+
+      ConstructorInfo verbAttributeConstructor = _HttpGetWithTemplateAttributeConstructor;
+      if (isCancel) {
+        verbAttributeConstructor = _HttpDeleteAttributeConstructor;
+      }
+
+      methodBuilder.SetCustomAttribute(new CustomAttributeBuilder(verbAttributeConstructor, new object[] { nameInUrl }));
+      methodBuilder.SetCustomAttribute(new CustomAttributeBuilder(_ActionNameAttributeConstructor, new object[] { actionName }));
+
+      if (_SwaggerOperationAttributeConstructor != null) {
+
+        string summary = "Polls the long-running operation '" + nameInUrl + "'";
+        if (isCancel) {
+          summary = "Requests the cancellation of the long-running operation '" + nameInUrl + "'";
+        }
+
+        methodBuilder.SetCustomAttribute(new CustomAttributeBuilder(
+          _SwaggerOperationAttributeConstructor, new object[] { summary, GetLongRunningProtocolDocumentation(kind) }
+        ));
+
+      }
+
+      if (authAttributeConstructor != null) {
+        methodBuilder.SetCustomAttribute(new CustomAttributeBuilder(authAttributeConstructor, options.AuthAttributeConstructorParams));
+      }
+
+      DefineQueryParameter(methodBuilder, 1, UjmwAsyncProtocol._AsyncIdQueryParam, "The 'asyncId' from the response of the initiating POST.");
+      DefineQueryParameter(methodBuilder, 2, UjmwAsyncProtocol._PollingSaltQueryParam, "6 fresh random characters, generated by the client for every request.");
+      DefineQueryParameter(methodBuilder, 3, UjmwAsyncProtocol._PollingHashQueryParam, "Base64Url(SHA-256(UTF-8(pollingSecret + pollingSalt))) without padding.");
+      if (isCancel) {
+        DefineQueryParameter(methodBuilder, 4, UjmwAsyncProtocol._WaitQueryParam, "Optional: number of seconds to give the operation the chance to react to the cancellation.");
+      }
+
+      ILGenerator il = methodBuilder.GetILGenerator();
+      il.Emit(OpCodes.Ldarg_0);
+      il.Emit(OpCodes.Ldstr, serviceMethod.Name);
+      il.Emit(OpCodes.Ldc_I4, (int)kind);
+      il.Emit(OpCodes.Ldarg_1);
+      il.Emit(OpCodes.Ldarg_2);
+      il.Emit(OpCodes.Ldarg_3);
+      if (isCancel) {
+        il.Emit(OpCodes.Ldarg_S, (byte)4);
+      }
+      else {
+        il.Emit(OpCodes.Ldnull);
+      }
+      il.Emit(OpCodes.Callvirt, invokeAsyncControlMethod);
+      il.Emit(OpCodes.Castclass, responseType);
+      il.Emit(OpCodes.Ret);
+
+    }
+
+    /// <summary>
+    /// Defines a (string) action parameter which is bound from the query string.
+    /// </summary>
+    private static void DefineQueryParameter(MethodBuilder methodBuilder, int position, string queryParamName, string description) {
+
+      ParameterBuilder parameterBuilder = methodBuilder.DefineParameter(position, ParameterAttributes.Optional, queryParamName);
+
+      parameterBuilder.SetCustomAttribute(new CustomAttributeBuilder(
+        _FromQueryAttributeConstructor, new object[0], new PropertyInfo[] { _FromQueryNameProp }, new object[] { queryParamName }
+      ));
+
+      if (_SwaggerParameterAttributeConstructor != null) {
+        try {
+          parameterBuilder.SetCustomAttribute(new CustomAttributeBuilder(_SwaggerParameterAttributeConstructor, new object[] { description }));
+        }
+        catch (Exception ex) {
+          //no problem - its just for the docu
+          DevLogger.LogError(ex);
+        }
+      }
+
+    }
+
+    /// <summary>
+    /// Returns a documentation text which is detailed enough to implement the long-running protocol
+    /// without any UJMW library (for example by an MCP client or an AI agent).
+    /// </summary>
+    internal static string GetLongRunningProtocolDocumentation(UjmwAsyncControlKind kind) {
+
+      StringBuilder sb = new StringBuilder();
+
+      if (kind == UjmwAsyncControlKind.Initiate) {
+        sb.Append("**Long-running operation** (UJMW async protocol). Without the query parameter 'wait' the call is executed synchronously. ");
+        sb.Append("With '?wait=<seconds>' the request ends after the given time and the operation continues in the background. ");
+        sb.Append("The response then always contains the property 'async'. If the operation terminated within the wait time, the result is delivered directly and 'async' carries no 'asyncId'. ");
+        sb.Append("Otherwise store 'async.asyncId' and 'async.pollingSecret' and poll via HTTP GET on the same URL.\n\n");
+      }
+      else if (kind == UjmwAsyncControlKind.Poll) {
+        sb.Append("Polls an operation which was initiated via POST with '?wait=<seconds>'. Do not poll before 'async.pollNbf' (ISO UTC). ");
+        sb.Append("Callback invocations and the final outcome are drained by the poll that fetches them (single consumer).\n\n");
+      }
+      else {
+        sb.Append("Requests the cancellation of an operation which was initiated via POST with '?wait=<seconds>'. ");
+        sb.Append("The optional 'wait' gives the operation the chance to react before the response is produced. The response DTO is identical to the one of a poll.\n\n");
+      }
+
+      sb.Append("**async.execState:** -2 = cancelled, -1 = running (cancellation requested), 0 = queued, 1 = running, 2 = completed, 3 = failed ('fault' is set). ");
+      sb.Append("Continue polling until the state is -2, 2 or 3.\n\n");
+      sb.Append("**async.cancellable:** whether a HTTP DELETE (cancellation request) is currently meaningful.\n\n");
+      sb.Append("**Polling authentication:** every GET/DELETE requires the query parameters 'asyncId', 'pollingSalt' (6 fresh random characters per request) and ");
+      sb.Append("'pollingHash' = Base64Url(SHA-256(UTF-8 bytes of the string pollingSecret + pollingSalt)) without '=' padding ('+' becomes '-', '/' becomes '_'). ");
+      sb.Append("A wrong or unknown 'asyncId'/'pollingHash' is answered with fault 'Wrong asyncId or pollingHash'.\n\n");
+      sb.Append("**Callbacks:** properties named '<callbackName>Invokes' contain arrays of { '#': <sequence>, 'arg1': ..., 'argN': ... }. ");
+      sb.Append("The sequence '#' is unique across all callbacks of the operation - replay all invocations strictly ordered by '#'.");
+
+      return sb.ToString();
     }
 
     private static string GetNamespaceFromApiGroupName(string apiGroupName) {
@@ -564,6 +755,20 @@ namespace System.Web.UJMW {
           List<string> createdPropertyNames = new List<string>();
           var parameters = methodInfo.GetParameters();
           foreach (var param in parameters) {
+
+            if (!UjmwAsyncProtocol.IsTransportedAsDtoProperty(param)) {
+
+              //CANCELLATIONTOKEN: never transported - CALLBACK: transported as array of invocations within the response
+              if (response && UjmwAsyncProtocol.IsCallbackParameter(param)) {
+                DynamicUjmwControllerFactory.BuildProp(
+                  typeBuilder, UjmwAsyncProtocol.GetCallbackInvokesPropertyName(param.Name), typeof(Dictionary<string, object>[]),
+                  "Invocations of the callback '" + param.Name + "' as array of { '#': <sequence>, 'arg1': ..., 'argN': ... } (replay ordered by '#' across all callbacks)."
+                );
+              }
+
+              continue;
+            }
+
             if ((response && param.IsOut) || (!response && !param.IsOut) || (param.ParameterType.IsByRef && !param.IsOut)) {
               string doc = param.GetDocumentation();
               if (param.ParameterType.IsByRef) {
@@ -584,6 +789,13 @@ namespace System.Web.UJMW {
             }
 
             DynamicUjmwControllerFactory.BuildProp(typeBuilder, UjmwFaultPropertyName, typeof(string),"Optional field, which can be used to transport an error-message.");
+
+            if (UjmwAsyncProtocol.IsLongRunningMethod(methodInfo)) {
+              DynamicUjmwControllerFactory.BuildProp(
+                typeBuilder, UjmwAsyncProtocol._AsyncPropertyName, typeof(UjmwAsyncState),
+                "Execution state of a long-running operation (only present, if the operation was initiated with 'wait')."
+              );
+            }
          
           }
           else {
