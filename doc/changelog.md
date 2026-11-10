@@ -3,9 +3,17 @@ This files contains a version history including all changes relevant for semanti
 
 *(it is automatically maintained using the ['KornSW-VersioningUtil'](https://github.com/KornSW/VersioningUtil))*
 
-## Upcoming Changes (5.7.4-develop)
+## Upcoming Changes
+
+*(none)*
+
+
+
+## v 5.8.0
 released **2026-11-10**, including:
  - **new Feature**: alternate AuthHeaderEvaluator with extended params (apiGroupName and additional responseHeaders) + opt-in for per-request trace-message
+
+
 
 ## v 5.7.4
 released **2026-10-30**, including:
