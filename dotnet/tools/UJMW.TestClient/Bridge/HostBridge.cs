@@ -821,16 +821,25 @@ namespace UJMW.TestClient.Bridge {
 
       Version remoteVersion;
       string[] knownMethodNames;
-      string remoteEndpointQualifyingName;
-      if (!DynamicClientFactory.TryEvaluateInfoEndpointResponse(rawInfoResponse, endpointQualifyingName, out remoteVersion, out knownMethodNames, out remoteEndpointQualifyingName)) {
+      if (!DynamicClientFactory.TryEvaluateInfoEndpointResponse(rawInfoResponse, endpointQualifyingName, out remoteVersion, out knownMethodNames)) {
+
+        string remoteContractName = TryGetMismatchingRemoteContractName(rawInfoResponse, endpointQualifyingName);
+        if (remoteContractName != null) {
+          result["ok"] = true;
+          result["contractMismatch"] = true;
+          result["remoteContractName"] = remoteContractName;
+          result["compatible"] = false;
+          result["knownMethods"] = JValue.CreateNull();
+        }
+
         return result;
       }
 
       Version localVersion = DynamicClientFactory.ExtractVersionFromEndpointQualifyingName(endpointQualifyingName);
 
       result["ok"] = true;
+      result["contractMismatch"] = false;
       result["remoteVersion"] = remoteVersion.ToString(3);
-      result["remoteEndpointQualifyingName"] = remoteEndpointQualifyingName;
       result["compatible"] = DynamicClientFactory.IsVersionCompatible(remoteVersion, localVersion, false);
 
       if (knownMethodNames != null) {
@@ -840,6 +849,50 @@ namespace UJMW.TestClient.Bridge {
       }
 
       return result;
+    }
+
+    /// <summary>
+    /// If the info-endpoint delivers exactly one UJMW endpoint and its contract name does not match the local one
+    /// (compared using the helpers of the DynamicClient), the contract name part of the server (without 'UJMW:'
+    /// prefix and without version) is returned - otherwise null.
+    /// </summary>
+    private static string TryGetMismatchingRemoteContractName(string rawInfoResponse, string localEndpointQualifyingName) {
+
+      const string ujmwPrefix = "UJMW:";
+      List<string> remoteNames = new List<string>();
+
+      try {
+
+        JObject json = JObject.Parse(rawInfoResponse);
+        JArray serviceEndpoints = json["ServiceEndpoints"] as JArray;
+        if (serviceEndpoints == null) {
+          return null;
+        }
+
+        foreach (JObject endpoint in serviceEndpoints.OfType<JObject>()) {
+          JToken eqnToken = endpoint["EndpointQualifyingName"];
+          if (eqnToken != null && eqnToken.Type == JTokenType.String) {
+            string eqn = eqnToken.ToString();
+            if (eqn.StartsWith(ujmwPrefix)) {
+              remoteNames.Add(eqn);
+            }
+          }
+        }
+
+      } catch (JsonException) {
+        return null;
+      }
+
+      if (remoteNames.Count != 1) {
+        return null;
+      }
+
+      string remoteName = remoteNames[0];
+      if (DynamicClientFactory.MatchEndpointQualifyingNamesWithoutVersion(remoteName, localEndpointQualifyingName)) {
+        return null;
+      }
+
+      return DynamicClientFactory.GetEndpointQualifyingNameWithoutVersion(remoteName).Substring(ujmwPrefix.Length);
     }
 
     /// <summary>

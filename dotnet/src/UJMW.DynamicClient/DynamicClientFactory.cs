@@ -1074,25 +1074,9 @@ namespace System.Web.UJMW {
     /// <param name="versionOnServerSide">The contract version which is provided by the server.</param>
     /// <param name="knownMethodNames">The methods provided by the server or null, if the server does not deliver this information.</param>
     public static bool TryEvaluateInfoEndpointResponse(string rawInfoResponse, string endpointQualifyingName, out Version versionOnServerSide, out string[] knownMethodNames) {
-      string endpointQualifyingNameOnServerSide;
-      return TryEvaluateInfoEndpointResponse(rawInfoResponse, endpointQualifyingName, out versionOnServerSide, out knownMethodNames, out endpointQualifyingNameOnServerSide);
-    }
-
-    /// <summary>
-    /// Evaluates the raw (JSON) response of an UJMW info-endpoint (= HTTP-GET on the root url of a service)
-    /// and searches the entry of the given endpoint (matched without version).
-    /// Never throws - invalid or unexpected content results in 'false'.
-    /// </summary>
-    /// <param name="rawInfoResponse">The raw response of the info-endpoint.</param>
-    /// <param name="endpointQualifyingName">The (local) endpoint qualifying name, like 'UJMW:MyNamespace.IMyContract/1.2.3'.</param>
-    /// <param name="versionOnServerSide">The contract version which is provided by the server.</param>
-    /// <param name="knownMethodNames">The methods provided by the server or null, if the server does not deliver this information.</param>
-    /// <param name="endpointQualifyingNameOnServerSide">The full endpoint qualifying name (including version) as provided by the server.</param>
-    public static bool TryEvaluateInfoEndpointResponse(string rawInfoResponse, string endpointQualifyingName, out Version versionOnServerSide, out string[] knownMethodNames, out string endpointQualifyingNameOnServerSide) {
 
       versionOnServerSide = null;
       knownMethodNames = null;
-      endpointQualifyingNameOnServerSide = null;
 
       if (string.IsNullOrWhiteSpace(rawInfoResponse) || string.IsNullOrWhiteSpace(endpointQualifyingName)) {
         return false;
@@ -1114,7 +1098,6 @@ namespace System.Web.UJMW {
             versionOnServerSide = ExtractVersionFromEndpointQualifyingName(eqn);
             JArray knownMethods = endpoint["UJMW.KnownMethods"] as JArray;
             knownMethodNames = knownMethods?.Select(m => m.ToString()).ToArray();
-            endpointQualifyingNameOnServerSide = eqn;
             return true;
           }
         }
@@ -1125,7 +1108,6 @@ namespace System.Web.UJMW {
 
       versionOnServerSide = null;
       knownMethodNames = null;
-      endpointQualifyingNameOnServerSide = null;
       return false;
     }
 

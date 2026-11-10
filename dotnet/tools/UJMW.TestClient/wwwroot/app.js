@@ -160,12 +160,9 @@
   }
 
   // contract name for infrastructure lookups: the UJMW qualifying name (generic arguments joined via '_'
-  // like 'System.Data.Fuse.IRepository_Ns.Person_Int32'), falls back to the type name if not inspectable
+  // like 'System.Data.Fuse.IRepository_Ns.Person_Int32') which is built by the official UJMW naming helper
   function infrastructureContractName(detail) {
-    if (detail.contractQualifyingName) {
-      return detail.contractQualifyingName;
-    }
-    return detail.typeFullName;
+    return detail.contractQualifyingName || '';
   }
 
   // display text of a checked type
@@ -1297,16 +1294,16 @@
       v.status.classList.add('version-na');
     } else {
       v.link.classList.add('hidden');
-      if (remote.compatible) {
+      if (remote.contractMismatch) {
+        v.remote.textContent = 'Remote: ';
+        v.status.textContent = "Mismatch! Contract is '" + remote.remoteContractName + "'";
+        v.status.classList.add('version-mismatch');
+      } else if (remote.compatible) {
         v.remote.textContent = "Remote: '" + remote.remoteVersion + "'";
         v.remote.classList.add('version-match');
       } else {
-        let remoteName = remote.remoteEndpointQualifyingName;
-        if (!remoteName) {
-          remoteName = remote.remoteVersion;
-        }
         v.remote.textContent = "Remote: '" + remote.remoteVersion + "'";
-        v.status.textContent = "Mismatch! Contract is '" + remoteName + "'";
+        v.status.textContent = 'Mismatch!';
         v.status.classList.add('version-mismatch');
         v.remote.classList.add('version-mismatch');
       }
@@ -4327,7 +4324,7 @@
       const target = targets[index];
       const pin = {
         typeFullName: detail.typeFullName,
-        url: joinUrlSegments([target.hostUrl, target.applicationBaseUrl, PIN_SUBROUTE_PLACEHOLDER, detail.contractRouteName || shortTypeName(detail.typeFullName)]),
+        url: joinUrlSegments([target.hostUrl, target.applicationBaseUrl, PIN_SUBROUTE_PLACEHOLDER, detail.contractRouteName]),
         hostUrl: target.hostUrl,
         webApplicationName: target.webApplicationName
       };

@@ -114,7 +114,8 @@ namespace System.Web.UJMW {
             List<MethodInfo> allMethods = new();
             CollectAllMethodsForType(contract, allMethods);
 
-            endpointMetadata["EndpointQualifyingName"] = $"UJMW:{contract.FullName}/{version}";
+            //same naming as 'BuildUjmwEndpointQualifyingName' of the DynamicClient (which is used for matching on client side)
+            endpointMetadata["EndpointQualifyingName"] = $"UJMW:{TypeAliasBuilder.BuildTypeAliasRecursive(contract, false, 1, null)}/{version}";
             endpointMetadata["ApiGroupName"] = controller.Value.ApiGroupName;
             //endpointMetadata["UJMW.ConcreteServiceInstanceTypeName"] = concreteServiceInstanceTypeName;
             endpointMetadata["UJMW.KnownMethods"] = allMethods.Where((mi)=> !mi.IsSpecialName).Select((mi) => mi.Name);
