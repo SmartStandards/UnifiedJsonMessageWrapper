@@ -5,8 +5,8 @@
     <AssemblyName>UJMW.Tests</AssemblyName>
     <RootNamespace>System.Web.UJMW</RootNamespace>
     <IsPackable>false</IsPackable>
-    <AssemblyVersion>5.7.5</AssemblyVersion>
-    <Version>5.7.5-develop</Version>
+    <AssemblyVersion>5.7.6</AssemblyVersion>
+    <Version>5.7.6-develop</Version>
     <AssemblyName>UJMW.Tests</AssemblyName>
     <PackageId>Tests</PackageId>
     <Product>Tests</Product>
