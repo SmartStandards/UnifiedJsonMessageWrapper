@@ -263,6 +263,7 @@ General rules:
 - `pollingSalt` / `pollingHash` (uniform names with the long-running protocol, decided Q-NAMES): identical algorithm as the long-running polling authentication: `pollingHash = Base64Url(SHA-256(UTF-8(pollingSecret + pollingSalt)))` without padding, a fresh 6-character `pollingSalt` per request (reuse of `UjmwAsyncProtocol.ComputePollingHash`).
 - `requestId` is a 53-bit Snowflake-style id transported as JSON string (same generator as `asyncId`).
 - `processor` is a purely informational name of the processor instance (statistics, diagnostics). It is **not** a security identity and may change during a lease (e.g. in a cluster where processors hand jobs over to each other); the queuing service simply updates the name stored for the entry. Only `requestId`, `pollingSalt` and `pollingHash` authorize `PUT` / `DELETE` / `POST` (decided Q-PROC).
+- **Naming convention (Q-PROCNAME):** the name must be stable and should be given explicitly. Everything before the first `#` is the constant name of an agent installation, everything after it is free for instance discriminators (timestamps, sequence numbers, process ids). Generated default: `<MachineName>/<ContractName>#MM-dd#HH-mm-ss`. Recommendation for queuing services: forget an instance after one day without activity, but only if another instance with the same agent name is alive (`UjmwQueueOptions.StaleProcessorRetentionSec` / `ProcessorAliveSec`).
 
 ### 5.1 `GET <route>/_queue` – info
 
@@ -279,18 +280,20 @@ Without `dequeue` the endpoint only returns statistics; `processor` is ignored. 
 		"RenderPreview": { "queued": 2, "active": 1, "past1m": 0, "past10m": 0, "past1h": 0, "past10h": 0 }
 	},
 	"processors": {
-		"worker-01@host-a": { "active": 1, "lastActivity": "2025-01-01T12:00:00Z" },
-		"worker-02@host-b": { "active": 2, "lastActivity": "2025-01-01T12:00:03Z" }
+		"worker-01@host-a": { "active": 1, "capacity": 2, "lastActivity": "2025-01-01T12:00:00Z" },
+		"worker-02@host-b": { "active": 2, "capacity": -1, "lastActivity": "2025-01-01T12:00:03Z" }
 	},
 	"fault": null
 }
 ```
 
+- The info response is serialized **indented** (easier to read in a browser).
+- `capacity` is the maximum number of parallel jobs reported by the processor via the optional `capacity` query parameter of its latest dequeue `GET` / completion `POST` (`-1` = not supplied). Together with `active` the utilization can be calculated server-side (decided Q-CAPACITY).
 - `lastActivity` is the latest of dequeue poll, heartbeat or completion.
 - `pastXX` are sliding-window counters of entries which **terminated** within the window (in any final state: completed, failed, cancelled, withdrawn by policy; decided Q-STATS).
 - There is **no** `raw` parameter (a human-friendly HTML representation was considered and discarded).
 
-### 5.2 `GET <route>/_queue?processor=<id>&dequeue=<filter>` – dequeue (lease)
+### 5.2 `GET <route>/_queue?processor=<id>&dequeue=<filter>[&capacity=<n>]` – dequeue (lease)
 
 `dequeue` filter syntax:
 
@@ -713,6 +716,8 @@ missed dequeue confirmations are always redelivered; explicit `DELETE` returns f
 | Q-BUF | Callback buffer towards the caller | identical to the long-running feature | **decided** |
 | Q-RET | Outcome retention | identical to the long-running feature | **decided** |
 | Q-PROC | Processor identity | one informational, updatable name; only `requestId` / `pollingSalt` / `pollingHash` authorize | **decided** |
+| Q-PROCNAME | Processor naming | stable name, explicit recommended; `<agent>#<discriminators>`; default `<MachineName>/<ContractName>#MM-dd#HH-mm-ss`; stale instances removed after 1 day if the same agent has an alive instance | **decided** |
+| Q-CAPACITY | Processor capacity | optional `capacity=<maxParallelTasks>` query param on dequeue `GET` and completion `POST`; stored per processor (latest value, `-1` if not supplied, invalid values ignored) and reported in `processors.<id>.capacity`; info JSON is indented | **decided** |
 | Q-ASM | Assembly placement | as proposed: host parts (`AddQueueFor`, `_queue` controller, `IUjmwQueuingService`, in-memory queue, bridge executor) in `UJMW.DynamicController`; `IUjmwQueue`, `UjmwQueueClient`, `QueueProcessor<T>`, JSON dispatcher in `UJMW.DynamicClient` | **decided** |
 | Q-LOG | Logging event-kind range | UJMW as a whole reserves `72xxx`; the queue mode uses the safe sub-range `72400` – `72499` | **decided** |
 | **open (later, out of scope, tracked in [doc/backlog.md](../backlog.md))** |

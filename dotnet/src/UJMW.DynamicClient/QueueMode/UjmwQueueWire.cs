@@ -32,6 +32,7 @@ namespace System.Web.UJMW {
 
         JObject processor = new JObject();
         processor["active"] = entry.Value.Active;
+        processor["capacity"] = entry.Value.Capacity;
         processor["lastActivity"] = entry.Value.LastActivity.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
         processors[entry.Key] = processor;
@@ -40,7 +41,8 @@ namespace System.Web.UJMW {
 
       json["fault"] = ToFaultToken(info.Fault);
 
-      return json.ToString(Formatting.None);
+      //indented for a readable browser view
+      return json.ToString(Formatting.Indented);
     }
 
     /// <summary>
@@ -70,6 +72,11 @@ namespace System.Web.UJMW {
           if (processorJson != null) {
 
             processor.Active = GetInt(processorJson, "active");
+
+            JToken capacity = processorJson["capacity"];
+            if (capacity != null && capacity.Type == JTokenType.Integer) {
+              processor.Capacity = capacity.Value<int>();
+            }
 
             JToken lastActivity = processorJson["lastActivity"];
             if (lastActivity != null && lastActivity.Type == JTokenType.Date) {

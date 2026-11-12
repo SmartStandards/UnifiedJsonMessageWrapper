@@ -65,7 +65,7 @@ namespace System.Web.UJMW {
     /// <summary>
     /// GET &lt;route&gt;/_queue?processor=..&amp;dequeue=..
     /// </summary>
-    public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter) {
+    public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter, int capacity) {
 
       if (methodFilter == null) {
         methodFilter = UjmwQueueMethodFilter.All;
@@ -73,7 +73,8 @@ namespace System.Web.UJMW {
 
       string query = BuildQuery(
         UjmwQueueProtocol.ProcessorQueryParam, processorId,
-        UjmwQueueProtocol.DequeueQueryParam, methodFilter.ToString()
+        UjmwQueueProtocol.DequeueQueryParam, methodFilter.ToString(),
+        UjmwQueueProtocol.CapacityQueryParam, FormatCapacity(capacity)
       );
 
       string content = this.Send(contractType, "GET", query, null);
@@ -117,10 +118,22 @@ namespace System.Web.UJMW {
     /// </summary>
     public UjmwQueueLease Complete(
       Type contractType, string queueName, string processorId, string requestId, string pollingSalt, string pollingHash,
-      string responseJson, UjmwQueueMethodFilter dequeueNext
+      string responseJson, UjmwQueueMethodFilter dequeueNext, int capacity
     ) {
 
       string query = BuildLeaseQuery(processorId, requestId, pollingSalt, pollingHash);
+
+      string capacityValue = FormatCapacity(capacity);
+      if (capacityValue != null) {
+
+        string separator = "&";
+        if (query.Length == 0) {
+          separator = "?";
+        }
+
+        query = query + separator + UjmwQueueProtocol.CapacityQueryParam + "=" + capacityValue;
+      }
+
       string body = UjmwQueueWire.BuildCompletionBody(responseJson, dequeueNext);
       string content = this.Send(contractType, "POST", query, body);
 
@@ -191,6 +204,15 @@ namespace System.Web.UJMW {
       }
 
       return responseContent;
+    }
+
+    private static string FormatCapacity(int capacity) {
+
+      if (capacity < 1) {
+        return null;
+      }
+
+      return capacity.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static string BuildLeaseQuery(string processorId, string requestId, string pollingSalt, string pollingHash) {

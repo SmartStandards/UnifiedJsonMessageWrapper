@@ -63,7 +63,7 @@ services.AddSingleton<IUjmwQueuingService>(new UjmwInMemoryQueuingService(new Uj
 UjmwQueueClient queue = new UjmwQueueClient((Type contractType) => "https://host/api/reports");
 
 QueueProcessor<IReportRenderer> processor = new QueueProcessor<IReportRenderer>(
-	new ReportRenderer(), queue, maxParallelTasks: 2
+	new ReportRenderer(), queue, maxParallelTasks: 2, processorName: "ReportAgent/Berlin-01#" + Environment.ProcessId
 );
 
 processor.Start();   // polls every 2 seconds while idle
@@ -127,13 +127,15 @@ All responses are HTTP `200` with JSON; queue framework errors are reported via 
 
 | Verb | Query | Body | Purpose |
 |---|---|---|---|
-| `GET` | – | – | statistics (`statsTotal`, `statsPerMethod`, `processors`) |
-| `GET` | `processor=<name>&dequeue=<filter>` | – | allocate the next entry |
+| `GET` | – | – | statistics (`statsTotal`, `statsPerMethod`, `processors` incl. `active`/`capacity`/`lastActivity`; indented JSON for browser viewing) |
+| `GET` | `processor=<name>&dequeue=<filter>[&capacity=<n>]` | – | allocate the next entry |
 | `PUT` | `processor&requestId&pollingSalt&pollingHash` | callback invocations (optional) | heartbeat / first `PUT` = confirmation |
 | `DELETE` | `processor&requestId&pollingSalt&pollingHash` | – | return the entry / confirm a requested cancellation |
-| `POST` | `processor&requestId&pollingSalt&pollingHash` | `{ "response": {...}, "dequeueNext": "*" }` | deliver the final response (optionally dequeue the next job) |
+| `POST` | `processor&requestId&pollingSalt&pollingHash[&capacity=<n>]` | `{ "response": {...}, "dequeueNext": "*" }` | deliver the final response (optionally dequeue the next job) |
 
 `dequeue` filter: `*` (any), `m1,m2` (whitelist), `!m1,!m2` (blacklist); mixing is rejected. Method names are transport-level names.
+
+`capacity` (optional, on dequeue `GET` and completion `POST`) is the maximum number of parallel jobs of the processor (`QueueProcessor` sends its `maxParallelTasks`). The server stores the value of the latest dequeue/completion per processor and reports it in the statistics (`-1` if not supplied, missing or invalid values are ignored). Together with `active` it allows a server-side utilization (`active / capacity`) to be calculated.
 
 ### 4.1 Lifecycle of an entry
 
@@ -148,6 +150,19 @@ All responses are HTTP `200` with JSON; queue framework errors are reported via 
 - **Heartbeats** renew the lease, deliver buffered callback invocations, and return `cancellationRequested` when the caller cancelled.
 - **Polling authentication** reuses the long-running algorithm: `pollingHash = Base64Url(SHA-256(UTF-8(pollingSecret + pollingSalt)))`; the `pollingSecret` is issued per allocation.
 - `processor` is purely informational, never a security identity.
+
+### 4.3 Processor names
+
+The name of a processor must be **stable** and should be given explicitly (`QueueProcessor` constructor parameter `processorName`).
+
+| Part | Rule | Example |
+|---|---|---|
+| before the first `#` | **constant** name of an agent installation (survives restarts) | `PrintAgent/Berlin-01` |
+| after the first `#` | free instance discriminators (timestamps, sequence numbers, process ids, ...) | `#4711`, `#03-14#08-15-00` |
+
+If no name is given, `<MachineName>/<ContractName>#MM-dd#HH-mm-ss` (local start time) is generated.
+
+**Server-side cleanup (recommendation, implemented by `UjmwInMemoryQueuingService`):** the knowledge of a processor instance is removed after one day without activity (`StaleProcessorRetentionSec`) – but only if at least one other instance with the **same agent name** is alive (`ProcessorAliveSec`) and the stale instance holds no entries. Agents which are simply offline therefore stay visible in the statistics.
 
 ### 4.2 Dequeue response
 
@@ -177,6 +192,8 @@ All responses are HTTP `200` with JSON; queue framework errors are reported via 
 | `LeaseLossTimeoutSec` | `60` | max gap between heartbeats before lease-loss handling |
 | `SynchronousCallTimeoutSec` | `100` | max wait for methods **without** `CancellationToken` |
 | `AllowAnonymousInfo` | `false` | anonymous access to the statistics endpoint |
+| `StaleProcessorRetentionSec` | `86400` | inactivity after which a processor instance is forgotten (only if the same agent has an alive instance) |
+| `ProcessorAliveSec` | `60` | max. inactivity of an instance that counts as alive |
 | `RedeliveryPolicy` | `null` (no redelivery) | decides about redelivery after a lost lease |
 | `LongRunningOptions` | `UjmwHostConfiguration.LongRunningOptions` | callback buffer and outcome retention |
 
@@ -188,6 +205,7 @@ All responses are HTTP `200` with JSON; queue framework errors are reported via 
 | constructor `methodWhitelist` / `methodBlacklist` | `null` | C# method names (all overloads) |
 | constructor `hardShutdown` | none | triggers `Kill(false)` when cancelled |
 | constructor `queueName` | `null` | resolved controller route; only needed in-process when a contract is registered more than once |
+| constructor `processorName` | generated | stable processor name (`<agent>#<discriminators>`, see 4.3) |
 | `Start(pollingIntervalSec)` | `2` | regular idle polling interval |
 | `IncreasePollRateForSecs` | `20` | duration of the increased poll rate after the queue ran empty |
 | `IncreasedPollRateMs` | `500` | poll interval while the increased poll rate is active |

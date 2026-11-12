@@ -32,6 +32,8 @@ namespace System.Web.UJMW {
     private int _LeaseLossTimeoutSec = 60;
     private int _SynchronousCallTimeoutSec = 100;
     private bool _AllowAnonymousInfo = false;
+    private int _StaleProcessorRetentionSec = 86400;
+    private int _ProcessorAliveSec = 60;
     private UjmwQueueRedeliveryPolicy _RedeliveryPolicy = null;
     private UjmwLongRunningOptions _LongRunningOptions = null;
 
@@ -104,6 +106,32 @@ namespace System.Web.UJMW {
       }
       set {
         _AllowAnonymousInfo = value;
+      }
+    }
+
+    /// <summary>
+    /// The server-side knowledge of a processor instance (statistics) is removed after this time without activity -
+    /// but only if at least one other instance with the same agent name (part before the first '#') is alive.
+    /// Default: 86400 (1 day).
+    /// </summary>
+    public int StaleProcessorRetentionSec {
+      get {
+        return _StaleProcessorRetentionSec;
+      }
+      set {
+        _StaleProcessorRetentionSec = value;
+      }
+    }
+
+    /// <summary>
+    /// A processor instance counts as alive if its latest activity is not older than this time. Default: 60.
+    /// </summary>
+    public int ProcessorAliveSec {
+      get {
+        return _ProcessorAliveSec;
+      }
+      set {
+        _ProcessorAliveSec = value;
       }
     }
 

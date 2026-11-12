@@ -206,9 +206,9 @@ namespace System.Web.UJMW {
         return _Inner.GetInfo(contractType, queueName);
       }
 
-      public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter) {
+      public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter, int capacity) {
         Interlocked.Increment(ref _DequeueCount);
-        return _Inner.Dequeue(contractType, queueName, processorId, methodFilter);
+        return _Inner.Dequeue(contractType, queueName, processorId, methodFilter, capacity);
       }
 
       public UjmwQueueHeartbeatResult Heartbeat(
@@ -224,14 +224,14 @@ namespace System.Web.UJMW {
 
       public UjmwQueueLease Complete(
         Type contractType, string queueName, string processorId, string requestId, string pollingSalt, string pollingHash,
-        string responseJson, UjmwQueueMethodFilter dequeueNext
+        string responseJson, UjmwQueueMethodFilter dequeueNext, int capacity
       ) {
 
         if (dequeueNext != null) {
           Interlocked.Increment(ref _CompleteWithDequeueNextCount);
         }
 
-        return _Inner.Complete(contractType, queueName, processorId, requestId, pollingSalt, pollingHash, responseJson, dequeueNext);
+        return _Inner.Complete(contractType, queueName, processorId, requestId, pollingSalt, pollingHash, responseJson, dequeueNext, capacity);
       }
 
     }

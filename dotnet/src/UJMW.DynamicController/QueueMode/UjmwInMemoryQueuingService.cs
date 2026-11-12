@@ -285,6 +285,15 @@ namespace System.Web.UJMW {
 
         }
 
+        foreach (KeyValuePair<string, int> capacity in queue.ProcessorCapacity) {
+
+          UjmwQueueProcessorInfo processorInfo;
+          if (info.Processors.TryGetValue(capacity.Key, out processorInfo)) {
+            processorInfo.Capacity = capacity.Value;
+          }
+
+        }
+
         foreach (Termination termination in queue.Terminations) {
 
           TimeSpan age = now - termination.Time;
@@ -303,7 +312,7 @@ namespace System.Web.UJMW {
     /// <summary>
     /// Allocates the next matching entry for the given processor (must be confirmed by a first heartbeat).
     /// </summary>
-    public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter) {
+    public UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter, int capacity) {
 
       DateTime now = _UtcNowGetter.Invoke();
 
@@ -318,6 +327,8 @@ namespace System.Web.UJMW {
         }
 
         this.Housekeeping(now);
+
+        this.StoreProcessorCapacity(queue, processorId, capacity);
 
         return this.AllocateNext(queue, processorId, methodFilter, now);
       }
@@ -431,7 +442,7 @@ namespace System.Web.UJMW {
     /// </summary>
     public UjmwQueueLease Complete(
       Type contractType, string queueName, string processorId, string requestId, string pollingSalt, string pollingHash,
-      string responseJson, UjmwQueueMethodFilter dequeueNext
+      string responseJson, UjmwQueueMethodFilter dequeueNext, int capacity
     ) {
 
       DateTime now = _UtcNowGetter.Invoke();
@@ -454,6 +465,7 @@ namespace System.Web.UJMW {
         }
 
         this.TouchProcessor(entry.Queue, processorId, now);
+        this.StoreProcessorCapacity(entry.Queue, processorId, capacity);
 
         int execState = UjmwAsyncProtocol._ExecStateCompleted;
         if (HasBusinessFault(responseJson)) {
@@ -606,6 +618,54 @@ namespace System.Web.UJMW {
 
       foreach (QueueState queue in _Queues.Values) {
         queue.Terminations.RemoveAll((termination) => (now - termination.Time) > _StatsWindow);
+        this.RemoveStaleProcessors(queue, now);
+      }
+
+    }
+
+    /// <summary>
+    /// Removes processor instances without activity for 'StaleProcessorRetentionSec', but only if another instance
+    /// with the same agent name (part before the first '#') is alive and the stale instance holds no entries.
+    /// Must be called within a lock on '_SyncRoot'.
+    /// </summary>
+    private void RemoveStaleProcessors(QueueState queue, DateTime now) {
+
+      if (queue.ProcessorActivity.Count < 2) {
+        return;
+      }
+
+      HashSet<string> aliveAgents = new HashSet<string>(StringComparer.Ordinal);
+      List<string> staleProcessors = new List<string>();
+
+      foreach (KeyValuePair<string, DateTime> processor in queue.ProcessorActivity) {
+
+        double idleSeconds = (now - processor.Value).TotalSeconds;
+
+        if (idleSeconds <= _Options.ProcessorAliveSec) {
+          aliveAgents.Add(UjmwQueueProtocol.GetAgentName(processor.Key));
+        }
+        else if (idleSeconds > _Options.StaleProcessorRetentionSec) {
+          staleProcessors.Add(processor.Key);
+        }
+
+      }
+
+      foreach (string processorId in staleProcessors) {
+
+        if (!aliveAgents.Contains(UjmwQueueProtocol.GetAgentName(processorId))) {
+          continue;
+        }
+
+        bool holdsEntries = _Entries.Values.Any((entry) => (
+          entry.Queue == queue && entry.ProcessorId == processorId &&
+          (entry.Phase == EntryPhase.Allocated || entry.Phase == EntryPhase.Leased)
+        ));
+        if (holdsEntries) {
+          continue;
+        }
+
+        queue.ProcessorActivity.Remove(processorId);
+        queue.ProcessorCapacity.Remove(processorId);
       }
 
     }
@@ -938,6 +998,24 @@ namespace System.Web.UJMW {
 
     }
 
+    /// <summary>
+    /// Stores the capacity reported with the latest dequeue / completion (-1 if it was not supplied).
+    /// Must be called within a lock on '_SyncRoot'.
+    /// </summary>
+    private void StoreProcessorCapacity(QueueState queue, string processorId, int capacity) {
+
+      if (string.IsNullOrWhiteSpace(processorId)) {
+        return;
+      }
+
+      if (capacity < 1) {
+        capacity = UjmwQueueProtocol.UnknownCapacity;
+      }
+
+      queue.ProcessorCapacity[processorId] = capacity;
+
+    }
+
     private UjmwQueueStats GetStats(UjmwQueueInfo info, string methodName) {
 
       UjmwQueueStats stats;
@@ -1047,6 +1125,7 @@ namespace System.Web.UJMW {
       public readonly List<Entry> Waiting = new List<Entry>();
       public readonly List<Termination> Terminations = new List<Termination>();
       public readonly Dictionary<string, DateTime> ProcessorActivity = new Dictionary<string, DateTime>();
+      public readonly Dictionary<string, int> ProcessorCapacity = new Dictionary<string, int>();
 
     }
 

@@ -387,7 +387,9 @@ namespace Security {
       IUjmwQueuingService queuingService = serviceProvider.GetRequiredService<IUjmwQueuingService>();
 
       QueueProcessor<ILongRunningDemoService> processor = new QueueProcessor<ILongRunningDemoService>(
-        new LongRunningDemoService(), queuingService, 2, null, null, default(System.Threading.CancellationToken), _QueuedLongRunningDemoRoute
+        new LongRunningDemoService(), queuingService, 2, null, null, default(System.Threading.CancellationToken), _QueuedLongRunningDemoRoute,
+        //constant agent name before the first '#', instance discriminator(s) after it
+        "UJMW.Demo/InProcessProcessor#" + Environment.ProcessId.ToString()
       );
 
       //poll increasing: burst while slots are free, no dequeues while all slots are busy,

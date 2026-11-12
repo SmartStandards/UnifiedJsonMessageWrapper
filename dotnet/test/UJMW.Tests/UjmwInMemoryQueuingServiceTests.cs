@@ -81,7 +81,7 @@ namespace System.Web.UJMW {
       string hash;
       Auth(lease.PollingSecret, out salt, out hash);
 
-      return service.Complete(typeof(IQueueContract), _Queue, "worker", lease.RequestId, salt, hash, responseJson, next);
+      return service.Complete(typeof(IQueueContract), _Queue, "worker", lease.RequestId, salt, hash, responseJson, next, -1);
     }
 
     private static UjmwQueueLease Dequeue(UjmwInMemoryQueuingService service, UjmwQueueMethodFilter filter = null) {
@@ -90,7 +90,7 @@ namespace System.Web.UJMW {
         filter = UjmwQueueMethodFilter.All;
       }
 
-      return service.Dequeue(typeof(IQueueContract), _Queue, "worker", filter);
+      return service.Dequeue(typeof(IQueueContract), _Queue, "worker", filter, -1);
     }
 
     private static UjmwQueueTicket Enqueue(UjmwInMemoryQueuingService service, string methodName, string requestJson = "{}") {
@@ -524,6 +524,92 @@ namespace System.Web.UJMW {
       service.TryRequestCancel(typeof(IQueueContract), _Queue, ticket.EntryId, salt, hash, TimeSpan.Zero, out state);
 
       Assert.IsFalse(Heartbeat(service, lease).CancellationRequested);
+
+    }
+
+    private static void Poll(UjmwInMemoryQueuingService service, string processorId) {
+      service.Dequeue(typeof(IQueueContract), _Queue, processorId, UjmwQueueMethodFilter.All, -1);
+    }
+
+    [TestMethod]
+    public void ProcessorCapacity_IsStoredInStats_AndMinusOneIfNotSupplied() {
+
+      UjmwInMemoryQueuingService service = this.CreateService();
+
+      service.Dequeue(typeof(IQueueContract), _Queue, "withCapacity", UjmwQueueMethodFilter.All, 4);
+      service.Dequeue(typeof(IQueueContract), _Queue, "withoutCapacity", UjmwQueueMethodFilter.All, -1);
+
+      UjmwQueueInfo info = service.GetInfo(typeof(IQueueContract), _Queue);
+
+      Assert.AreEqual(4, info.Processors["withCapacity"].Capacity);
+      Assert.AreEqual(-1, info.Processors["withoutCapacity"].Capacity);
+
+      string json = UjmwQueueWire.SerializeInfo(info);
+      Assert.IsTrue(json.Contains("\n"), "the stats JSON should be indented");
+
+      UjmwQueueInfo parsed = UjmwQueueWire.ParseInfo(json);
+      Assert.AreEqual(4, parsed.Processors["withCapacity"].Capacity);
+      Assert.AreEqual(-1, parsed.Processors["withoutCapacity"].Capacity);
+
+    }
+
+    [TestMethod]
+    public void ProcessorCapacity_ParseIgnoresInvalidValues() {
+
+      Assert.AreEqual(-1, UjmwQueueProtocol.ParseCapacity(null));
+      Assert.AreEqual(-1, UjmwQueueProtocol.ParseCapacity("abc"));
+      Assert.AreEqual(-1, UjmwQueueProtocol.ParseCapacity("0"));
+      Assert.AreEqual(3, UjmwQueueProtocol.ParseCapacity("3"));
+
+    }
+
+    [TestMethod]
+    public void StaleProcessor_IsRemovedAfterOneDay_IfSameAgentHasAliveInstance() {
+
+      UjmwInMemoryQueuingService service = this.CreateService();
+
+      Poll(service, "agentA#01-01#10-00-00");
+      Poll(service, "agentB#01-01#10-00-00");
+
+      _Now = _Now.AddDays(1).AddMinutes(1);
+
+      Poll(service, "agentA#01-02#10-01-00");
+
+      UjmwQueueInfo info = service.GetInfo(typeof(IQueueContract), _Queue);
+
+      Assert.IsFalse(info.Processors.ContainsKey("agentA#01-01#10-00-00"));
+      Assert.IsTrue(info.Processors.ContainsKey("agentA#01-02#10-01-00"));
+
+      //no alive instance of 'agentB' - the knowledge is kept
+      Assert.IsTrue(info.Processors.ContainsKey("agentB#01-01#10-00-00"));
+
+    }
+
+    [TestMethod]
+    public void StaleProcessor_IsKept_IfSameAgentInstanceIsNotAlive() {
+
+      UjmwInMemoryQueuingService service = this.CreateService();
+
+      Poll(service, "agentA#old");
+      _Now = _Now.AddDays(1);
+      Poll(service, "agentA#new");
+      _Now = _Now.AddMinutes(5);
+
+      UjmwQueueInfo info = service.GetInfo(typeof(IQueueContract), _Queue);
+
+      Assert.IsTrue(info.Processors.ContainsKey("agentA#old"));
+      Assert.IsTrue(info.Processors.ContainsKey("agentA#new"));
+
+    }
+
+    [TestMethod]
+    public void ProcessorName_Convention_AgentNameAndGeneratedName() {
+
+      Assert.AreEqual("host/IFoo", UjmwQueueProtocol.GetAgentName("host/IFoo#03-14#08-15-00"));
+      Assert.AreEqual("plain", UjmwQueueProtocol.GetAgentName("plain"));
+
+      string generated = UjmwQueueProtocol.GenerateProcessorName("host/IFoo");
+      StringAssert.Matches(generated, new Text.RegularExpressions.Regex(@"^host/IFoo#\d{2}-\d{2}#\d{2}-\d{2}-\d{2}$"));
 
     }
 

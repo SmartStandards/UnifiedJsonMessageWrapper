@@ -19,8 +19,10 @@ namespace System.Web.UJMW {
     /// Allocates the next matching entry for the given processor. The allocation must be confirmed
     /// by a first heartbeat within the dequeue confirmation timeout, otherwise it is withdrawn.
     /// Returns an empty lease (RequestId == null) if no matching entry is available.
+    /// 'capacity' is the (optional) maximum number of parallel jobs of the processor (-1 = unknown),
+    /// which allows the server to calculate the utilization.
     /// </summary>
-    UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter);
+    UjmwQueueLease Dequeue(Type contractType, string queueName, string processorId, UjmwQueueMethodFilter methodFilter, int capacity);
 
     /// <summary>
     /// Heartbeat of a leased entry. Delivers buffered callback invocations (JSON, UJMW callback wire format)
@@ -41,10 +43,11 @@ namespace System.Web.UJMW {
     /// If 'dequeueNext' is not null, the next matching entry is allocated in the same round-trip.
     /// The returned lease is never null: it is empty (RequestId == null) if no next entry was requested or available
     /// and carries a 'Fault' if the completion itself was rejected.
+    /// 'capacity' is the (optional) maximum number of parallel jobs of the processor (-1 = unknown).
     /// </summary>
     UjmwQueueLease Complete(
       Type contractType, string queueName, string processorId, string requestId, string pollingSalt, string pollingHash,
-      string responseJson, UjmwQueueMethodFilter dequeueNext
+      string responseJson, UjmwQueueMethodFilter dequeueNext, int capacity
     );
 
   }

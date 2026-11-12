@@ -72,7 +72,8 @@ namespace System.Web.UJMW {
     [HttpGet]
     public IActionResult GetInfoOrDequeue(
       [FromQuery(Name = UjmwQueueProtocol.ProcessorQueryParam)] string processor,
-      [FromQuery(Name = UjmwQueueProtocol.DequeueQueryParam)] string dequeue
+      [FromQuery(Name = UjmwQueueProtocol.DequeueQueryParam)] string dequeue,
+      [FromQuery(Name = UjmwQueueProtocol.CapacityQueryParam)] string capacity
     ) {
 
       if (string.IsNullOrWhiteSpace(dequeue)) {
@@ -88,7 +89,7 @@ namespace System.Web.UJMW {
         return this.JsonResponse(UjmwQueueWire.SerializeLease(rejected));
       }
 
-      UjmwQueueLease lease = _QueuingService.Dequeue(_ContractType, _QueueName, processor, filter);
+      UjmwQueueLease lease = _QueuingService.Dequeue(_ContractType, _QueueName, processor, filter, UjmwQueueProtocol.ParseCapacity(capacity));
 
       return this.JsonResponse(UjmwQueueWire.SerializeLease(lease));
     }
@@ -140,7 +141,8 @@ namespace System.Web.UJMW {
       [FromQuery(Name = UjmwQueueProtocol.ProcessorQueryParam)] string processor,
       [FromQuery(Name = UjmwQueueProtocol.RequestIdQueryParam)] string requestId,
       [FromQuery(Name = UjmwQueueProtocol.PollingSaltQueryParam)] string pollingSalt,
-      [FromQuery(Name = UjmwQueueProtocol.PollingHashQueryParam)] string pollingHash
+      [FromQuery(Name = UjmwQueueProtocol.PollingHashQueryParam)] string pollingHash,
+      [FromQuery(Name = UjmwQueueProtocol.CapacityQueryParam)] string capacity
     ) {
 
       string responseJson;
@@ -154,7 +156,8 @@ namespace System.Web.UJMW {
       }
 
       UjmwQueueLease lease = _QueuingService.Complete(
-        _ContractType, _QueueName, processor, requestId, pollingSalt, pollingHash, responseJson, dequeueNext
+        _ContractType, _QueueName, processor, requestId, pollingSalt, pollingHash, responseJson, dequeueNext,
+        UjmwQueueProtocol.ParseCapacity(capacity)
       );
 
       return this.JsonResponse(UjmwQueueWire.SerializeCompletionResult(lease, dequeueNext != null));

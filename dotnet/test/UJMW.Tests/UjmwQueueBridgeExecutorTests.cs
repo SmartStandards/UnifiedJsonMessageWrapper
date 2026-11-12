@@ -53,7 +53,7 @@ namespace System.Web.UJMW {
 
       while (DateTime.UtcNow < deadline) {
 
-        UjmwQueueLease lease = service.Dequeue(typeof(IBridgeProbe), _Queue, "worker", UjmwQueueMethodFilter.All);
+        UjmwQueueLease lease = service.Dequeue(typeof(IBridgeProbe), _Queue, "worker", UjmwQueueMethodFilter.All, -1);
         if (lease.HasEntry) {
           return lease;
         }
@@ -80,7 +80,7 @@ namespace System.Web.UJMW {
       string hash;
       Auth(lease.PollingSecret, out salt, out hash);
 
-      UjmwQueueLease result = service.Complete(typeof(IBridgeProbe), _Queue, "worker", lease.RequestId, salt, hash, responseJson, null);
+      UjmwQueueLease result = service.Complete(typeof(IBridgeProbe), _Queue, "worker", lease.RequestId, salt, hash, responseJson, null, -1);
       Assert.IsNull(result.Fault);
 
     }

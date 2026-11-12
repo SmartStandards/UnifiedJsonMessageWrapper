@@ -55,10 +55,16 @@ namespace System.Web.UJMW {
     /// <param name="methodBlacklist">null = nothing excluded, otherwise the listed C# method names are excluded.</param>
     /// <param name="hardShutdown">Triggers 'Kill(false)' when cancelled.</param>
     /// <param name="queueName">The resolved controller route (only needed for in-process queues with several routes per contract).</param>
+    /// <param name="processorName">
+    /// Name of the processor (recommended to be given explicitly). Convention: everything before the first '#' is the
+    /// CONSTANT name of an agent installation, everything after it is free for instance discriminators (timestamps,
+    /// sequence numbers, process ids, ...). If null, '&lt;MachineName&gt;/&lt;ContractName&gt;#MM-dd#HH-mm-ss' is generated.
+    /// </param>
     public QueueProcessor(
       TService innerService, IUjmwQueue queue, int maxParallelTasks = 1,
       string[] methodWhitelist = null, string[] methodBlacklist = null,
-      CancellationToken hardShutdown = default(CancellationToken), string queueName = null
+      CancellationToken hardShutdown = default(CancellationToken), string queueName = null,
+      string processorName = null
     ) {
 
       if (innerService == null) {
@@ -84,7 +90,15 @@ namespace System.Web.UJMW {
       _MaxParallelTasks = maxParallelTasks;
       _Dispatcher = new UjmwQueueJsonDispatcher(typeof(TService));
       _MethodFilter = this.BuildFilter(methodWhitelist, methodBlacklist);
-      _ProcessorId = Environment.MachineName + "/" + typeof(TService).Name + "/" + Guid.NewGuid().ToString("N").Substring(0, 6);
+      if (processorName != null && (string.IsNullOrWhiteSpace(processorName) || processorName.StartsWith(UjmwQueueProtocol.InstanceDiscriminatorSeparator))) {
+        throw new ArgumentException("The processor name must not be empty and must start with a constant agent name (before the first '#').", nameof(processorName));
+      }
+
+      if (processorName == null) {
+        processorName = UjmwQueueProtocol.GenerateProcessorName(Environment.MachineName + "/" + typeof(TService).Name);
+      }
+
+      _ProcessorId = processorName;
 
       if (hardShutdown.CanBeCanceled) {
         _HardShutdownRegistration = hardShutdown.Register(() => this.Kill(false));
@@ -222,7 +236,7 @@ namespace System.Web.UJMW {
 
         UjmwQueueLease lease;
         try {
-          lease = _Queue.Dequeue(typeof(TService), _QueueName, _ProcessorId, _MethodFilter);
+          lease = _Queue.Dequeue(typeof(TService), _QueueName, _ProcessorId, _MethodFilter, _MaxParallelTasks);
         }
         catch (Exception ex) {
           DevLogger.LogError(ex);
@@ -651,7 +665,7 @@ namespace System.Web.UJMW {
           CreateAuth(job.Lease.PollingSecret, out salt, out hash);
 
           UjmwQueueLease next = _Queue.Complete(
-            typeof(TService), _QueueName, _ProcessorId, job.Lease.RequestId, salt, hash, responseJson, dequeueNext
+            typeof(TService), _QueueName, _ProcessorId, job.Lease.RequestId, salt, hash, responseJson, dequeueNext, _MaxParallelTasks
           );
 
           if (next != null && next.Fault != null) {

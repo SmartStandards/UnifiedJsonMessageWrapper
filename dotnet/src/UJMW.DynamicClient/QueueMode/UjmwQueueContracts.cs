@@ -519,7 +519,21 @@ namespace System.Web.UJMW {
   public class UjmwQueueProcessorInfo {
 
     private int _Active = 0;
+    private int _Capacity = -1;
     private DateTime _LastActivity = DateTime.MinValue;
+
+    /// <summary>
+    /// Maximum number of parallel jobs reported by the processor (-1 = unknown).
+    /// Together with 'Active' the utilization can be calculated.
+    /// </summary>
+    public int Capacity {
+      get {
+        return _Capacity;
+      }
+      set {
+        _Capacity = value;
+      }
+    }
 
     /// <summary>
     /// Entries currently allocated / leased by this processor.

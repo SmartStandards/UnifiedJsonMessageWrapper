@@ -28,6 +28,67 @@ namespace System.Web.UJMW {
     public const string PollingHashQueryParam = "pollingHash";
 
     /// <summary>
+    /// Optional query parameter of the dequeue GET and the completion POST: the maximum number of parallel jobs
+    /// of the processor (allows the server to calculate the utilization together with the active jobs).
+    /// </summary>
+    public const string CapacityQueryParam = "capacity";
+
+    /// <summary>
+    /// Value for an unknown processor capacity.
+    /// </summary>
+    public const int UnknownCapacity = -1;
+
+    /// <summary>
+    /// Parses the optional 'capacity' query value (missing, ill-typed or non-positive values are ignored = -1).
+    /// </summary>
+    public static int ParseCapacity(string rawValue) {
+
+      int capacity;
+      if (!int.TryParse(rawValue, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out capacity)) {
+        return UnknownCapacity;
+      }
+
+      if (capacity < 1) {
+        return UnknownCapacity;
+      }
+
+      return capacity;
+    }
+
+    /// <summary>
+    /// Separator within processor names: everything before the first '#' is the constant name of an agent installation,
+    /// everything after it is free for instance discriminators (timestamps, sequence numbers, process ids, ...).
+    /// </summary>
+    public const string InstanceDiscriminatorSeparator = "#";
+
+    /// <summary>
+    /// Returns the constant agent name of a processor name (the part before the first '#').
+    /// </summary>
+    public static string GetAgentName(string processorName) {
+
+      if (processorName == null) {
+        return null;
+      }
+
+      int separatorIndex = processorName.IndexOf(InstanceDiscriminatorSeparator, StringComparison.Ordinal);
+      if (separatorIndex < 0) {
+        return processorName;
+      }
+
+      return processorName.Substring(0, separatorIndex);
+    }
+
+    /// <summary>
+    /// Generates a processor name following the convention '&lt;agentName&gt;#MM-dd#HH-mm-ss' (local start time as discriminator).
+    /// </summary>
+    public static string GenerateProcessorName(string agentName) {
+
+      DateTime startTime = DateTime.Now;
+
+      return agentName + InstanceDiscriminatorSeparator + startTime.ToString("MM-dd") + InstanceDiscriminatorSeparator + startTime.ToString("HH-mm-ss");
+    }
+
+    /// <summary>
     /// Maximum number of explicit releases (the next release terminates the entry).
     /// </summary>
     public const int MaxReleases = 10;

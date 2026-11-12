@@ -76,7 +76,7 @@ namespace System.Web.UJMW {
       executor.NextResponse =
         "{ \"statsTotal\": { \"queued\": 3, \"active\": 1, \"past1m\": 2, \"past10m\": 2, \"past1h\": 2, \"past10h\": 2 }," +
         "  \"statsPerMethod\": { \"Square\": { \"queued\": 3, \"active\": 1 } }," +
-        "  \"processors\": { \"p1\": { \"active\": 1, \"lastActivity\": \"2025-01-01T12:00:00Z\" } }, \"fault\": null }";
+        "  \"processors\": { \"p1\": { \"active\": 1, \"capacity\": 4, \"lastActivity\": \"2025-01-01T12:00:00Z\" }, \"p2\": { \"active\": 0 } }, \"fault\": null }";
 
       UjmwQueueInfo info = CreateClient(executor).GetInfo(typeof(IRemoteWorker), null);
 
@@ -87,6 +87,8 @@ namespace System.Web.UJMW {
       Assert.AreEqual(2, info.StatsTotal.Past10h);
       Assert.AreEqual(1, info.StatsPerMethod["Square"].Active);
       Assert.AreEqual(1, info.Processors["p1"].Active);
+      Assert.AreEqual(4, info.Processors["p1"].Capacity);
+      Assert.AreEqual(-1, info.Processors["p2"].Capacity);
       Assert.AreEqual(new DateTime(2025, 1, 1, 12, 0, 0, DateTimeKind.Utc), info.Processors["p1"].LastActivity);
       Assert.IsNull(info.Fault);
 
@@ -101,11 +103,11 @@ namespace System.Web.UJMW {
         "  \"pollingSecret\": \"Zt8kQ2xW\", \"heartbeatSec\": 3, \"fault\": null }";
 
       UjmwQueueLease lease = CreateClient(executor).Dequeue(
-        typeof(IRemoteWorker), null, "worker 1", UjmwQueueMethodFilter.Blacklist(new string[] { "A", "B" })
+        typeof(IRemoteWorker), null, "worker 1", UjmwQueueMethodFilter.Blacklist(new string[] { "A", "B" }), 4
       );
 
       Assert.AreEqual("GET", executor.LastMethod);
-      Assert.AreEqual("http://host/api/worker/_queue?processor=worker%201&dequeue=%21A%2C%21B", executor.LastUrl);
+      Assert.AreEqual("http://host/api/worker/_queue?processor=worker%201&dequeue=%21A%2C%21B&capacity=4", executor.LastUrl);
       Assert.IsTrue(lease.HasEntry);
       Assert.AreEqual(5, lease.TotalInQueue);
       Assert.AreEqual("Square", lease.MethodName);
@@ -122,11 +124,12 @@ namespace System.Web.UJMW {
       RecordingExecutor executor = new RecordingExecutor();
       executor.NextResponse = "{ \"totalInQueue\": 0, \"method\": null, \"requestId\": null, \"request\": null, \"pollingSecret\": null, \"heartbeatSec\": 0, \"fault\": null }";
 
-      UjmwQueueLease lease = CreateClient(executor).Dequeue(typeof(IRemoteWorker), null, "p", null);
+      UjmwQueueLease lease = CreateClient(executor).Dequeue(typeof(IRemoteWorker), null, "p", null, -1);
 
       Assert.IsFalse(lease.HasEntry);
       Assert.IsNull(lease.RequestJson);
       Assert.IsTrue(executor.LastUrl.EndsWith("dequeue=%2A"));
+      Assert.IsFalse(executor.LastUrl.Contains("capacity"));
 
     }
 
@@ -179,10 +182,11 @@ namespace System.Web.UJMW {
       executor.NextResponse = "{ \"totalInQueue\": 0, \"method\": \"Square\", \"requestId\": \"77\", \"request\": { \"value\": 2 }, \"pollingSecret\": \"x\", \"heartbeatSec\": 3, \"fault\": null }";
 
       UjmwQueueLease next = CreateClient(executor).Complete(
-        typeof(IRemoteWorker), null, "p", "1", "s", "h", "{\"return\":49,\"fault\":null}", UjmwQueueMethodFilter.All
+        typeof(IRemoteWorker), null, "p", "1", "s", "h", "{\"return\":49,\"fault\":null}", UjmwQueueMethodFilter.All, 2
       );
 
       Assert.AreEqual("POST", executor.LastMethod);
+      Assert.AreEqual("http://host/api/worker/_queue?processor=p&requestId=1&pollingSalt=s&pollingHash=h&capacity=2", executor.LastUrl);
       JObject body = JObject.Parse(executor.LastBody);
       Assert.AreEqual(49, body["response"]["return"].Value<int>());
       Assert.AreEqual("*", body["dequeueNext"].Value<string>());
@@ -196,7 +200,7 @@ namespace System.Web.UJMW {
       RecordingExecutor executor = new RecordingExecutor();
       executor.NextResponse = "{ \"fault\": \"processor lost\" }";
 
-      UjmwQueueLease next = CreateClient(executor).Complete(typeof(IRemoteWorker), null, "p", "1", "s", "h", "{\"return\":1}", null);
+      UjmwQueueLease next = CreateClient(executor).Complete(typeof(IRemoteWorker), null, "p", "1", "s", "h", "{\"return\":1}", null, -1);
 
       Assert.AreEqual(JTokenType.Null, JObject.Parse(executor.LastBody)["dequeueNext"].Type);
       Assert.IsFalse(next.HasEntry);
