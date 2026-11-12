@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
@@ -13,6 +13,15 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\OutgoingRequestSideChannelConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)%28Setup%29\IncommingResponseSideChannelConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\IUjmwQueue.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\QueueProcessor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueContracts.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueJsonDispatcher.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueProtocol.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueBridgeExecutor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueClient.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueSideChannelContext.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueWire.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TypeAliasBuilder.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwAsyncProtocol.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwExtensions.cs" />

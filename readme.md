@@ -237,6 +237,18 @@ public class EntryModule : IHttpModule {
 
 # Documentation
 
+**Start here: [Documentation Guide](doc/README.md)** – the red thread through UJMW and its special features.
+
+Feature guides:
+
+- [Sidechannels](doc/features/sidechannels.md)
+- [Contextualization](doc/features/contextualization.md)
+- [Long-running operations ("Async")](doc/features/long-running-operations.md)
+- [Async queue mode](doc/features/async-queue-mode.md)
+- [Test Client](doc/features/testclient.md)
+
+Reference:
+
 - [Changelog](doc/changelog.md)
 - [Decisions](doc/decisions/)
 - [Epics (future ideas)](doc/epics/)

@@ -43,7 +43,21 @@ namespace System.Web.UJMW {
 
         Type contractType = GetContractTypeFromContext(context);
         MethodInfo calledContractMethod = null;
-        if (context.RouteData.Values.TryGetValue("action", out object actionUntyped)) {
+
+        //queue mode: the hooks receive the queued contract type and the reference method of 'IUjmwQueue' (decided Q-AUTH)
+        UjmwQueueControllerBase queueController = context.Controller as UjmwQueueControllerBase;
+        if (queueController != null) {
+
+          if (queueController.IsAnonymousInfoRequest(context.HttpContext.Request)) {
+            await next();
+            return;
+          }
+
+          contractType = queueController.ContractType;
+          calledContractMethod = queueController.GetTargetQueueMethod(context.HttpContext.Request);
+
+        }
+        else if (context.RouteData.Values.TryGetValue("action", out object actionUntyped)) {
           DynamicUjmwControllerFactory.TryGetContractMethod(
             contractType, (string)actionUntyped, out calledContractMethod
           );

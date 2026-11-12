@@ -17,6 +17,7 @@
     <dependencies>
       <group targetFramework="net8.0">
         <dependency id="Newtonsoft.Json" version="13.0.3" />
+        <dependency id="UJMW.DynamicClient" version="5.7.4-develop" />
         <!--
         <dependency id="Microsoft.AspNetCore" version="2.2.0" />
         <dependency id="Microsoft.AspNetCore.Mvc" version="2.2.0" />
@@ -26,6 +27,7 @@
       </group>
       <group targetFramework="net10.0">
         <dependency id="Newtonsoft.Json" version="13.0.4" />
+        <dependency id="UJMW.DynamicClient" version="5.7.4-develop" />
         <!-- additional packages which are note implicitely provided by 'Microsoft.AspNetCore.App' -->
         <dependency id="SmartStandards.WebApiDependencies.AspNetCore.net10.0" version="10.0.8" />
         <dependency id="Microsoft.AspNetCore.Authentication.Negotiate" version="10.0.8" />

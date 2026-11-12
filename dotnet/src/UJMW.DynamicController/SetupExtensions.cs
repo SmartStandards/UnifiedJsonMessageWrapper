@@ -30,6 +30,10 @@ namespace System.Web.UJMW {
         services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, UjmwOperationStoreHostedService>();
       }
 
+      if (registrar.HasQueueEntries) {
+        UjmwQueueSetup.RegisterQueueServices(services);
+      }
+
     }
 
     internal static bool TryGetValue(this IHeaderDictionary headers, string headerName, out string headerValue) {

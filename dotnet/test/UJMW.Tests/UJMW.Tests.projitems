@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientFactoryTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientLongRunningTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueProcessorTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwAsyncProtocolTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LongRunningOperationStoreTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LongRunningEndToEndTests.cs" />
@@ -19,5 +20,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicClientTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UjmwHostConfigurationTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MockReadOnlyUjmwManagedInfrastructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwInMemoryQueuingServiceTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwQueueBridgeExecutorTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwQueueClientTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UjmwQueueJsonDispatcherTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueModeEndToEndTests.cs" />
   </ItemGroup>
 </Project>

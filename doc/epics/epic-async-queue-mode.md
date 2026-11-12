@@ -1,6 +1,6 @@
 # Epic: UJMW Async Queue Mode (Pull-Based Processing via `_queue`)
 
-**Status:** Concept validated, all open questions and operational policies decided (not yet an active requirement)  
+**Status:** Implemented (phase 1: in-memory queuing service, `_queue` endpoint, `QueueProcessor<T>`, remote `UjmwQueueClient`; covered by MSTest incl. HTTP end-to-end tests; demo route `QueuedLongRunningDemo` in `UJMW.DemoWebService.net10.0`)  
 **Scope:** ASP.NET Core hosting (`UJMW.DynamicController`), the .NET dynamic client (`UJMW.DynamicClient`), a new processor-side runtime (`QueueProcessor<T>`), Swagger. **WCF is explicitly out of scope.**  
 **Builds on:** [Epic: Long-Running Operations](epic-long-running-operations.md), [Decision: HTTP verbs for execution control](../decisions/decision-http-verbs-for-execution-control.md)
 
@@ -424,6 +424,7 @@ Late confirmation (allocation already withdrawn, see 5.2):
 | Queue capacity (Q-CAP) | `UjmwQueueOptions.MaxQueueSize` | `1000` | When the queue is full, the enqueue is rejected **immediately**; the caller receives the fault `Queue capacity exceeded` (no waiting, no blocking) |
 | Selection order (Q-FIFO) | – | – | one FIFO queue across all methods; the dequeue takes the front-most entry matching the filter |
 | Idle polling (Q-TIMING) | `QueueProcessor<T>.Start(pollingIntervalSec)` | `2` s | interval of dequeue polls while the processor is idle / the queue is empty |
+| Poll increasing (Q-POLLINC) | `QueueProcessor<T>.IncreasePollRateForSecs` / `IncreasedPollRateMs` | `20` s / `500` ms | burst while slots are free, no dequeues while all slots are busy, increased poll rate after the queue ran empty (see 9.1) |
 | Dequeue confirmation (Q-TIMING) | `UjmwQueueOptions.DequeueConfirmationTimeoutSec` | `2` s | the first `PUT` must arrive within this time, otherwise the allocation is withdrawn |
 | Heartbeat interval (Q-TIMING) | `UjmwQueueOptions.HeartbeatSec` (transported as `heartbeatSec`) | `3` s | interval of the subsequent `PUT` requests (from the second `PUT` on) |
 | Lease loss (Q-TIMING) | `UjmwQueueOptions.LeaseLossTimeoutSec` | `60` s | maximum gap between two `PUT` requests before the server-side lease-loss handling (`RedeliveryPolicy`, see 10) is invoked |
@@ -535,8 +536,10 @@ processor.Start(pollingIntervalSec: 2);
 |---|---|
 | `InnerService` | the real implementation of `T` |
 | `CurrentTasks` | number of currently running jobs |
-| `Start(int pollingIntervalSec = 2)` | starts an internal poller (dequeue whenever a slot is free) |
-(the job sends its heartbeats autonomously) |
+| `Start(int pollingIntervalSec = 2)` | starts an internal poller (regular idle interval; poll increasing see notes) |
+| `Next()` | manual single dequeue (if a slot is free); returns `true` if a job was started (the job sends its heartbeats autonomously) |
+| `IncreasePollRateForSecs` | duration of the increased poll rate (default `20`) |
+| `IncreasedPollRateMs` | poll interval while the increased poll rate is active (default `500`) |
 | `Stop(bool wait = false)` | stops the internal poller; running jobs continue (optionally wait for them) |
 | `Kill(bool wait = true)` | stops the poller, **cancels** the running implementations and returns their entries via `DELETE` in parallel as fast as possible; optionally waits synchronously until all returns are done. Also triggered by `hardShutdown` |
 
@@ -545,7 +548,11 @@ Notes:
 - Sub-services of `T` are **not supported in phase 1** (later iteration, decided Q-SUB).
 - Polling uses **one** request per `_queue` (filter via `dequeue`), not one per method.
 - Every allocation is confirmed with an immediate first `PUT` **before** the implementation is invoked; a rejected confirmation (`Withdrawn - dequeue confirmation missed`) discards the job silently (trace log only).
-- With `maxParallelTasks == 1` (sequential processing) the processor uses `dequeueNext` on completion to save the separate dequeue round-trip.
+- **Poll increasing** (internal poller):
+  1. As long as slots are free, a found entry is followed by an **immediate** next dequeue (burst), until
+     a) all slots are busy – then **no dequeue `GET`s** are sent at all (the heartbeat `PUT`s are sufficient), or
+     b) nothing more is found – then the poll interval is reduced to `IncreasedPollRateMs` for `IncreasePollRateForSecs` before it falls back to `pollingIntervalSec`.
+  2. Every completion requests the next entry via `dequeueNext` (independent of `maxParallelTasks`; the `POST` represents the dequeue `GET`); the slot of the completing job is handed over to the next job. Continues with rule 1 – an empty `dequeueNext` result also starts the increased poll rate (1b).
 - `Kill` must cancel the running implementations; otherwise a returned entry could be executed twice.
 
 #### Method filters (decided, Q-FILTER)
@@ -656,7 +663,7 @@ Not subject to the policy: missed dequeue confirmations (5.2; always redelivered
 | R-23 | Configurable `MaxQueueSize` (default `1000`); a full queue rejects the enqueue immediately with the fault `Queue capacity exceeded` |
 | R-24 | One FIFO queue across all methods; a dequeue takes the front-most entry matching the filter |
 | R-25 | Released entries are reinserted at index 0, 1, 2, 3, 5, 8, 13, 21, 34, 55 (Fibonacci without duplicate 1); the 11th release terminates the entry with the fault `Dequeued and Released 10 Times (Limit)` |
-| R-26 | Processor idle polling `2` s, dequeue confirmation `2` s (both configurable) |
+| R-26 | Processor idle polling `2` s, dequeue confirmation `2` s (both configurable); poll increasing: burst while slots are free, no dequeues while busy, `500` ms for `20` s after the queue ran empty, `dequeueNext` on every completion |
 | R-27 | Callback buffer and outcome retention reuse the definitions / options of the long-running feature |
 | R-28 | A shutdown of the queue host does not cancel running processor jobs |
 | R-29 | Logging via `DevLogger`; the queue-mode implementation uses only the sub-range `72400` – `72499` of the UJMW-wide reserved range `72xxx` (the enum comment may document `72xxx` as UJMW range and `724xx` as queue-mode range); see TODO-LOG in 15 |
@@ -702,6 +709,7 @@ missed dequeue confirmations are always redelivered; explicit `DELETE` returns f
 | Q-REQUEUE | Position of released entries / poison protection | index 0, 1, 2, 3, 5, 8, 13, 21, 34, 55 (Fibonacci without duplicate 1); the 11th release terminates the entry with the fault `Dequeued and Released 10 Times (Limit)` | **decided** |
 | Q-FIFO | Ordering across methods | one FIFO queue across all methods; filters take the front-most matching entry | **decided** |
 | Q-TIMING | Timing defaults | idle poll 2 s, dequeue confirmation 2 s, heartbeat interval 3 s, lease loss after 60 s | **decided** |
+| Q-POLLINC | Poll increasing | burst while slots are free; no `GET` while all slots are busy; `IncreasedPollRateMs` (500) for `IncreasePollRateForSecs` (20) after the queue ran empty; `dequeueNext` on every completion | **decided** |
 | Q-BUF | Callback buffer towards the caller | identical to the long-running feature | **decided** |
 | Q-RET | Outcome retention | identical to the long-running feature | **decided** |
 | Q-PROC | Processor identity | one informational, updatable name; only `requestId` / `pollingSalt` / `pollingHash` authorize | **decided** |

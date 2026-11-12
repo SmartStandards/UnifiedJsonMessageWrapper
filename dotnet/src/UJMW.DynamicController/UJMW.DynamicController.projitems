@@ -19,6 +19,14 @@
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\UJMW.DynamicClient\UjmwAsyncProtocol.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwInMemoryQueuingService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueBridge.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueRegistry.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueControllerBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)QueueMode\UjmwQueueSetup.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerFactory.QueueMode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DynamicUjmwControllerRegistrar.QueueMode.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\AnnouncementTriggerEndpoint.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SelfAnnouncement\EndpointInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\UJMW.DynamicClient\TypeAliasBuilder.cs" />

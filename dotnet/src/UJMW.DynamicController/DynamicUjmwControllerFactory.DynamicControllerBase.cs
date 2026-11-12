@@ -163,6 +163,9 @@ namespace System.Web.UJMW {
 
       protected Func<TServiceInterface> _ServiceInstanceGetter = null;
 
+      private IUjmwOperationStore _OperationStore = null;
+      private bool _IsQueueMode = false;
+
       public DynamicControllerBase(object injectedRootServiceInstance) {
 
         Type myDynamicControllerType = this.GetType();
@@ -180,6 +183,14 @@ namespace System.Web.UJMW {
 
         if (injectedRootServiceInstance == null) {
           throw new Exception($"The dynamic asp controller base requires to get an '{rootType.Name}' injected - but got null!");
+        }
+
+        //queue mode: the root instance is the contract proxy of the bridge (which also provides a dedicated operation store)
+        IUjmwQueueBridge queueBridge = UjmwQueueRegistry.TryGetBridge(myDynamicControllerType, injectedRootServiceInstance);
+        if (queueBridge != null) {
+          injectedRootServiceInstance = queueBridge.ContractProxy;
+          _OperationStore = queueBridge.OperationStore;
+          _IsQueueMode = true;
         }
 
         if (navPath.Length == 0) {
@@ -265,7 +276,8 @@ namespace System.Web.UJMW {
             this.HttpContext.Response.Headers,
             _Options,
             _ContextualArgumentCollector,
-            this.HttpContext.RequestAborted
+            this.HttpContext.RequestAborted,
+            _IsQueueMode
           );
 
           return responseDto;
@@ -298,7 +310,8 @@ namespace System.Web.UJMW {
               this.HttpContext.Response.Headers,
               _Options,
               _ContextualArgumentCollector,
-              this.HttpContext.RequestAborted
+              this.HttpContext.RequestAborted,
+              _IsQueueMode
             );
 
           }
@@ -311,7 +324,9 @@ namespace System.Web.UJMW {
             this.HttpContext.Response.Headers,
             _Options,
             _ContextualArgumentCollector,
-            waitTime
+            waitTime,
+            this.GetOperationStore(),
+            _IsQueueMode
           );
 
         }
@@ -333,7 +348,7 @@ namespace System.Web.UJMW {
         try {
 
           MethodRedirector redirector = GetOrCreateRedirector(methodName, this);
-          IUjmwOperationStore store = UjmwHostConfiguration.OperationStore;
+          IUjmwOperationStore store = this.GetOperationStore();
           string operationScope = this.GetOperationScope(methodName);
 
           UjmwOperationSnapshot snapshot;
@@ -373,6 +388,18 @@ namespace System.Web.UJMW {
       /// </summary>
       private string GetOperationScope(string methodName) {
         return this.GetType().FullName + "." + methodName;
+      }
+
+      /// <summary>
+      /// Queue-mode controllers use the dedicated operation store of their bridge (C-1), all others the global one.
+      /// </summary>
+      private IUjmwOperationStore GetOperationStore() {
+
+        if (_OperationStore != null) {
+          return _OperationStore;
+        }
+
+        return UjmwHostConfiguration.OperationStore;
       }
 
       /// <summary>

@@ -11,7 +11,7 @@ using System.Web.UJMW.SelfAnnouncement;
 
 namespace System.Web.UJMW {
 
-  public sealed class DynamicUjmwControllerRegistrar : IApplicationFeatureProvider<ControllerFeature> {
+  public sealed partial class DynamicUjmwControllerRegistrar : IApplicationFeatureProvider<ControllerFeature> {
 
     internal DynamicUjmwControllerRegistrar() {
     }
@@ -27,6 +27,8 @@ namespace System.Web.UJMW {
       foreach (Tuple<Type, DynamicUjmwControllerOptions> _Entry in _Entries) {
         DynamicUjmwControllerRegistrar.CreateAndRegisterController(feature, _Entry.Item1, _Entry.Item2);
       }
+
+      this.PopulateQueueControllers(feature);
 
       if (_AnnouncementTriggerEndpointRequested) {
 

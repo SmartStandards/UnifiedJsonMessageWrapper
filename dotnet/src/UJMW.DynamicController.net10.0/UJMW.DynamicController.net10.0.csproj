@@ -43,6 +43,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- required by the async queue mode (the queue bridge is a dynamic UJMW client proxy) -->
+    <ProjectReference Include="..\UJMW.DynamicClient.net10.0\UJMW.DynamicClient.net10.0.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
 
     <!-- IMPORTANT: this package is made for the ASP.NET Core ecosystem ONLY -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

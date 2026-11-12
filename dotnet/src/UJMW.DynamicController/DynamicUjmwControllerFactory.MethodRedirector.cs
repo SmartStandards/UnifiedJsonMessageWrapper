@@ -116,18 +116,24 @@ namespace System.Web.UJMW {
           Func<TServiceInterface> svcInstanceGetter, object requestDto,
           IHeaderDictionary requestHeaders, IHeaderDictionary responseHeaders,
           DynamicUjmwControllerOptions options, ContextualArgumentCollectorDelegate contextualArgumentCollector,
-          CancellationToken requestAborted
+          CancellationToken requestAborted, bool forwardInboundSideChannel
         ) {
 
           object responseDto = Activator.CreateInstance(_ResponseDtoType);
           UjmwSynchronousCallbackRecorder callbackRecorder = new UjmwSynchronousCallbackRecorder();
+          IDictionary<string, string> previousForwardedSideChannel = UjmwQueueSideChannelContext.Current;
 
           try {
 
             object[] serviceMethodParams = this.MapRequest(requestDto);
 
-            IDictionary<string, string> dummySideChannelContent;
-            this.RestoreInboundSideChannel(requestDto, requestHeaders, contextualArgumentCollector, out dummySideChannelContent);
+            IDictionary<string, string> processedSideChannelContent;
+            this.RestoreInboundSideChannel(requestDto, requestHeaders, contextualArgumentCollector, out processedSideChannelContent);
+
+            //queue mode: the original inbound snapshot is forwarded unchanged into the queue entry (C-6)
+            if (forwardInboundSideChannel) {
+              UjmwQueueSideChannelContext.Current = processedSideChannelContent;
+            }
 
             IDictionary<string, string> contextualArguments = this.CollectContextualArguments(options, contextualArgumentCollector, requestDto);
 
@@ -138,6 +144,11 @@ namespace System.Web.UJMW {
           }
           catch (Exception ex) {
             this.ApplyFault(responseDto, ex);
+          }
+          finally {
+            if (forwardInboundSideChannel) {
+              UjmwQueueSideChannelContext.Current = previousForwardedSideChannel;
+            }
           }
 
           this.WriteCallbackInvocations(responseDto, callbackRecorder.GetInvocations());
@@ -161,7 +172,7 @@ namespace System.Web.UJMW {
           string operationScope, Func<TServiceInterface> svcInstanceGetter, object requestDto,
           IHeaderDictionary requestHeaders, IHeaderDictionary responseHeaders,
           DynamicUjmwControllerOptions options, ContextualArgumentCollectorDelegate contextualArgumentCollector,
-          TimeSpan wait
+          TimeSpan wait, IUjmwOperationStore operationStore, bool forwardInboundSideChannel
         ) {
 
           object[] serviceMethodParams;
@@ -197,6 +208,12 @@ namespace System.Web.UJMW {
 
             object responseDto = Activator.CreateInstance(_ResponseDtoType);
             bool failed = false;
+            IDictionary<string, string> previousForwardedSideChannel = UjmwQueueSideChannelContext.Current;
+
+            //queue mode: the original inbound snapshot is forwarded unchanged into the queue entry (C-6)
+            if (forwardInboundSideChannel) {
+              UjmwQueueSideChannelContext.Current = sideChannelSnapshot;
+            }
 
             try {
               this.Execute(
@@ -214,13 +231,18 @@ namespace System.Web.UJMW {
               failed = true;
 
             }
+            finally {
+              if (forwardInboundSideChannel) {
+                UjmwQueueSideChannelContext.Current = previousForwardedSideChannel;
+              }
+            }
 
             Dictionary<string, string> backChannelContent = this.CaptureOutgoingBackChannel();
 
             return new UjmwOperationOutcome(new AsyncResult(responseDto, backChannelContent), failed);
           };
 
-          UjmwOperationSnapshot snapshot = UjmwHostConfiguration.OperationStore.Initiate(operationScope, body, wait);
+          UjmwOperationSnapshot snapshot = operationStore.Initiate(operationScope, body, wait);
 
           return this.CreateResponseFromSnapshot(snapshot, responseHeaders);
         }

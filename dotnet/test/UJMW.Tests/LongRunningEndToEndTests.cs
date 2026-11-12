@@ -139,6 +139,17 @@ namespace System.Web.UJMW {
 
     }
 
+    /// <summary>
+    /// Restores the global client configuration after each test (other test classes rely on its default value
+    /// and 'ClassCleanup' may run delayed).
+    /// </summary>
+    [TestCleanup]
+    public void RestoreClientConfiguration() {
+
+      UjmwClientConfiguration.LongRunningWaitSeconds = _OriginalLongRunningWaitSeconds;
+
+    }
+
     [TestMethod]
     public void DynamicClient_LongRunningOperation_PollsAndReplaysCallbacksInOrder() {
 

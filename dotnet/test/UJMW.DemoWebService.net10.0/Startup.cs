@@ -269,6 +269,14 @@ namespace Security {
           ApiGroupName = "LongRunning-Demo"
         });
 
+        //async queue mode: the same contract, but the calls are enqueued and processed by queue processors
+        //(here an in-process processor, see 'Configure') - remote processors can attach via '<route>/_queue'
+        r.AddQueueFor<ILongRunningDemoService>(new DynamicUjmwControllerOptions {
+          ControllerRoute = _QueuedLongRunningDemoRoute,
+          ApiGroupName = "Queue-Demo",
+          EnableAuthHeaderEvaluatorHook = false
+        });
+
         r.AddAnnouncementTriggerEndpoint();
 
       });
@@ -362,8 +370,34 @@ namespace Security {
       );
 
 
+      this.StartQueueDemoProcessor(app.ApplicationServices, lifetimeEvents);
+
       //var ass = AppDomain.CurrentDomain.GetAssemblies().Where((a)=>a.IsDynamic).ToArray();
       //var tps = ass.First().GetTypes();
+    }
+
+    private const string _QueuedLongRunningDemoRoute = "QueuedLongRunningDemo";
+
+    /// <summary>
+    /// Starts an in-process queue processor (2 parallel jobs) for the queue-mode demo endpoint
+    /// and disposes it when the application is stopping.
+    /// </summary>
+    private void StartQueueDemoProcessor(IServiceProvider serviceProvider, IHostApplicationLifetime lifetimeEvents) {
+
+      IUjmwQueuingService queuingService = serviceProvider.GetRequiredService<IUjmwQueuingService>();
+
+      QueueProcessor<ILongRunningDemoService> processor = new QueueProcessor<ILongRunningDemoService>(
+        new LongRunningDemoService(), queuingService, 2, null, null, default(System.Threading.CancellationToken), _QueuedLongRunningDemoRoute
+      );
+
+      //poll increasing: burst while slots are free, no dequeues while all slots are busy,
+      //increased poll rate for a while after the queue ran empty (values = defaults, shown for demonstration)
+      processor.IncreasePollRateForSecs = 20;
+      processor.IncreasedPollRateMs = 500;
+
+      lifetimeEvents.ApplicationStarted.Register(() => processor.Start(0));
+      lifetimeEvents.ApplicationStopping.Register(() => processor.Dispose());
+
     }
 
   }
