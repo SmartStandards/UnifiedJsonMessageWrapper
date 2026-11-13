@@ -542,13 +542,15 @@ namespace System.Web.UJMW {
             }
           }
 
-          if (_InboundSideChannelCfg.AcceptedChannels.Length == 0) {
-            return false;
-          }
+          //====== no channels arrived - lets decide if this is bad or not? ======
 
-          if (!_InboundSideChannelCfg.SkipAllowed) {
+          //if no channels are regitered anyway - it makes no sense to throw if we've got no data...
+          bool offeringAnyChannels = (_InboundSideChannelCfg.AcceptedChannels.Length > 0);
+
+          //when offered, then is the current situation(got no data) only valid where thre is an opt-out (using 'AcceptNoChannelProvided'>SkipAllowed) 
+          if (offeringAnyChannels && !_InboundSideChannelCfg.SkipAllowed) {
             string msg = "Rejected incomming request because of missing side channel";
-            DevLogger.LogWarning(0, 72003, msg);
+            InsLogger.LogWarning(0, 72003, msg);
             throw new Exception(msg);
           }
 
