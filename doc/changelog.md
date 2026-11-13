@@ -9,6 +9,12 @@ This files contains a version history including all changes relevant for semanti
 
 
 
+## v 5.8.1
+released **2026-11-13**, including:
+ - Bugfix: AcceptNoChannelProvided in combination with NO other AllowedSideChannel never called the DefaultsGetter
+
+
+
 ## v 5.8.0
 released **2026-11-10**, including:
  - **new Feature**: alternate AuthHeaderEvaluator with extended params (apiGroupName and additional responseHeaders) + opt-in for per-request trace-message
